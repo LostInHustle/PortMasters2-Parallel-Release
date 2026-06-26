@@ -1,0 +1,135 @@
+// =====================================================================
+// PortMasters 2 Parallel Release: Lords of the Silk Road (Online Edition)
+// Prisma schema covering accounts, sessions, rooms, membership, per
+// player game state, and chat (room wide and one to one messages).
+// =====================================================================
+
+generator client {
+  provider = "prisma-client-js"
+  // A custom, explicit output location instead of node_modules/@prisma/client,
+  // so the import path is stable regardless of where this gets imported from.
+  output   = "../generated/prisma"
+  // Prisma 7's default engine type for this generator is "client": no Rust
+  // query engine binary at all, just the JS client talking through a driver
+  // adapter (see src/lib/db.ts). binaryTargets doesn't apply to that engine
+  // type, so it's intentionally not set here.
+}
+
+// SQLite: a single embedded file, no separate database server to run.
+// Prisma 7 no longer allows a datasource url here; the CLI (migrate, db
+// push, studio) reads DATABASE_URL from prisma.config.ts at the repo
+// root instead, and the app itself connects through the driver adapter
+// in src/lib/db.ts. Both ultimately point at the same DATABASE_URL value,
+// which (per prisma.config.ts) resolves to prisma/dev.db locally. For
+// production, point it at an absolute path on a persistent volume (see
+// docs/deployment.md).
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id           String    @id @default(cuid())
+  username     String    @unique
+  passwordHash String
+  displayName  String
+  avatarHue    Int       @default(180)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  sessions     Session[]
+  memberships  RoomMember[]
+  ownedRooms   Room[]      @relation("RoomHost")
+  gameStates   GameState[]
+  sentMessages Message[]   @relation("MessageSender")
+  recvMessages Message[]   @relation("MessageRecipient")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Room {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  name        String
+  hostId      String
+  isPublic    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  // The room's shared checkpoint: the round and phase every captain is
+  // synchronized to. currentPhase stores the Phase union (see
+  // src/lib/game/types.ts) as a string, e.g. "0", "5", "worker_mgmt".
+  // Advanced by the ready-check protocol in src/server/realtime.ts once
+  // every current room member (minus anyone bankrupt or at the endgame
+  // screen) has signaled ready, so it survives a server restart instead
+  // of living only in memory.
+  currentRound Int      @default(1)
+  currentPhase String   @default("0")
+
+  // Flips to true the moment the host starts the voyage (see the
+  // "room:start" handler in src/server/realtime.ts). A room sits open in
+  // phase 0 with no minimum headcount before that, so anyone can join;
+  // once a voyage is under way the room is locked, and the join routes
+  // (src/app/api/rooms/[id]/join, src/app/api/rooms/join) refuse anyone
+  // who isn't already a member.
+  started      Boolean  @default(false)
+
+  host        User       @relation("RoomHost", fields: [hostId], references: [id], onDelete: Cascade)
+  members     RoomMember[]
+  messages    Message[]
+  gameStates  GameState[]
+
+  @@index([hostId])
+}
+
+model RoomMember {
+  id        String   @id @default(cuid())
+  userId    String
+  roomId    String
+  joinedAt  DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roomId])
+  @@index([roomId])
+}
+
+model GameState {
+  id        String   @id @default(cuid())
+  userId    String
+  roomId    String
+  data      String   // JSON blob of the full per-player game state
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roomId])
+  @@index([userId])
+  @@index([roomId])
+}
+
+model Message {
+  id          String    @id @default(cuid())
+  roomId      String?
+  senderId    String
+  recipientId String?
+  content     String
+  createdAt   DateTime  @default(now())
+
+  room        Room?     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  sender      User      @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient   User?     @relation("MessageRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, createdAt])
+  @@index([senderId, recipientId, createdAt])
+}

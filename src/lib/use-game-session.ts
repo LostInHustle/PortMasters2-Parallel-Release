@@ -1,0 +1,238 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
+import { api } from "@/lib/api";
+import type { Socket } from "socket.io-client";
+import {
+  phaseLabel,
+  showWelcome,
+  snapToCheckpoint,
+} from "@/lib/game/engine";
+import { createInitialGameState, type GameContext, type GameState } from "@/lib/game/types";
+
+type SessionState = {
+  game: GameState;
+  logs: string[];
+  loaded: boolean;
+  saving: boolean;
+  lastSavedAt: number | null;
+};
+
+type Action =
+  | { type: "INIT"; game: GameState; logs: string[] }
+  | { type: "APPLY"; fn: (g: GameState, logs: string[]) => void; postDraft?: boolean }
+  | { type: "START_FRESH"; checkpoint?: { round: number; phase: string } | null; ctx?: GameContext }
+  | { type: "SET_SAVING"; saving: boolean; at: number };
+
+function reducer(state: SessionState, action: Action): SessionState {
+  switch (action.type) {
+    case "INIT":
+      return { ...state, game: action.game, logs: action.logs, loaded: true };
+    case "START_FRESH": {
+      const g = createInitialGameState();
+      const logs: string[] = [];
+      showWelcome(g, logs);
+      // A genuinely new captain (no save of their own yet) joins wherever
+      // the room's checkpoint already is, instead of always at round 1.
+      const cp = action.checkpoint;
+      if (cp && action.ctx && (cp.round > 1 || cp.phase !== "0")) {
+        snapToCheckpoint(g, action.ctx, cp.round, cp.phase, logs);
+      }
+      return { ...state, game: g, logs, loaded: true };
+    }
+    case "APPLY": {
+      const game = structuredClone(state.game) as GameState;
+      const logs = [...state.logs];
+      action.fn(game, logs);
+      if (logs.length > 500) logs.splice(0, logs.length - 500);
+      return { ...state, game, logs };
+    }
+    case "SET_SAVING":
+      return { ...state, saving: action.saving, lastSavedAt: action.at };
+    default:
+      return state;
+  }
+}
+
+export function useGameSession(roomId: string, socket: Socket | null, enabled: boolean) {
+  const ctx: GameContext = useMemo(() => ({ seedBase: roomId }), [roomId]);
+  const [state, dispatch] = useReducer(reducer, {
+    game: createInitialGameState(),
+    logs: [],
+    loaded: false,
+    saving: false,
+    lastSavedAt: null,
+  });
+
+  // Load saved state on mount / room change.
+  useEffect(() => {
+    if (!enabled) return;
+    let alive = true;
+
+    // Safety net: if the API call hangs (network hiccup, server spinning up),
+    // fall back to a fresh game after 12 s instead of showing "Weighing
+    // anchor…" forever.  This is the root-cause fix for the loading freeze
+    // reported when joining or hosting a room.
+    const LOAD_TIMEOUT_MS = 12_000;
+    let loadTimedOut = false;
+    const timeoutId = setTimeout(() => {
+      if (!alive) return;
+      loadTimedOut = true;
+      dispatch({ type: "START_FRESH", checkpoint: null, ctx });
+    }, LOAD_TIMEOUT_MS);
+
+    (async () => {
+      try {
+        const { state: raw, checkpoint } = await api.getGameState(roomId);
+        if (!alive || loadTimedOut) return;
+        clearTimeout(timeoutId);
+        if (raw) {
+          const game = JSON.parse(raw) as GameState;
+          // Ensure required arrays exist (back-compat).
+          game.purchasedCards = game.purchasedCards ?? [];
+          game.completedOrders = game.completedOrders ?? [];
+          game.resourceCards = game.resourceCards ?? [];
+          game.customerCards = game.customerCards ?? [];
+          game.equippedModules = game.equippedModules ?? [];
+          game.weavers = game.weavers ?? [];
+          game.masterWeavers = game.masterWeavers ?? [];
+          game.sachetMakers = game.sachetMakers ?? [];
+          game.revealedIntel = game.revealedIntel ?? [];
+          game.phase2DemandTags = game.phase2DemandTags ?? [];
+          game.modifierFlags = game.modifierFlags ?? {};
+          game.inventory = game.inventory ?? {};
+          game.boonChoices = game.boonChoices ?? [];
+          game.boonSwapUsed = game.boonSwapUsed ?? false;
+          game.moduleSwapUsed = game.moduleSwapUsed ?? false;
+          game.pirateAttackResolved = game.pirateAttackResolved ?? false;
+          game.escortHired = game.escortHired ?? false;
+          game.debts = game.debts ?? [];
+          game.loansGiven = game.loansGiven ?? [];
+          game.defaultedDebt = game.defaultedDebt ?? false;
+          dispatch({ type: "INIT", game, logs: [] });
+        } else {
+          dispatch({
+            type: "START_FRESH",
+            checkpoint: checkpoint ? { round: checkpoint.currentRound, phase: checkpoint.currentPhase } : null,
+            ctx,
+          });
+        }
+      } catch {
+        if (alive && !loadTimedOut) {
+          clearTimeout(timeoutId);
+          // Include ctx so a fresh game is still seeded with the room's
+          // deterministic economy, and include the room's last-known
+          // checkpoint so a captain who had a network error doesn't land
+          // back at round 1 while everyone else is mid-voyage.
+          dispatch({ type: "START_FRESH", checkpoint: null, ctx });
+        }
+      }
+    })();
+    return () => {
+      alive = false;
+      clearTimeout(timeoutId);
+    };
+  }, [roomId, enabled, ctx]);
+
+  // Broadcast live status to the room on every game change.
+  const broadcastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!enabled || !state.loaded || !socket) return;
+    if (broadcastTimer.current) clearTimeout(broadcastTimer.current);
+    broadcastTimer.current = setTimeout(() => {
+      socket.emit("game:status", {
+        roomId,
+        round: state.game.currentRound,
+        phase: state.game.phase,
+        phaseLabel: phaseLabel(state.game),
+        gold: state.game.money,
+        reputation: state.game.score,
+        shipLevel: state.game.shipLevel,
+        gameOver: state.game.gameOver,
+      });
+    }, 120);
+    return () => {
+      if (broadcastTimer.current) clearTimeout(broadcastTimer.current);
+    };
+  }, [state.game, state.loaded, socket, roomId, enabled]);
+
+  // Heartbeat: re-broadcast status every 8s so the server-side cache stays
+  // fresh and late joiners (or reconnects after a realtime restart) hydrate.
+  useEffect(() => {
+    if (!enabled || !state.loaded || !socket) return;
+    const t = setInterval(() => {
+      socket.emit("game:status", {
+        roomId,
+        round: state.game.currentRound,
+        phase: state.game.phase,
+        phaseLabel: phaseLabel(state.game),
+        gold: state.game.money,
+        reputation: state.game.score,
+        shipLevel: state.game.shipLevel,
+        gameOver: state.game.gameOver,
+      });
+    }, 8000);
+    return () => clearInterval(t);
+  }, [state.loaded, socket, roomId, enabled, state.game.currentRound, state.game.phase, state.game.money, state.game.score, state.game.shipLevel, state.game.gameOver]);
+
+  // Autosave (debounced) to the server.
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Mirrors the latest game state / unsaved-changes flag outside React state so
+  // the unmount cleanup below can see them without becoming stale.
+  const latestGameRef = useRef(state.game);
+  const dirtyRef = useRef(false);
+
+  useEffect(() => {
+    if (!enabled || !state.loaded) return;
+    latestGameRef.current = state.game;
+    dirtyRef.current = true;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    dispatch({ type: "SET_SAVING", saving: true, at: state.lastSavedAt ?? 0 });
+    saveTimer.current = setTimeout(async () => {
+      try {
+        await api.saveGameState(roomId, latestGameRef.current);
+        dirtyRef.current = false;
+        dispatch({ type: "SET_SAVING", saving: false, at: Date.now() });
+      } catch {
+        dispatch({ type: "SET_SAVING", saving: false, at: state.lastSavedAt ?? 0 });
+      }
+    }, 700);
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
+  }, [state.game, state.loaded, roomId, enabled]);
+
+  // Flush any unsaved changes immediately. Call this before deliberately
+  // leaving a room so the debounce window above can't silently drop the
+  // player's last action.
+  const flush = useCallback(async () => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    if (!dirtyRef.current) return;
+    try {
+      await api.saveGameState(roomId, latestGameRef.current);
+      dirtyRef.current = false;
+      dispatch({ type: "SET_SAVING", saving: false, at: Date.now() });
+    } catch {
+      // Leave dirtyRef set so the unmount safety net below still tries once more.
+    }
+  }, [roomId]);
+
+  // Safety net: if the component unmounts (or the room changes) while a save
+  // is still pending, flush it instead of silently losing the player's most
+  // recent action. Covers any future unmount path that doesn't call flush().
+  useEffect(() => {
+    return () => {
+      if (dirtyRef.current) {
+        api.saveGameState(roomId, latestGameRef.current).catch(() => {});
+        dirtyRef.current = false;
+      }
+    };
+  }, [roomId]);
+
+  const act = useCallback(
+    (fn: (g: GameState, logs: string[]) => void) => dispatch({ type: "APPLY", fn }),
+    [],
+  );
+
+  return { state, act, ctx, flush };
+}
