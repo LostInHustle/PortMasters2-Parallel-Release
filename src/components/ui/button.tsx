@@ -5,7 +5,14 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
+  // Tactile micro-interactions live here, at the primitive, so every button
+  // in the app (gameplay actions, toolbar, modals) feels alive without each
+  // call site re-stating it: a subtle hover lift, a quick press that scales
+  // the button down on :active, and a snappier, scoped transition in place
+  // of the old blanket `transition-all`. `motion-reduce` fully opts out for
+  // users who ask the OS for reduced motion. Everything here is
+  // transform-based, so none of it reflows the surrounding layout.
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer select-none will-change-transform transition-[transform,background-color,border-color,box-shadow,color] duration-150 ease-out active:duration-100 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.97] motion-reduce:transition-none motion-reduce:transform-none disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
   {
     variants: {
       variant: {

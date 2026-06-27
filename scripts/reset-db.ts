@@ -2,14 +2,14 @@
 // PortMasters 2: reset the development database to a pristine state.
 //
 // Usage:
-//   npx tsx scripts/reset-db.ts          — wipe everything
-//   npx tsx scripts/reset-db.ts --keep-users — keep User + Session rows
+//   npx tsx scripts/reset-db.ts         , wipe everything
+//   npx tsx scripts/reset-db.ts --keep-users, keep User + Session rows
 //
 // This deletes every test room, test account, stale membership, saved
 // game-state blob, and chat message from the local SQLite database.
 //
 // After running this, the next `npm run dev` starts with a completely
-// empty lobby — no old test rooms, no orphaned memberships from past
+// empty lobby, no old test rooms, no orphaned memberships from past
 // sessions, no leftover game states pointing at deleted rooms.
 // =====================================================================
 

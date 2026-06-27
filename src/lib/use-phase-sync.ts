@@ -12,6 +12,16 @@ export type ReadyState = {
   requiredUserIds: string[];
 };
 
+// Mirrors the server's CHECKPOINT_PHASE_ORDER + checkpointRank (see
+// src/server/realtime.ts).  Used on the client to detect when we've fallen
+// behind the room's synchronized checkpoint so we can catch up.
+const CHECKPOINT_PHASE_ORDER = ["0", "5", "1", "barter", "worker_mgmt", "2", "3", "4"];
+function checkpointRank(round: number, phase: string): number | null {
+  const idx = CHECKPOINT_PHASE_ORDER.indexOf(phase);
+  if (idx === -1) return null;
+  return round * CHECKPOINT_PHASE_ORDER.length + idx;
+}
+
 /**
  * Gates the six recurring "everyone advances together" phase transitions
  * (locking in a boon, finishing buying/trading/maintenance/shipyard)
@@ -36,6 +46,7 @@ export function usePhaseSync(
   game: GameState,
   act: (fn: (g: GameState, logs: string[]) => void) => void,
   authed: boolean,
+  myUserId: string,
 ) {
   const [waiting, setWaiting] = useState(false);
   const [ready, setReady] = useState<ReadyState | null>(null);
@@ -55,11 +66,66 @@ export function usePhaseSync(
     const onReadyUpdate = (data: ReadyState & { roomId: string }) => {
       if (data.roomId !== roomId) return;
       setReady(data);
+      const g = gameRef.current;
+
+      // ── Desync catch-up ──────────────────────────────────────────
+      // When the room's synchronized checkpoint has moved ahead of us
+      // (we missed a phase:advance broadcast because of a transport
+      // blip, common on tunnelled connections like ngrok), execute the
+      // pending transition right now instead of staying stuck at
+      // "Waiting…" forever.  The pending function was stored by
+      // markReady, and since every client runs the same deterministic
+      // transition, executing it locally catches us up by exactly one
+      // phase, the one the room just left.  If the room somehow
+      // advanced multiple phases (extremely rare), the next
+      // phase:ready_update heartbeat will trigger another catch-up step.
+      const serverRank = checkpointRank(data.round, data.phase);
+      const clientRank = checkpointRank(g.currentRound, String(g.phase));
+      if (
+        serverRank !== null &&
+        clientRank !== null &&
+        serverRank > clientRank &&
+        pendingFn.current
+      ) {
+        const fn = pendingFn.current;
+        pendingFn.current = null;
+        setWaiting(false);
+        act(fn);
+        return;
+      }
+
+      // ── Self-heal a dropped ready vote ────────────────────────────
+      // A vote emitted the instant a flaky transport blips (common on
+      // tunnelled or long-polling connections) can reach the server
+      // stamped against the pre-reconnect socket, fail that handler's
+      // `roomId === s.roomId` check, and be silently dropped, leaving
+      // the room stuck at "n-1/n ready" forever with no error and the
+      // local button still showing "Waiting…".  So whenever the server
+      // hands us the authoritative roster: if we still intend to be
+      // ready for the checkpoint the room is actually on, but we aren't
+      // in it, assert it again.  phase:ready is idempotent (a Set add),
+      // so re-sending when we're already counted is harmless.
+      if (
+        pendingFn.current &&
+        myUserId &&
+        data.round === g.currentRound &&
+        data.phase === String(g.phase) &&
+        !data.readyUserIds.includes(myUserId)
+      ) {
+        socket.emit("phase:ready", { roomId, round: g.currentRound, phase: g.phase });
+      }
     };
     const onAdvance = (data: { roomId: string; round: number; phase: string }) => {
       if (data.roomId !== roomId) return;
       const g = gameRef.current;
-      if (data.round !== g.currentRound || String(g.phase) !== data.phase) return;
+      const advanceRank = checkpointRank(data.round, data.phase);
+      const clientRank = checkpointRank(g.currentRound, String(g.phase));
+      if (advanceRank === null || clientRank === null) return;
+      // Stale advance for a checkpoint we've already passed, ignore.
+      if (advanceRank < clientRank) return;
+      // Exact match (normal case) or advance is ahead (we missed an
+      // earlier advance, ngrok drop, etc.).  Either way, execute the
+      // pending transition if one is waiting.
       const fn = pendingFn.current;
       pendingFn.current = null;
       setWaiting(false);
@@ -109,7 +175,7 @@ export function usePhaseSync(
       socket.off("room:restarted", onRestarted);
       socket.off("room:error", onError);
     };
-  }, [socket, roomId, act, authed]);
+  }, [socket, roomId, act, authed, myUserId]);
 
   // Once authed flips to true, fire the deferred phase:state:request so the
   // client gets the room's current checkpoint + ready set.  This covers the

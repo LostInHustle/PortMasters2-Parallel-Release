@@ -57,7 +57,7 @@ export function GameRoom({
 }) {
   const { socket, connected, authed, onlineUsers } = useRealtime(me);
   const { state, act, ctx, flush } = useGameSession(room.id, socket, true);
-  const phaseSync = usePhaseSync(room.id, socket, state.game, act, authed);
+  const phaseSync = usePhaseSync(room.id, socket, state.game, act, authed, me.id);
 
   // A trade involving me just closed, on either side: as the one who
   // clicked Trade (pay the requested item, receive the offered one), or
@@ -173,12 +173,16 @@ export function GameRoom({
   // The host can change (the original one left before the voyage even
   // started, say), so this is kept live from the room:members broadcast
   // rather than frozen at whatever it was when this component mounted.
+  // The member list is also kept live here so the DM candidate list and
+  // player detail modal always see the current roster, not just the
+  // snapshot that arrived via REST on mount.
   const [hostId, setHostId] = useState<string>((room as any).host?.id ?? me.id);
   useEffect(() => {
     if (!socket) return;
-    const onMembers = (data: { roomId: string; hostId: string | null }) => {
-      if (data.roomId !== room.id || !data.hostId) return;
-      setHostId(data.hostId);
+    const onMembers = (data: { roomId: string; members?: Array<PublicUser & { joinedAt?: string }>; hostId: string | null }) => {
+      if (data.roomId !== room.id) return;
+      if (data.hostId) setHostId(data.hostId);
+      if (data.members) setMembers(data.members);
     };
     socket.on("room:members", onMembers);
     return () => {
@@ -380,7 +384,7 @@ export function GameRoom({
                 <h1 className="font-bold leading-tight truncate">{normalizeRoomName(room.name)}</h1>
                 <Pill tone="sea" className="shrink-0"><Users className="h-3 w-3" /> {members.length}</Pill>
               </div>
-              <button onClick={copyCode} className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
+              <button onClick={copyCode} className="pm-pressable text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1">
                 <span className="font-mono tracking-widest">{room.code}</span>
                 <Copy className="h-3 w-3" />
               </button>
@@ -588,7 +592,7 @@ function DmTab({
               <button
                 key={u.id}
                 onClick={() => onPick(u)}
-                className="w-full flex items-center gap-2.5 p-2 rounded-lg text-left hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                className="pm-pressable w-full flex items-center gap-2.5 p-2 rounded-lg text-left hover:bg-black/5 dark:hover:bg-white/5"
               >
                 <Avatar hue={u.avatarHue} name={u.displayName} size={28} />
                 <div className="flex-1 min-w-0">

@@ -202,6 +202,44 @@
     background-image: linear-gradient(135deg, oklch(0.62 0.19 20), oklch(0.66 0.2 10));
   }
 
+  /* Tactile feedback for clickable elements that aren't the <Button>
+     primitive (raw <button> rows, the room-code chip, DM candidate rows).
+     Same press language as the button: a quick hover lift and an :active
+     scale-down, transform-only so nothing reflows, and a clean opt-out for
+     reduced-motion users. */
+  .pm-pressable {
+    transition:
+      transform 150ms ease-out,
+      background-color 150ms ease-out,
+      box-shadow 150ms ease-out,
+      color 150ms ease-out;
+    will-change: transform;
+    cursor: pointer;
+  }
+  .pm-pressable:hover {
+    transform: translateY(-1.5px);
+    box-shadow: 0 4px 12px -4px oklch(0.3 0.05 200 / 0.25);
+  }
+  .pm-pressable:active {
+    transform: scale(0.97);
+    transition-duration: 100ms;
+  }
+  .pm-pressable:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px oklch(0.55 0.11 195 / 0.5);
+  }
+  .dark .pm-pressable:hover {
+    box-shadow: 0 4px 12px -4px oklch(0.05 0.01 230 / 0.45);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pm-pressable,
+    .pm-pressable:hover,
+    .pm-pressable:active {
+      transition: none;
+      transform: none;
+    }
+  }
+
   /* Slim custom scrollbars for log / chat panels. */
   .pm-scroll {
     scrollbar-width: thin;
