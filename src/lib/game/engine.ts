@@ -242,9 +242,21 @@ export function explainExpectedPrice(state: GameState, itemType: string): Expect
   return { min, max, isProduct: !isResource, modifiers };
 }
 
+// The canonical per-worker, per-round wage for a given type, given every
+// currently active modifier. There is no separate one-time "hiring fee"
+// in this game (see hireWorker below, which never touches state.money);
+// the number this returns is what Phase 3 actually charges for that
+// worker, so every place that shows or charges a wage, this function,
+// payWages, and the Pending Payroll preview in WorkerMgmt (GamePhasePanel.tsx),
+// must all read from here rather than re-deriving the formula themselves.
+// Root cause of the Master's Apprentice bug: payWages and that preview
+// used to hardcode WAGES[type] with only the Artisan's Workshop
+// surcharge, so hire_discount silently never reduced the actual wage
+// payment even though the hiring screen's own price looked discounted.
 export function getHireCost(state: GameState, type: string): number {
   let wage = WAGES[type];
   if (state.modifierFlags.hire_discount) wage = Math.floor(wage * (1 - state.modifierFlags.hire_discount));
+  if (hasModule(state, "artisans_workshop")) wage = Math.floor(wage * 1.2);
   return wage;
 }
 
@@ -563,15 +575,7 @@ export function processProduction(state: GameState, logs: string[]) {
 
 export function payWages(state: GameState, logs: string[]): true | "bankruptcy" {
   let total = 0;
-  const countWorkers = (list: GameState["weavers"], type: string) => {
-    let w = 0;
-    for (const _ of list) {
-      let wage = WAGES[type];
-      if (hasModule(state, "artisans_workshop")) wage = Math.floor(wage * 1.2);
-      w += wage;
-    }
-    return w;
-  };
+  const countWorkers = (list: GameState["weavers"], type: string) => list.length * getHireCost(state, type);
   const ww = countWorkers(state.weavers, "weaver");
   const mw = countWorkers(state.masterWeavers, "master");
   const sw = countWorkers(state.sachetMakers, "sachet_maker");

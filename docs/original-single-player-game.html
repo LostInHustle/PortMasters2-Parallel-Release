@@ -1053,7 +1053,7 @@ function renderWelcome(p) {
       <div style="text-align:center; margin: 20px 0">
         ${hasSave ? `<button class="btn btn-success btn-xl" onclick="loadGame()">📂 Continue Voyage</button><br><br>` : ''}
         <button class="btn btn-success btn-xl" onclick="startBoonDrafting()">🚢 Set Sail</button>
-        <br><button class="btn" onclick="showTutorial(0)" style="margin-top:8px;font-size:13px;padding:8px 22px">📖 New Player Tutorial</button>
+        <br><button class="btn" onclick="showTutorial(0)" style="margin-top:8px;font-size:13px;padding:8px 22px">New Player Tutorial</button>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px auto;text-align:left;max-width:700px">
         <div style="background:#E8F5E9;border-left:4px solid #4CAF50;border-radius:4px;padding:10px">
@@ -1134,7 +1134,7 @@ function renderPurchase(p) {
   p.innerHTML = `
     <div>
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px">
-        <h2 style="color:#1A3C8C">⚓ Port Merchant Exchange</h2>
+        <h2 style="color:#1A3C8C">Port Merchant Exchange</h2>
         <button class="btn btn-gold" onclick="showRumorBoard()">🔮 Broker's Rumor Board</button>
       </div>
       <div class="card-grid">
@@ -1290,7 +1290,7 @@ function renderWorkerList(type, list, name, tasks) {
 function renderOrders(p) {
   p.innerHTML = `
     <div>
-      <h2 style="color:#1A3C8C; margin-bottom:16px">🤝 Trade Manifest</h2>
+      <h2 style="color:#1A3C8C; margin-bottom:16px">Trade Manifest</h2>
       <div class="card-grid">
         ${game.customerCards.map(o => {
           const canComplete = o.resources.every(r => (game.inventory[r.type] || 0) >= r.required);

@@ -10,8 +10,10 @@ import type { GameState } from "@/lib/game/types";
 import { phaseLabel } from "@/lib/game/engine";
 import type { PlayerDetailData } from "@/lib/use-player-detail";
 import type { PublicUser } from "@/lib/api";
+import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import { cn } from "@/lib/utils";
 import { Avatar, Pill } from "../shared";
+import { CaptainLegacyCard } from "../CaptainLegacyCard";
 import { Sparkles, BookOpen, Lightbulb, ChevronLeft, ChevronRight, Coins, Trophy, Ship, Loader2, Eye, RotateCcw, Bell, BellOff } from "lucide-react";
 import type { NotificationItem } from "@/lib/use-notifications";
 
@@ -71,7 +73,7 @@ export function NotificationHistoryModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><Bell className="h-5 w-5 text-teal-600 dark:text-teal-400" /> 🔔 Notifications</DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><Bell className="h-5 w-5 text-teal-600 dark:text-teal-400" />Notifications</DialogTitle>
           <DialogDescription className="sr-only">Every ledger update, harbor message, and direct message this session</DialogDescription>
         </DialogHeader>
         <ScrollArea className="max-h-[60vh]">
@@ -265,6 +267,7 @@ export function PlayerDetailModal({
   isMe,
   detail,
   loading,
+  legacy,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -272,6 +275,7 @@ export function PlayerDetailModal({
   isMe: boolean;
   detail: PlayerDetailData | null | undefined;
   loading: boolean;
+  legacy: CaptainLegacySummary | null | undefined;
 }) {
   const workerGroups = detail
     ? [
@@ -291,6 +295,12 @@ export function PlayerDetailModal({
           </DialogTitle>
           <DialogDescription className="sr-only">Detailed voyage status</DialogDescription>
         </DialogHeader>
+
+        {/* Renown is server side, account wide data (see src/lib/game/legacy.ts),
+            so it's shown independently of the live cargo/workers/log detail
+            below, which relies on that captain's own client relaying it back
+            and can be unavailable if they've stepped away. */}
+        {legacy && <CaptainLegacyCard legacy={legacy} compact />}
 
         {!detail ? (
           <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm py-10">

@@ -53,7 +53,7 @@ export function GameControlPanel({
       startText = `Need 2 captains (${requiredCount}/2)`;
       startDisabled = true;
     } else {
-      startText = "🚀 Start the Voyage";
+      startText = "Start the Voyage";
       startDisabled = false;
     }
     nextDisabled = true;

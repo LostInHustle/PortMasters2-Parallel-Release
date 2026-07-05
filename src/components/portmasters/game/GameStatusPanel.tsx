@@ -1,7 +1,7 @@
 "use client";
 
-import { COLORS, ICONS, PRODUCTS, RESOURCES, WAGES } from "@/lib/game/constants";
-import { hasModule } from "@/lib/game/engine";
+import { COLORS, ICONS, PRODUCTS, RESOURCES } from "@/lib/game/constants";
+import { getHireCost } from "@/lib/game/engine";
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { Term } from "../Term";
@@ -12,9 +12,9 @@ export function GameStatusPanel({ game, onRepayLoan }: { game: GameState; onRepa
   const discount = game.shipLevel * 5;
   const showObligations = ![0, 5, "endgame", "bankruptcy"].includes(game.phase);
 
-  const ww = game.weavers.length * (hasModule(game, "artisans_workshop") ? Math.floor(WAGES.weaver * 1.2) : WAGES.weaver);
-  const mw = game.masterWeavers.length * (hasModule(game, "artisans_workshop") ? Math.floor(WAGES.master * 1.2) : WAGES.master);
-  const sw = game.sachetMakers.length * (hasModule(game, "artisans_workshop") ? Math.floor(WAGES.sachet_maker * 1.2) : WAGES.sachet_maker);
+  const ww = game.weavers.length * getHireCost(game, "weaver");
+  const mw = game.masterWeavers.length * getHireCost(game, "master");
+  const sw = game.sachetMakers.length * getHireCost(game, "sachet_maker");
   const pendWages = ww + mw + sw;
   const pendMaint = game.fixedCost + game.maintenancePenalty;
   const pendTotal = pendWages + pendMaint;
