@@ -32,7 +32,6 @@ import {
   getHireCost,
   getOwnedAmount,
   handleModuleSelect,
-  hasModule,
   hireEscort,
   hireWorker,
   postBarterOffer,
@@ -203,7 +202,7 @@ function Welcome({
               onClick={() => phaseSync.startGame()}
             >
               <Ship className="h-5 w-5 mr-2" />
-              {canStart ? "🚀 Start the Voyage" : `Need at least 2 captains (${harborIds.length}/2)`}
+              {canStart ? "Start the Voyage" : `Need at least 2 captains (${harborIds.length}/2)`}
             </Button>
             {phaseSync.startError && <p className="text-xs text-rose-600 dark:text-rose-400">{phaseSync.startError}</p>}
           </>
@@ -211,7 +210,7 @@ function Welcome({
           <div className="text-sm text-muted-foreground">⏳ Waiting for the host to start the voyage… ({harborIds.length} in harbor)</div>
         )}
         <Button variant="ghost" className="rounded-xl" onClick={onShowTutorial}>
-          <BookOpen className="h-4 w-4 mr-2" /> 📖 New Player Tutorial
+          <BookOpen className="h-4 w-4 mr-2" />New Player Tutorial
         </Button>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-left max-w-2xl mx-auto">
@@ -322,9 +321,21 @@ function Purchase({
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold flex items-center gap-2"><Anchor className="h-5 w-5 text-teal-600 dark:text-teal-400" /> ⚓ Port Merchant Exchange</h2>
+        <h2 className="text-lg font-semibold flex items-center gap-2"><Anchor className="h-5 w-5 text-teal-600 dark:text-teal-400" />Port Merchant Exchange</h2>
         <Button variant="secondary" size="sm" className="rounded-lg" onClick={onShowRumors}>🔮 Broker's Rumor Board</Button>
       </div>
+      {game.revealedIntel.length > 0 && (
+        <div className="rounded-lg border border-amber-500/25 bg-amber-500/[0.06] px-3.5 py-2.5 mb-3.5 text-xs">
+          <strong>🗣️ Broker's Whispers active this round:</strong>{" "}
+          {game.revealedIntel.map((i, idx) => (
+            <span key={idx}>
+              {idx > 0 && ", "}
+              {ICONS[i.item] ?? ""} {i.item} ({i.port})
+            </span>
+          ))}
+          <span className="text-muted-foreground"> (a matching order is guaranteed in Phase 2, buy accordingly).</span>
+        </div>
+      )}
       <MarketPriceReference game={game} />
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
         {game.resourceCards.map((c) => {
@@ -421,7 +432,8 @@ function BarterPhase({
   return (
     <div className="max-w-3xl mx-auto">
       <h2 className="text-lg font-semibold mb-1 flex items-center gap-2">
-        <Handshake className="h-5 w-5 text-amber-600 dark:text-amber-400" /> 🤝 <Term term="Barter">Captain&apos;s Exchange</Term>
+        <Handshake className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+        <Term term="Barter">Captain&apos;s Exchange</Term>
       </h2>
       <p className="text-sm text-muted-foreground mb-4">
         Short on one good and sitting on too much of another? Post a swap for the rest of the harbor to see, or take someone else&apos;s.
@@ -431,12 +443,12 @@ function BarterPhase({
         <h3 className="text-center font-semibold mb-3 text-sm">📤 Post an Offer</h3>
         <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
           <span className="text-muted-foreground">I&apos;ll give</span>
-          <Input type="number" min={1} step={1} value={offerAmount} onChange={(e) => setOfferAmount(parseInt(e.target.value, 10))} className="w-16 h-9" />
+          <Input type="number" min={1} step={1} value={offerAmount} onChange={(e) => setOfferAmount(Math.max(1, parseInt(e.target.value, 10) || 1))} className="w-16 h-9" />
           <select value={offerItem} onChange={(e) => setOfferItem(e.target.value)} className={selectClass}>
             {items.map((it) => <option key={it} value={it}>{ICONS[it]} {it}</option>)}
           </select>
           <span className="text-muted-foreground">for</span>
-          <Input type="number" min={1} step={1} value={requestAmount} onChange={(e) => setRequestAmount(parseInt(e.target.value, 10))} className="w-16 h-9" />
+          <Input type="number" min={1} step={1} value={requestAmount} onChange={(e) => setRequestAmount(Math.max(1, parseInt(e.target.value, 10) || 1))} className="w-16 h-9" />
           <select value={requestItem} onChange={(e) => setRequestItem(e.target.value)} className={selectClass}>
             {items.map((it) => <option key={it} value={it}>{ICONS[it]} {it}</option>)}
           </select>
@@ -515,9 +527,9 @@ function WorkerMgmt({
   const weaverCost = getHireCost(game, "weaver");
   const masterCost = getHireCost(game, "master");
   const makerCost = getHireCost(game, "sachet_maker");
-  const ww = game.weavers.length * (hasModule(game, "artisans_workshop") ? Math.floor(WAGES.weaver * 1.2) : WAGES.weaver);
-  const mw = game.masterWeavers.length * (hasModule(game, "artisans_workshop") ? Math.floor(WAGES.master * 1.2) : WAGES.master);
-  const sw = game.sachetMakers.length * (hasModule(game, "artisans_workshop") ? Math.floor(WAGES.sachet_maker * 1.2) : WAGES.sachet_maker);
+  const ww = game.weavers.length * weaverCost;
+  const mw = game.masterWeavers.length * masterCost;
+  const sw = game.sachetMakers.length * makerCost;
   const totalWages = ww + mw + sw;
   const nW = game.weavers.length + game.masterWeavers.length + game.sachetMakers.length;
 
@@ -555,9 +567,9 @@ function WorkerMgmt({
         <div className="rounded-xl bg-orange-500/[0.06] border border-orange-500/20 p-3.5 mb-4">
           <h3 className="text-center font-semibold mb-2 text-orange-700 dark:text-orange-300">💰 Pending Payroll: Deducted at Phase 3</h3>
           <div className="text-xs space-y-0.5">
-            {ww > 0 && <div className="flex justify-between"><span>👩‍🔧 {game.weavers.length}× Weaver @ {hasModule(game, "artisans_workshop") ? Math.floor(WAGES.weaver * 1.2) : WAGES.weaver}g</span><b>{ww} Gold</b></div>}
-            {mw > 0 && <div className="flex justify-between"><span>👩‍🎨 {game.masterWeavers.length}× Master @ {hasModule(game, "artisans_workshop") ? Math.floor(WAGES.master * 1.2) : WAGES.master}g</span><b>{mw} Gold</b></div>}
-            {sw > 0 && <div className="flex justify-between"><span>🌸 {game.sachetMakers.length}× Maker @ {hasModule(game, "artisans_workshop") ? Math.floor(WAGES.sachet_maker * 1.2) : WAGES.sachet_maker}g</span><b>{sw} Gold</b></div>}
+            {ww > 0 && <div className="flex justify-between"><span>👩‍🔧 {game.weavers.length}× Weaver @ {weaverCost}g</span><b>{ww} Gold</b></div>}
+            {mw > 0 && <div className="flex justify-between"><span>👩‍🎨 {game.masterWeavers.length}× Master @ {masterCost}g</span><b>{mw} Gold</b></div>}
+            {sw > 0 && <div className="flex justify-between"><span>🌸 {game.sachetMakers.length}× Maker @ {makerCost}g</span><b>{sw} Gold</b></div>}
             <div className="flex justify-between border-t border-orange-500/20 pt-1 mt-1 font-bold"><span>💸 Total Wages Due</span><span className="text-rose-600 dark:text-rose-400">{totalWages} Gold</span></div>
           </div>
         </div>
@@ -654,7 +666,19 @@ function Orders({
 }) {
   return (
     <div>
-      <h2 className="text-lg font-semibold mb-4 flex items-center gap-2"><Coins className="h-5 w-5 text-amber-600 dark:text-amber-400" /> 🤝 Trade Manifest</h2>
+      <h2 className="text-lg font-semibold mb-4 flex items-center gap-2"><Coins className="h-5 w-5 text-amber-600 dark:text-amber-400" />Trade Manifest</h2>
+      {game.revealedIntel.length > 0 && (
+        <div className="rounded-lg border border-amber-500/25 bg-amber-500/[0.06] px-3.5 py-2.5 mb-3.5 text-xs">
+          <strong>🗣️ Broker's Whispers active this round:</strong>{" "}
+          {game.revealedIntel.map((i, idx) => (
+            <span key={idx}>
+              {idx > 0 && ", "}
+              {ICONS[i.item] ?? ""} {i.item} ({i.port})
+            </span>
+          ))}
+          <span className="text-muted-foreground"> (look for the 🔮 badge below).</span>
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
         {game.customerCards.map((o) => {
           const canComplete = o.resources.every(r => (game.inventory[r.type] || 0) >= r.required!);
@@ -671,10 +695,12 @@ function Orders({
             totalVat = vatBreakdown.final * o.resources[0].required!;
             netProfit -= totalVat;
           }
+          const matchesIntel = game.revealedIntel.some((i) => o.resources.some((r) => r.type === i.item));
           return (
-            <div key={o.id} className="rounded-xl border border-black/10 dark:border-white/10 bg-background/50 overflow-hidden flex flex-col">
-              <div className="px-3.5 py-2 text-xs font-semibold border-b border-black/5 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03]">
-                📍 {o.demandPort} <span className="text-muted-foreground">{o.isProductOrder ? "· Finished Product Demand" : "· Raw Material Demand"}</span>
+            <div key={o.id} className={cn("rounded-xl border overflow-hidden flex flex-col", matchesIntel ? "border-amber-500/40 bg-amber-500/[0.04]" : "border-black/10 dark:border-white/10 bg-background/50")}>
+              <div className="px-3.5 py-2 text-xs font-semibold border-b border-black/5 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] flex items-center justify-between gap-2">
+                <span>📍 {o.demandPort} <span className="text-muted-foreground">{o.isProductOrder ? "· Finished Product Demand" : "· Raw Material Demand"}</span></span>
+                {matchesIntel && <span className="text-amber-600 dark:text-amber-400 shrink-0">🔮 Guaranteed</span>}
               </div>
               <div className="p-3.5 flex-1 space-y-1.5">
                 {o.resources.map((r, i) => {
@@ -790,9 +816,9 @@ function SettlementBills({
   phaseSync: PhaseSync;
   members: PublicUser[];
 }) {
-  const ww = game.weavers.length * (hasModule(game, "artisans_workshop") ? Math.floor(WAGES.weaver * 1.2) : WAGES.weaver);
-  const mw = game.masterWeavers.length * (hasModule(game, "artisans_workshop") ? Math.floor(WAGES.master * 1.2) : WAGES.master);
-  const sw = game.sachetMakers.length * (hasModule(game, "artisans_workshop") ? Math.floor(WAGES.sachet_maker * 1.2) : WAGES.sachet_maker);
+  const ww = game.weavers.length * getHireCost(game, "weaver");
+  const mw = game.masterWeavers.length * getHireCost(game, "master");
+  const sw = game.sachetMakers.length * getHireCost(game, "sachet_maker");
   const wagesDue = ww + mw + sw;
   const maintCost = game.fixedCost + game.maintenancePenalty;
   const totalDue = wagesDue + maintCost;

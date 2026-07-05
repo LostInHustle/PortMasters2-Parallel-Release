@@ -1,6 +1,6 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# dependencies
+# Dependencies
 node_modules
 /.pnp
 .pnp.*
@@ -10,54 +10,57 @@ node_modules
 !.yarn/releases
 !.yarn/versions
 
-# testing
+# Testing
 /coverage
 
-# next.js
+# Next.js
 /.next/
 /out/
 
-# production
+# Production
 /build
 
-# misc
+# Miscellaneous
 .DS_Store
 *.pem
 
-# debug
+# Debug logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
-
-# env files (can opt-in for committing if needed)
-.env*
-
-# vercel
-.vercel
-
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-local-*
-.claude
-.z-ai-config
 *.log
 dev.log
 dev.out.log
+server.log
+
+# Environment files (opt-in if needed)
+.env*
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Local scratch files
+local-*
+.claude
+.z-ai-config
 test
 prompt
 
-server.log
 # Skills directory
 /skills/
 
-# generated Prisma client (run `prisma generate` or `npm install` to create it)
+# Generated Prisma client (run `prisma generate` or `npm install`)
 /generated/
-# local SQLite database files (run `npm run db:push` to create one)
+
+# Local SQLite database files (run `npm run db:push`)
 /prisma/*.db
 /prisma/*.db-journal
-# AI-build-platform scratch artifacts (not project source)
+
+# AI build platform scratch artifacts
 /tool-results/
 /download/

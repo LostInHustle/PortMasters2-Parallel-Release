@@ -91,4 +91,10 @@ export const api = {
 
   // Captain's Legacy (persistent Renown, across every voyage the account has played)
   getLegacy: () => jfetch<{ legacy: CaptainLegacySummary }>("/api/legacy"),
+  getLegacyFor: (userId: string) => jfetch<{ legacy: CaptainLegacySummary }>(`/api/legacy/${userId}`),
+  getLegaciesFor: (userIds: string[]) =>
+    jfetch<{ legacies: Record<string, CaptainLegacySummary> }>("/api/legacy/batch", {
+      method: "POST",
+      body: JSON.stringify({ userIds }),
+    }),
 };

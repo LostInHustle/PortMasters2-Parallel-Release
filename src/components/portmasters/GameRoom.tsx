@@ -367,10 +367,21 @@ export function GameRoom({
     onLeave();
   }
 
+  // Renown (Captain's Legacy) is server side, account wide data, unlike
+  // the rest of the detail popup (cargo, workers, log), which is relayed
+  // peer to peer and only available while that captain's own client is
+  // connected and responsive. Fetched fresh on every click rather than
+  // cached indefinitely, same as playerDetail.requestDetail below, so a
+  // captain who just finished another voyage elsewhere shows their
+  // current standing.
+  const [otherLegacy, setOtherLegacy] = useState<Record<string, CaptainLegacySummary>>({});
   const handleSelectPlayer = useCallback(
     (userId: string) => {
       setSelectedPlayerId(userId);
       playerDetail.requestDetail(userId);
+      api.getLegacyFor(userId)
+        .then(({ legacy }) => setOtherLegacy((prev) => ({ ...prev, [userId]: legacy })))
+        .catch(() => {});
     },
     [playerDetail],
   );
@@ -556,6 +567,7 @@ export function GameRoom({
         isMe={selectedPlayerId === me.id}
         detail={selectedPlayerId ? playerDetail.detail[selectedPlayerId] : undefined}
         loading={selectedPlayerId ? Boolean(playerDetail.loading[selectedPlayerId]) : false}
+        legacy={selectedPlayerId ? otherLegacy[selectedPlayerId] : undefined}
       />
 
       {/* Floating help when bankrupt / endgame */}

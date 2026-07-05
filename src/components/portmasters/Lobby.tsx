@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api, type ChatMessage, type PublicUser, type RoomSummary } from "@/lib/api";
 import { useRealtime } from "@/lib/use-realtime";
@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { cn, normalizeRoomName } from "@/lib/utils";
 import { APP_NAME } from "@/lib/game/constants";
-import { DEFAULT_LEGACY_SUMMARY, renownProgress } from "@/lib/game/legacy";
+import { DEFAULT_LEGACY_SUMMARY, renownProgress, type CaptainLegacySummary } from "@/lib/game/legacy";
 
 export function Lobby({
   me,
@@ -83,6 +83,23 @@ export function Lobby({
     api.getLegacy().then(({ legacy }) => { if (alive) setLegacy(legacy); }).catch(() => {});
     return () => { alive = false; };
   }, []);
+
+  // Renown for every other captain currently shown in "Captains Online"
+  // below, fetched as one batch rather than one request per captain (see
+  // POST /api/legacy/batch). Keyed on the *set* of online ids, not the
+  // onlineUsers array itself, since that array gets a new reference on
+  // every presence:update broadcast (anyone, anywhere, connecting or
+  // switching rooms), most of which don't actually add or remove anyone
+  // from this list.
+  const [otherLegacies, setOtherLegacies] = useState<Record<string, CaptainLegacySummary>>({});
+  const onlineIdsKey = useMemo(() => onlineUsers.map((u) => u.id).sort().join(","), [onlineUsers]);
+  useEffect(() => {
+    const ids = onlineIdsKey ? onlineIdsKey.split(",") : [];
+    if (ids.length === 0) return;
+    let alive = true;
+    api.getLegaciesFor(ids).then(({ legacies }) => { if (alive) setOtherLegacies(legacies); }).catch(() => {});
+    return () => { alive = false; };
+  }, [onlineIdsKey]);
 
   async function createRoom() {
     if (!newName.trim()) return;
@@ -375,6 +392,7 @@ export function Lobby({
                   <div className="space-y-1.5">
                     {onlineUsers.map((u) => {
                       const isMe = u.id === me.id;
+                      const otherLegacy = otherLegacies[u.id];
                       return (
                         <button
                           key={u.id}
@@ -397,6 +415,11 @@ export function Lobby({
                               {u.roomId ? "In a harbor" : "In the lobby"}
                             </div>
                           </div>
+                          {otherLegacy && (
+                            <Pill tone="gold" className="shrink-0">
+                              <Star className="h-3 w-3" /> {renownProgress(otherLegacy.renownXP).level}
+                            </Pill>
+                          )}
                           {!isMe && <MessageCircle className="h-4 w-4 text-muted-foreground/60" />}
                         </button>
                       );
