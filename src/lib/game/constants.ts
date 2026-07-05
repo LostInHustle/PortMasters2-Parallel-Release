@@ -219,6 +219,7 @@ export const TUTORIAL_STEPS: { title: string; content: string }[] = [
   <li>Hire artisans only when you can cover <strong>two full voyages of wages</strong>.</li>
   <li>Phase 4 ship upgrades compound quickly. Do not skip them.</li>
   <li>Caught short by pirates or a bad round? Ask the harbor for a loan before you assume the voyage is over.</li>
+  <li>Every voyage's final Reputation becomes Renown on your account, forever, win or lose. Check your Captain's Legacy any time from the Lobby.</li>
   <li><kbd style="background:#eee;border:1px solid #ccc;padding:1px 6px;border-radius:3px">Ctrl+S</kbd> saves your run &nbsp;·&nbsp; <kbd style="background:#eee;border:1px solid #ccc;padding:1px 6px;border-radius:3px">F1</kbd> opens the full guide.</li>
 </ul>
 <div style="background:#E8F5E9;border:2px solid #4CAF50;border-radius:8px;padding:12px;text-align:center;margin-top:14px">
@@ -276,6 +277,13 @@ Brocade(70-90💰), Sachet(95-120💰)
 • Repay it any time before the voyage's last round ends, or it's taken from your funds automatically and handed to your lender
 • Still short when the voyage finishes? That unpaid loan is what bankrupts you, not the round it was borrowed in
 • Lending Gold raises your own reputation, scaled to how much you lent
+
+Captain's Legacy:
+• Every voyage's final Reputation becomes Renown XP on your account the moment the voyage ends, win or lose
+• Renown is permanent: it survives a restart and carries into every future voyage, in any harbor, unlike Gold, cargo, and ship level
+• Each Renown level grants a small Gold bonus at the start of your next fresh voyage
+• Whoever ends a voyage with the highest Reputation among everyone who reached the endgame screen is crowned Sea Master
+• Check your current Renown level, title, and Sea Master crowns any time from the Lobby
 
 🌊 Voyage Phases:
 1. Port Purchase: buy resources at ports (plus Broker rumors)

@@ -51,14 +51,17 @@ import {
 } from "@/lib/game/engine";
 import type { GameContext, GameState, Worker } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
-import { Anchor, Ship, BookOpen, Coins, Trophy, Handshake, X, ShieldCheck, Skull, HandCoins } from "lucide-react";
+import { Anchor, Ship, BookOpen, Coins, Trophy, Handshake, X, ShieldCheck, Skull, HandCoins, Crown } from "lucide-react";
 import type { PublicUser } from "@/lib/api";
+import type { VoyageCompleteEvent } from "@/lib/realtime";
+import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import type { usePhaseSync } from "@/lib/use-phase-sync";
 import type { useBarter, BarterOffer } from "@/lib/use-barter";
 import type { useAid } from "@/lib/use-aid";
 import { ReadyBar } from "./ReadyBar";
 import { Term } from "../Term";
 import { Avatar } from "../shared";
+import { CaptainLegacyCard } from "../CaptainLegacyCard";
 import { PriceBreakdownTooltip, ExpectedPriceTooltip, priceAwareTermContent } from "./PriceTooltips";
 
 // Every raw material and product gets a price preview here, not just the
@@ -114,6 +117,8 @@ type Props = {
   phaseSync: PhaseSync;
   barter: Barter;
   aid: Aid;
+  voyageResult: VoyageCompleteEvent | null;
+  myLegacy: CaptainLegacySummary | null;
   onRestart: () => void;
   onShowRumors: () => void;
   onShowGuide: () => void;
@@ -1068,10 +1073,16 @@ function Endgame({
   game,
   isHost,
   onRestart,
+  voyageResult,
+  myLegacy,
+  myUserId,
 }: {
   game: GameState;
   isHost: boolean;
   onRestart: () => void;
+  voyageResult: VoyageCompleteEvent | null;
+  myLegacy: CaptainLegacySummary | null;
+  myUserId: string;
 }) {
   let rating: string;
   if (game.score >= 300) rating = "👑 King of Silk Road";
@@ -1079,12 +1090,56 @@ function Endgame({
   else if (game.score >= 100) rating = "⭐ Successful Merchant";
   else if (game.score >= 50) rating = "👍 Qualified Trader";
   else rating = "🌊 Novice Merchant";
+  const mine = voyageResult?.standings.find((s) => s.userId === myUserId);
   return (
     <div className="max-w-md mx-auto text-center py-4">
       <div className="text-2xl font-bold mb-4">🎮 Game Over!</div>
       <div className="text-xl font-bold text-teal-700 dark:text-teal-300 my-3 flex items-center justify-center gap-2"><Trophy className="h-5 w-5" /> 🏆 Final Reputation: {game.score}</div>
       <div className="text-lg text-emerald-600 dark:text-emerald-400 my-2 flex items-center justify-center gap-2"><Coins className="h-5 w-5" /> 💰 Final Funds: {game.money} Gold</div>
       <div className="text-lg text-amber-600 dark:text-amber-400 my-4">📈 Merchant Rank: {rating}</div>
+
+      {voyageResult ? (
+        <div className="space-y-3 mb-5 text-left">
+          {mine?.crowned && (
+            <div className="rounded-xl border-2 border-amber-400 bg-amber-400/10 px-4 py-3 text-center">
+              <div className="text-lg font-bold text-amber-600 dark:text-amber-300 flex items-center justify-center gap-2">
+                <Crown className="h-5 w-5" /> Crowned Sea Master!
+              </div>
+              <div className="text-xs text-muted-foreground mt-0.5">Highest Reputation in this harbor's voyage.</div>
+            </div>
+          )}
+          <div className="rounded-xl border border-black/5 dark:border-white/10 overflow-hidden">
+            <div className="px-3 py-2 text-xs font-semibold bg-black/[0.03] dark:bg-white/[0.05]">🏁 Final Standings</div>
+            <div className="divide-y divide-black/5 dark:divide-white/10">
+              {voyageResult.standings.map((s, i) => (
+                <div key={s.userId} className={cn("flex items-center gap-2 px-3 py-2 text-sm", s.userId === myUserId && "bg-teal-500/[0.06]")}>
+                  <span className="text-xs text-muted-foreground w-4 shrink-0">{i + 1}</span>
+                  <Avatar hue={s.avatarHue} name={s.displayName} size={22} />
+                  <span className="flex-1 truncate font-medium">{s.displayName}</span>
+                  {s.crowned && <Crown className="h-3.5 w-3.5 text-amber-500 shrink-0" />}
+                  {s.bankrupt && <Skull className="h-3.5 w-3.5 text-rose-500 shrink-0" />}
+                  <span className="text-xs text-muted-foreground shrink-0">{s.reputation} Rep.</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          {myLegacy && (
+            <div>
+              {mine && (
+                <div className="text-xs text-center text-muted-foreground mb-1.5">
+                  +{mine.xpGained} Renown XP this voyage{mine.leveledUp ? " · Renown level up!" : ""}
+                </div>
+              )}
+              <CaptainLegacyCard legacy={myLegacy} />
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="text-sm text-muted-foreground mb-5">
+          ⏳ Waiting on the rest of the harbor to finish their voyage before Sea Master is crowned…
+        </div>
+      )}
+
       {isHost ? (
         <Button className="pm-grad-primary text-white rounded-xl px-8" onClick={onRestart}>🔄 Restart Voyage</Button>
       ) : (
@@ -1094,7 +1149,7 @@ function Endgame({
   );
 }
 
-export function GamePhasePanel({ game, ctx, act, members, myUserId, isHost, phaseSync, barter, aid, onRestart, onShowRumors, onShowTutorial }: Props) {
+export function GamePhasePanel({ game, ctx, act, members, myUserId, isHost, phaseSync, barter, aid, voyageResult, myLegacy, onRestart, onShowRumors, onShowTutorial }: Props) {
   return (
     <div className="pm-glass rounded-2xl p-4 sm:p-5 min-h-[520px]">
       <AnimatePresence mode="sync">
@@ -1122,7 +1177,7 @@ export function GamePhasePanel({ game, ctx, act, members, myUserId, isHost, phas
     if (p === 3) return <Settlement game={game} act={act} aid={aid} myUserId={myUserId} phaseSync={phaseSync} members={members} />;
     if (p === 4) return <Shipyard game={game} act={act} phaseSync={phaseSync} members={members} />;
     if (p === "bankruptcy") return <Bankruptcy game={game} />;
-    if (p === "endgame") return <Endgame game={game} isHost={isHost} onRestart={onRestart} />;
+    if (p === "endgame") return <Endgame game={game} isHost={isHost} onRestart={onRestart} voyageResult={voyageResult} myLegacy={myLegacy} myUserId={myUserId} />;
     if (p === "module_draft") return <ModuleDraft game={game} act={act} />;
     if (p === "module_swap") return <ModuleSwap game={game} act={act} />;
     return null;

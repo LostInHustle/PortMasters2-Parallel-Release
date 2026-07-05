@@ -6,16 +6,19 @@ import { api, type ChatMessage, type PublicUser, type RoomSummary } from "@/lib/
 import { useRealtime } from "@/lib/use-realtime";
 import { Avatar, OnlineDot, Pill } from "./shared";
 import { ChatPanel } from "./ChatPanel";
+import { CaptainLegacyCard } from "./CaptainLegacyCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   Anchor,
   LogOut,
   Plus,
   Ship,
+  Star,
   Users,
   KeyRound,
   Loader2,
@@ -25,6 +28,7 @@ import {
 } from "lucide-react";
 import { cn, normalizeRoomName } from "@/lib/utils";
 import { APP_NAME } from "@/lib/game/constants";
+import { DEFAULT_LEGACY_SUMMARY, renownProgress } from "@/lib/game/legacy";
 
 export function Lobby({
   me,
@@ -37,6 +41,8 @@ export function Lobby({
 }) {
   const { socket, connected, authed, onlineUsers } = useRealtime(me);
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
+  const [legacy, setLegacy] = useState(DEFAULT_LEGACY_SUMMARY);
+  const [legacyOpen, setLegacyOpen] = useState(false);
   const [loadingRooms, setLoadingRooms] = useState(true);
   const [newName, setNewName] = useState("");
   const [isPublic, setIsPublic] = useState(true);
@@ -67,6 +73,16 @@ export function Lobby({
     const t = setInterval(refreshRooms, 8000);
     return () => clearInterval(t);
   }, [refreshRooms]);
+
+  // A captain's Renown only ever changes when a voyage concludes (see
+  // maybeConcludeVoyage in src/server/realtime.ts), which never happens
+  // while sitting in the lobby, so a plain fetch on mount is enough; no
+  // polling needed like the room list above.
+  useEffect(() => {
+    let alive = true;
+    api.getLegacy().then(({ legacy }) => { if (alive) setLegacy(legacy); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
 
   async function createRoom() {
     if (!newName.trim()) return;
@@ -171,6 +187,11 @@ export function Lobby({
             <Pill tone="sea" className="hidden sm:inline-flex">
               <Users className="h-3 w-3" /> {totalOnline} sailing
             </Pill>
+            <button onClick={() => setLegacyOpen(true)} className="pm-pressable">
+              <Pill tone="gold">
+                <Star className="h-3 w-3" /> Renown {renownProgress(legacy.renownXP).level}
+              </Pill>
+            </button>
             <div className="flex items-center gap-2 pl-2 border-l border-black/5 dark:border-white/10">
               <Avatar hue={me.avatarHue} name={me.displayName} size={32} ring />
               <div className="hidden sm:block leading-tight">
@@ -412,6 +433,19 @@ export function Lobby({
           </aside>
         </div>
       </main>
+
+      <Dialog open={legacyOpen} onOpenChange={setLegacyOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Star className="h-5 w-5 text-amber-500" />Captain's Legacy</DialogTitle>
+            <DialogDescription>Renown carries across every voyage this account ever sails, in any harbor.</DialogDescription>
+          </DialogHeader>
+          <CaptainLegacyCard legacy={legacy} />
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Every Renown level grants a small Gold bonus at the start of your next fresh voyage. It grows from the Reputation you bank on the way to Round 8, so it only ever goes up, even on a voyage that ends in bankruptcy.
+          </p>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

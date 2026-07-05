@@ -1,0 +1,64 @@
+"use client";
+
+import { Progress } from "@/components/ui/progress";
+import { Crown, Trophy, Ship, Star } from "lucide-react";
+import { renownProgress, renownTitleForLevel, type CaptainLegacySummary } from "@/lib/game/legacy";
+import { cn } from "@/lib/utils";
+
+// Shown both in the Lobby (a captain's standing account of who they are
+// across every voyage they've ever sailed) and on the Endgame screen
+// right after a voyage concludes (see GamePhasePanel.tsx), where it
+// reflects the account *after* this voyage's Renown XP was applied.
+export function CaptainLegacyCard({
+  legacy,
+  className,
+  compact,
+}: {
+  legacy: CaptainLegacySummary;
+  className?: string;
+  compact?: boolean;
+}) {
+  const { level, xpIntoLevel, xpForNextLevel } = renownProgress(legacy.renownXP);
+  const title = renownTitleForLevel(level);
+  const pct = xpForNextLevel > 0 ? Math.min(100, Math.round((xpIntoLevel / xpForNextLevel) * 100)) : 100;
+
+  return (
+    <div className={cn("rounded-xl border border-amber-500/20 bg-amber-500/[0.04] p-3.5", className)}>
+      <div className="flex items-center gap-2 mb-2">
+        <div className="pm-grad-amber h-8 w-8 rounded-lg flex items-center justify-center shrink-0">
+          <Star className="h-4 w-4 text-white" />
+        </div>
+        <div className="min-w-0">
+          <div className="text-sm font-semibold truncate">Renown {level} · {title}</div>
+          <div className="text-[10px] text-muted-foreground">{legacy.renownXP} XP earned in total</div>
+        </div>
+      </div>
+      <Progress value={pct} className="h-1.5 mb-1" />
+      <div className="text-[10px] text-muted-foreground mb-2.5">
+        {xpIntoLevel} / {xpForNextLevel} XP to Renown {level + 1}
+      </div>
+      {!compact && (
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="rounded-lg bg-background/60 py-1.5">
+            <div className="text-sm font-bold flex items-center justify-center gap-1">
+              <Ship className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" /> {legacy.voyagesCompleted}
+            </div>
+            <div className="text-[9px] text-muted-foreground">Voyages</div>
+          </div>
+          <div className="rounded-lg bg-background/60 py-1.5">
+            <div className="text-sm font-bold flex items-center justify-center gap-1">
+              <Crown className="h-3.5 w-3.5 text-amber-500" /> {legacy.seaMasterCrowns}
+            </div>
+            <div className="text-[9px] text-muted-foreground">Sea Master</div>
+          </div>
+          <div className="rounded-lg bg-background/60 py-1.5">
+            <div className="text-sm font-bold flex items-center justify-center gap-1">
+              <Trophy className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> {legacy.bestScore}
+            </div>
+            <div className="text-[9px] text-muted-foreground">Best Rep.</div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

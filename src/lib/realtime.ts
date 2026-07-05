@@ -40,6 +40,30 @@ export type GameStatusUpdate = {
   at: number;
 };
 
+// One row per captain who was seated in the room when its voyage
+// concluded (see maybeConcludeVoyage in src/server/realtime.ts), sorted
+// by Reputation, highest first. Renown fields reflect that captain's
+// CaptainLegacy account *after* this voyage's XP was applied, not before.
+export type VoyageStanding = {
+  userId: string;
+  displayName: string;
+  avatarHue: number;
+  reputation: number;
+  gold: number;
+  crowned: boolean;
+  bankrupt: boolean;
+  renownLevel: number;
+  renownTitle: string;
+  xpGained: number;
+  leveledUp: boolean;
+};
+
+export type VoyageCompleteEvent = {
+  roomId: string;
+  winnerId: string | null;
+  standings: VoyageStanding[];
+};
+
 let socket: Socket | null = null;
 
 export function getSocket(): Socket {

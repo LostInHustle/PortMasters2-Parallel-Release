@@ -47,6 +47,7 @@ export function usePhaseSync(
   act: (fn: (g: GameState, logs: string[]) => void) => void,
   authed: boolean,
   myUserId: string,
+  startingGoldBonus: number = 0,
 ) {
   const [waiting, setWaiting] = useState(false);
   const [ready, setReady] = useState<ReadyState | null>(null);
@@ -59,6 +60,15 @@ export function usePhaseSync(
   useEffect(() => {
     gameRef.current = game;
   }, [game]);
+
+  // Same pattern as gameRef: this only settles once the captain's
+  // CaptainLegacy row has loaded (see useGameSession), a moment after
+  // this hook first mounts, so onRestarted below needs the current value
+  // without the whole effect resubscribing every time it changes.
+  const goldBonusRef = useRef(startingGoldBonus);
+  useEffect(() => {
+    goldBonusRef.current = startingGoldBonus;
+  }, [startingGoldBonus]);
 
   useEffect(() => {
     if (!socket) return;
@@ -150,7 +160,7 @@ export function usePhaseSync(
       pendingFn.current = null;
       setWaiting(false);
       setStartError(null);
-      act((state, logs) => restartGame(state, logs));
+      act((state, logs) => restartGame(state, logs, goldBonusRef.current));
     };
 
     socket.on("phase:ready_update", onReadyUpdate);

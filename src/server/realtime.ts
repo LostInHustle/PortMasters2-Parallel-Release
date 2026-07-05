@@ -24,6 +24,7 @@ import type { Server as HttpServer } from "http";
 import { Server } from "socket.io";
 import { db } from "../lib/db";
 import { leaveRoomForUser, roomMemberIds } from "../lib/rooms";
+import { levelForRenownXP, renownTitleForLevel } from "../lib/game/legacy";
 
 // ---------- Types ----------
 type PublicUser = {
@@ -198,12 +199,17 @@ export function attachRealtime(httpServer: HttpServer): Server {
         roomStatuses.delete(roomId);
         roomBarterOffers.delete(roomId);
         roomAidRequests.delete(roomId);
+        concludedRooms.delete(roomId);
       } else {
         io.to(`room:${roomId}`).emit("room:system", {
           roomId,
           content: `${displayName}'s voyage has ended; they are no longer a member of this harbor`,
         });
         emitRoomMembers(roomId);
+        // The captain who just left might have been the only one still
+        // out at sea; everyone else could already be sitting at their
+        // endgame screen waiting on exactly this.
+        await maybeConcludeVoyage(roomId);
       }
     }, DEPARTURE_GRACE_MS);
     departureTimers.set(key, t);
@@ -304,6 +310,115 @@ export function attachRealtime(httpServer: HttpServer): Server {
     }
     cp.advancing = true;
     io.to(`room:${roomId}`).emit("phase:advance", { roomId, round: cp.round, phase: cp.phase });
+  }
+
+  // ---------- Voyage conclusion & Captain's Legacy ----------
+  // Fires once per room, the moment every current member has reported
+  // reaching either "endgame" or "bankruptcy": the whole harbor's voyage
+  // is over for everyone still seated in it, the same "who's actually
+  // still sailing" definition activeRosterSet uses above, just inverted.
+  // Whoever reached "endgame" (not bankrupt) with the highest reported
+  // Reputation is crowned Sea Master, the title this game has always
+  // promised the tutorial and README without any code that actually
+  // awarded it. This is also the one place a CaptainLegacy row ever gets
+  // written: Reputation earned this voyage becomes Renown XP on every
+  // finisher's account, persisting across every future voyage they ever
+  // sail, unlike Gold, cargo, and ship level, which a restart (see
+  // "room:restart" below) wipes on purpose. concludedRooms guards against
+  // firing twice for the same voyage; "room:restart" clears it so a
+  // room that plays again can conclude, and be crowned, again.
+  const concludedRooms = new Set<string>();
+
+  async function maybeConcludeVoyage(roomId: string) {
+    if (concludedRooms.has(roomId)) return;
+    const memberIds = await roomMemberIds(roomId);
+    if (memberIds.length === 0) return;
+    const statuses = roomStatuses.get(roomId);
+    if (!statuses) return;
+
+    const finished: { userId: string; user: PublicUser; reputation: number; gold: number; phase: string }[] = [];
+    for (const id of memberIds) {
+      const st = statuses.get(id);
+      const phase = st ? String(st.phase) : "";
+      if (phase !== "endgame" && phase !== "bankruptcy") return; // someone is still out at sea
+      finished.push({ userId: id, user: st.user, reputation: st.reputation ?? 0, gold: st.gold ?? 0, phase });
+    }
+
+    // Guard set right after the roster check passes, before any `await`
+    // below, so a second game:status arriving while the first captain's
+    // legacy write is still in flight can't slip through and process the
+    // same conclusion twice.
+    concludedRooms.add(roomId);
+
+    const crownable = finished.filter((f) => f.phase === "endgame");
+    const winnerId = crownable.length
+      ? crownable.reduce((best, f) => (f.reputation > best.reputation ? f : best)).userId
+      : null;
+
+    const standings: {
+      userId: string;
+      displayName: string;
+      avatarHue: number;
+      reputation: number;
+      gold: number;
+      crowned: boolean;
+      bankrupt: boolean;
+      renownLevel: number;
+      renownTitle: string;
+      xpGained: number;
+      leveledUp: boolean;
+    }[] = [];
+
+    for (const f of finished) {
+      const xpGained = Math.max(0, f.reputation);
+      const crowned = f.userId === winnerId;
+      const prior = await db.captainLegacy.findUnique({ where: { userId: f.userId } });
+      const newXP = (prior?.renownXP ?? 0) + xpGained;
+      const newLevel = levelForRenownXP(newXP);
+      const leveledUp = newLevel > (prior?.renownLevel ?? 1);
+      const newBestScore = Math.max(prior?.bestScore ?? 0, f.reputation);
+      await db.captainLegacy.upsert({
+        where: { userId: f.userId },
+        create: {
+          userId: f.userId,
+          renownXP: newXP,
+          renownLevel: newLevel,
+          voyagesCompleted: 1,
+          seaMasterCrowns: crowned ? 1 : 0,
+          bestScore: newBestScore,
+        },
+        update: {
+          renownXP: newXP,
+          renownLevel: newLevel,
+          voyagesCompleted: { increment: 1 },
+          ...(crowned ? { seaMasterCrowns: { increment: 1 } } : {}),
+          bestScore: newBestScore,
+        },
+      });
+
+      standings.push({
+        userId: f.userId,
+        displayName: f.user.displayName,
+        avatarHue: f.user.avatarHue,
+        reputation: f.reputation,
+        gold: f.gold,
+        crowned,
+        bankrupt: f.phase === "bankruptcy",
+        renownLevel: newLevel,
+        renownTitle: renownTitleForLevel(newLevel),
+        xpGained,
+        leveledUp,
+      });
+      if (leveledUp) {
+        io.to(`room:${roomId}`).emit("room:system", {
+          roomId,
+          content: `${f.user.displayName} reached Renown Level ${newLevel}: ${renownTitleForLevel(newLevel)}!`,
+        });
+      }
+    }
+    standings.sort((a, b) => b.reputation - a.reputation);
+
+    io.to(`room:${roomId}`).emit("room:voyage_complete", { roomId, winnerId, standings });
   }
 
   // ---------- Bartering ----------
@@ -642,6 +757,11 @@ export function attachRealtime(httpServer: HttpServer): Server {
       }
       await broadcastReadyState(roomId, cp);
       await maybeAdvance(roomId, cp);
+      // gameOver only ever becomes true at "bankruptcy" or "endgame" (see
+      // GameState.gameOver in src/lib/game/types.ts), the two phases this
+      // report could have just moved someone into, so this is the one
+      // handler that can ever be the report that completes a room.
+      if (broadcast.gameOver) await maybeConcludeVoyage(roomId);
     });
 
     socket.on("phase:ready", async (payload: { roomId?: string; round?: number; phase?: string | number }) => {
@@ -1085,6 +1205,8 @@ export function attachRealtime(httpServer: HttpServer): Server {
         roomStatuses.delete(roomId);
         clearBarter(roomId);
         clearAid(roomId);
+        // A restarted room can sail, and conclude, all over again.
+        concludedRooms.delete(roomId);
 
         io.to(`room:${roomId}`).emit("room:restarted", { roomId });
         const cp = await getCheckpoint(roomId);

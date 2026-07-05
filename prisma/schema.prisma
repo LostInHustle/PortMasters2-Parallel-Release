@@ -42,6 +42,7 @@ model User {
   gameStates   GameState[]
   sentMessages Message[]   @relation("MessageSender")
   recvMessages Message[]   @relation("MessageRecipient")
+  legacy       CaptainLegacy?
 }
 
 model Session {
@@ -116,6 +117,29 @@ model GameState {
   @@unique([userId, roomId])
   @@index([userId])
   @@index([roomId])
+}
+
+// A captain's progression across every voyage they've ever sailed, in
+// any room. Everything else in this schema is scoped to one room (or
+// one player within one room); this table is deliberately the one
+// exception, keyed only on userId. Written in exactly one place: the
+// voyage conclusion check in src/server/realtime.ts, the moment every
+// current member of a room has reported reaching either the endgame
+// screen or bankruptcy. See src/lib/game/legacy.ts for the level curve,
+// titles, and the starting Gold bonus this unlocks.
+model CaptainLegacy {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  renownLevel      Int      @default(1)
+  renownXP         Int      @default(0)
+  voyagesCompleted Int      @default(0)
+  // Times a captain has ended a voyage with the highest Reputation among
+  // everyone who reached the endgame screen (not bankrupt) in that room.
+  seaMasterCrowns  Int      @default(0)
+  bestScore        Int      @default(0)
+  updatedAt        DateTime @updatedAt
+
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Message {
