@@ -88,7 +88,6 @@ export type GameState = {
   phase2DemandTags: string[];
   revealedIntel: IntelItem[];
   intelCost: number;
-  intelOrderUsed: boolean;
   equippedModules: Module[];
   // Each round's boon and module draft pools, fixed once rolled (see
   // startBoonDrafting / startModuleDrafting in engine.ts) so reopening the
@@ -170,7 +169,6 @@ export function createInitialGameState(startingGoldBonus: number = 0): GameState
     phase2DemandTags: [],
     revealedIntel: [],
     intelCost: 5,
-    intelOrderUsed: false,
     equippedModules: [],
     boonChoices: [],
     boonSwapUsed: false,

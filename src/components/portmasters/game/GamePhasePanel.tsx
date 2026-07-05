@@ -324,6 +324,18 @@ function Purchase({
         <h2 className="text-lg font-semibold flex items-center gap-2"><Anchor className="h-5 w-5 text-teal-600 dark:text-teal-400" />Port Merchant Exchange</h2>
         <Button variant="secondary" size="sm" className="rounded-lg" onClick={onShowRumors}>🔮 Broker's Rumor Board</Button>
       </div>
+      {game.revealedIntel.length > 0 && (
+        <div className="rounded-lg border border-amber-500/25 bg-amber-500/[0.06] px-3.5 py-2.5 mb-3.5 text-xs">
+          <strong>🗣️ Broker's Whispers active this round:</strong>{" "}
+          {game.revealedIntel.map((i, idx) => (
+            <span key={idx}>
+              {idx > 0 && ", "}
+              {ICONS[i.item] ?? ""} {i.item} ({i.port})
+            </span>
+          ))}
+          <span className="text-muted-foreground"> (a matching order is guaranteed in Phase 2, buy accordingly).</span>
+        </div>
+      )}
       <MarketPriceReference game={game} />
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
         {game.resourceCards.map((c) => {
@@ -655,6 +667,18 @@ function Orders({
   return (
     <div>
       <h2 className="text-lg font-semibold mb-4 flex items-center gap-2"><Coins className="h-5 w-5 text-amber-600 dark:text-amber-400" />Trade Manifest</h2>
+      {game.revealedIntel.length > 0 && (
+        <div className="rounded-lg border border-amber-500/25 bg-amber-500/[0.06] px-3.5 py-2.5 mb-3.5 text-xs">
+          <strong>🗣️ Broker's Whispers active this round:</strong>{" "}
+          {game.revealedIntel.map((i, idx) => (
+            <span key={idx}>
+              {idx > 0 && ", "}
+              {ICONS[i.item] ?? ""} {i.item} ({i.port})
+            </span>
+          ))}
+          <span className="text-muted-foreground"> (look for the 🔮 badge below).</span>
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
         {game.customerCards.map((o) => {
           const canComplete = o.resources.every(r => (game.inventory[r.type] || 0) >= r.required!);
@@ -671,10 +695,12 @@ function Orders({
             totalVat = vatBreakdown.final * o.resources[0].required!;
             netProfit -= totalVat;
           }
+          const matchesIntel = game.revealedIntel.some((i) => o.resources.some((r) => r.type === i.item));
           return (
-            <div key={o.id} className="rounded-xl border border-black/10 dark:border-white/10 bg-background/50 overflow-hidden flex flex-col">
-              <div className="px-3.5 py-2 text-xs font-semibold border-b border-black/5 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03]">
-                📍 {o.demandPort} <span className="text-muted-foreground">{o.isProductOrder ? "· Finished Product Demand" : "· Raw Material Demand"}</span>
+            <div key={o.id} className={cn("rounded-xl border overflow-hidden flex flex-col", matchesIntel ? "border-amber-500/40 bg-amber-500/[0.04]" : "border-black/10 dark:border-white/10 bg-background/50")}>
+              <div className="px-3.5 py-2 text-xs font-semibold border-b border-black/5 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] flex items-center justify-between gap-2">
+                <span>📍 {o.demandPort} <span className="text-muted-foreground">{o.isProductOrder ? "· Finished Product Demand" : "· Raw Material Demand"}</span></span>
+                {matchesIntel && <span className="text-amber-600 dark:text-amber-400 shrink-0">🔮 Guaranteed</span>}
               </div>
               <div className="p-3.5 flex-1 space-y-1.5">
                 {o.resources.map((r, i) => {

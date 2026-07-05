@@ -295,13 +295,19 @@ function genProductOrder(rng: Rng, filter: string | null = null): Omit<OrderCard
   return { demandPort: port, resources: [{ type: product, required: req }], reward: basePrice * req, totalItems: req, isProductOrder: true };
 }
 
-function genMixedOrder(state: GameState, rng: Rng): Omit<OrderCard, "id"> {
-  if (state.revealedIntel.length && !state.intelOrderUsed) {
-    const intel = pick(rng, state.revealedIntel);
-    state.intelOrderUsed = true;
-    if ((RESOURCES as readonly string[]).includes(intel.item)) return genRawOrder(rng, intel.item);
-    if ((PRODUCTS as readonly string[]).includes(intel.item)) return genProductOrder(rng, intel.item);
-  }
+// Deliberately a pure function of rng only. It used to also take `state`
+// so it could fold a captain's own revealed Broker's Whisper intel
+// straight into whichever of the 5 shared order slots it was generating
+// at the time, which meant the number of rng() calls this consumed
+// depended on that captain's own purchase history. Since orderRng below
+// is the same *shared, room-wide* seeded stream every captain's client
+// derives independently (see the file header), a captain who bought
+// intel silently shifted their own view of every order after the one
+// intel touched out of sync with everyone else's, breaking the "every
+// captain sees the identical market" guarantee this whole seeding scheme
+// exists for. See startPhase2 for where the intel guarantee actually
+// happens now: entirely after, and independent of, this shared draw.
+function genMixedOrder(rng: Rng): Omit<OrderCard, "id"> {
   return rng() < 0.5 ? genRawOrder(rng) : genProductOrder(rng);
 }
 
@@ -641,7 +647,6 @@ export function endRound(state: GameState, logs: string[]) {
   state.modifierFlags = {};
   state.phase2DemandTags = [];
   state.revealedIntel = [];
-  state.intelOrderUsed = false;
   state.roundRevenue = 0;
   state.roundCosts = 0;
   state.maintenanceCosts = 0;
@@ -782,7 +787,6 @@ export function startPhase1(state: GameState, ctx: GameContext, logs: string[]) 
     if (!state.phase2DemandTags.includes(t)) state.phase2DemandTags.push(t);
   }
   state.revealedIntel = [];
-  state.intelOrderUsed = false;
   logs.push(`\n⚓=== Round ${state.currentRound} - Phase 1: Port Purchase ===`);
   logs.push(`💰 Current Funds: ${state.money} Gold`);
   // [ONLINE] Deterministic port market per (room, round).
@@ -880,11 +884,31 @@ export function startPhase2(state: GameState, ctx: GameContext, logs: string[]) 
   state.orderCount = 0;
   state.completedOrders = [];
   logs.push(`\n🤝=== Round ${state.currentRound} - Phase 2: Trade Transaction ===`);
-  // [ONLINE] Deterministic trade orders per (room, round).
+  // [ONLINE] Deterministic trade orders per (room, round): every captain
+  // in the room independently derives the identical base 5 orders here,
+  // since this loop never reads anything captain specific.
   const orderRng = createRng(`${ctx.seedBase}:R${state.currentRound}:orders`);
   state.customerCards = [];
   for (let i = 0; i < 5; i++) {
-    state.customerCards.push({ id: i, ...genMixedOrder(state, orderRng) });
+    state.customerCards.push({ id: i, ...genMixedOrder(orderRng) });
+  }
+  // Broker's Whisper guarantee, applied after the shared draw above and
+  // entirely with this captain's own randomness, so it can never nudge
+  // what anyone else in the room sees. One order slot is overwritten per
+  // rumor this captain has revealed and not yet cashed in this round
+  // (see purchaseIntel), up to however many revealed items and order
+  // slots there are; previously a single `intelOrderUsed` flag capped
+  // this at one guarantee per round no matter how many rumors a captain
+  // had revealed (Broker's Network reveals two per purchase), so the
+  // second rumor's "guaranteed" order silently never appeared.
+  const guaranteedCount = Math.min(state.revealedIntel.length, state.customerCards.length);
+  for (let i = 0; i < guaranteedCount; i++) {
+    const intel = state.revealedIntel[i];
+    const localRng: Rng = Math.random;
+    const guaranteed = (RESOURCES as readonly string[]).includes(intel.item)
+      ? genRawOrder(localRng, intel.item)
+      : genProductOrder(localRng, intel.item);
+    state.customerCards[i] = { id: state.customerCards[i].id, ...guaranteed };
   }
 }
 
