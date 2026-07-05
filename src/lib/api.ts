@@ -1,6 +1,8 @@
 // =====================================================================
 // PortMasters 2 Parallel Release: REST API helpers (typed fetch wrappers)
 // =====================================================================
+import type { CaptainLegacySummary } from "@/lib/game/legacy";
+
 export type PublicUser = {
   id: string;
   username: string;
@@ -86,4 +88,7 @@ export const api = {
   // DMs
   getDmHistory: (otherUserId: string) =>
     jfetch<{ other: PublicUser; messages: ChatMessage[] }>(`/api/messages/dm/${otherUserId}`),
+
+  // Captain's Legacy (persistent Renown, across every voyage the account has played)
+  getLegacy: () => jfetch<{ legacy: CaptainLegacySummary }>("/api/legacy"),
 };

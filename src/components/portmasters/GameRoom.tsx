@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { api, type ChatMessage, type PublicUser, type RoomDetail } from "@/lib/api";
+import type { VoyageCompleteEvent } from "@/lib/realtime";
+import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import { useRealtime } from "@/lib/use-realtime";
 import { useGameSession } from "@/lib/use-game-session";
 import { usePhaseSync } from "@/lib/use-phase-sync";
@@ -56,8 +58,8 @@ export function GameRoom({
   onLeave: () => void;
 }) {
   const { socket, connected, authed, onlineUsers } = useRealtime(me);
-  const { state, act, ctx, flush } = useGameSession(room.id, socket, true);
-  const phaseSync = usePhaseSync(room.id, socket, state.game, act, authed, me.id);
+  const { state, act, ctx, flush, startingGoldBonus } = useGameSession(room.id, socket, true);
+  const phaseSync = usePhaseSync(room.id, socket, state.game, act, authed, me.id, startingGoldBonus);
 
   // A trade involving me just closed, on either side: as the one who
   // clicked Trade (pay the requested item, receive the offered one), or
@@ -115,6 +117,39 @@ export function GameRoom({
     if (!socket || !authed) return;
     socket.emit("room:join", { roomId: room.id });
   }, [socket, authed, room.id]);
+
+  // Fires once, the moment every captain still seated in the room has
+  // reached either the endgame screen or bankruptcy (see
+  // maybeConcludeVoyage in src/server/realtime.ts): who was crowned Sea
+  // Master, and everyone's final standing. Re-fetches my own Captain's
+  // Legacy right after, since that's the one place its Renown XP,
+  // level, and Sea Master crown count actually change. Cleared on
+  // "room:restarted" so a fresh voyage's Endgame screen doesn't show the
+  // previous one's standings while waiting on the new one to conclude.
+  const [voyageResult, setVoyageResult] = useState<VoyageCompleteEvent | null>(null);
+  const [myLegacy, setMyLegacy] = useState<CaptainLegacySummary | null>(null);
+  useEffect(() => {
+    if (!socket) return;
+    const onVoyageComplete = (data: VoyageCompleteEvent) => {
+      if (data.roomId !== room.id) return;
+      setVoyageResult(data);
+      api.getLegacy().then(({ legacy }) => setMyLegacy(legacy)).catch(() => {});
+      const mine = data.standings.find((s) => s.userId === me.id);
+      if (mine?.crowned) {
+        toast.success("Crowned Sea Master!", { description: `Highest Reputation in the harbor this voyage: ${mine.reputation}.` });
+      }
+    };
+    const onRestarted = (data: { roomId: string }) => {
+      if (data.roomId !== room.id) return;
+      setVoyageResult(null);
+    };
+    socket.on("room:voyage_complete", onVoyageComplete);
+    socket.on("room:restarted", onRestarted);
+    return () => {
+      socket.off("room:voyage_complete", onVoyageComplete);
+      socket.off("room:restarted", onRestarted);
+    };
+  }, [socket, room.id, me.id]);
 
   // settleOutstandingDebts (engine.ts) runs deep inside the endRound
   // mutation, with no way to call socket.emit itself, so it leaves the
@@ -441,6 +476,8 @@ export function GameRoom({
               phaseSync={phaseSync}
               barter={barter}
               aid={aid}
+              voyageResult={voyageResult}
+              myLegacy={myLegacy}
               onRestart={handleRestart}
               onShowRumors={() => setRumorOpen(true)}
               onShowGuide={() => setGuideOpen(true)}

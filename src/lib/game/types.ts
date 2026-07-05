@@ -128,10 +128,16 @@ export type GameContext = {
   seedBase: string;
 };
 
-export function createInitialGameState(): GameState {
+// startingGoldBonus comes from the captain's persistent Renown level (see
+// src/lib/game/legacy.ts and use-game-session.ts's START_FRESH handling)
+// so a captain with a long track record starts every fresh voyage a
+// little ahead, never behind. Defaults to 0 for any caller that doesn't
+// know the captain's Renown yet, so every existing call site keeps
+// working unchanged.
+export function createInitialGameState(startingGoldBonus: number = 0): GameState {
   return {
     inventory: { Hemp: 8, Silk: 5, Tea: 3, "Linen Clothes": 0, "Cotton Clothes": 0, Brocade: 0, Sachet: 0 },
-    money: 100,
+    money: 100 + startingGoldBonus,
     score: 0,
     currentRound: 1,
     maxRounds: MAX_ROUNDS,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import type { Socket } from "socket.io-client";
 import {
@@ -9,6 +9,7 @@ import {
   snapToCheckpoint,
 } from "@/lib/game/engine";
 import { createInitialGameState, type GameContext, type GameState } from "@/lib/game/types";
+import { renownStartingGoldBonus } from "@/lib/game/legacy";
 
 type SessionState = {
   game: GameState;
@@ -21,7 +22,7 @@ type SessionState = {
 type Action =
   | { type: "INIT"; game: GameState; logs: string[] }
   | { type: "APPLY"; fn: (g: GameState, logs: string[]) => void; postDraft?: boolean }
-  | { type: "START_FRESH"; checkpoint?: { round: number; phase: string } | null; ctx?: GameContext }
+  | { type: "START_FRESH"; checkpoint?: { round: number; phase: string } | null; ctx?: GameContext; startingGoldBonus?: number }
   | { type: "SET_SAVING"; saving: boolean; at: number };
 
 function reducer(state: SessionState, action: Action): SessionState {
@@ -29,7 +30,7 @@ function reducer(state: SessionState, action: Action): SessionState {
     case "INIT":
       return { ...state, game: action.game, logs: action.logs, loaded: true };
     case "START_FRESH": {
-      const g = createInitialGameState();
+      const g = createInitialGameState(action.startingGoldBonus ?? 0);
       const logs: string[] = [];
       showWelcome(g, logs);
       // A genuinely new captain (no save of their own yet) joins wherever
@@ -63,6 +64,12 @@ export function useGameSession(roomId: string, socket: Socket | null, enabled: b
     saving: false,
     lastSavedAt: null,
   });
+  // The captain's Renown level translates to a small starting Gold bonus
+  // (see src/lib/game/legacy.ts) applied both to a brand new voyage below
+  // and, later, to a host-triggered restart (see usePhaseSync, which
+  // takes this as a parameter so its own reset stays consistent with
+  // whatever a fresh join would grant).
+  const [startingGoldBonus, setStartingGoldBonus] = useState(0);
 
   // Load saved state on mount / room change.
   useEffect(() => {
@@ -83,9 +90,17 @@ export function useGameSession(roomId: string, socket: Socket | null, enabled: b
 
     (async () => {
       try {
-        const { state: raw, checkpoint } = await api.getGameState(roomId);
+        const [{ state: raw, checkpoint }, legacyResult] = await Promise.all([
+          api.getGameState(roomId),
+          // A brand new captain (no CaptainLegacy row yet) or a fetch
+          // that fails outright just means no bonus this load; never
+          // block picking up the actual voyage over it.
+          api.getLegacy().catch(() => null),
+        ]);
         if (!alive || loadTimedOut) return;
         clearTimeout(timeoutId);
+        const goldBonus = legacyResult ? renownStartingGoldBonus(legacyResult.legacy.renownLevel) : 0;
+        setStartingGoldBonus(goldBonus);
         if (raw) {
           const game = JSON.parse(raw) as GameState;
           // Ensure required arrays exist (back-compat).
@@ -115,6 +130,7 @@ export function useGameSession(roomId: string, socket: Socket | null, enabled: b
             type: "START_FRESH",
             checkpoint: checkpoint ? { round: checkpoint.currentRound, phase: checkpoint.currentPhase } : null,
             ctx,
+            startingGoldBonus: goldBonus,
           });
         }
       } catch {
@@ -234,5 +250,5 @@ export function useGameSession(roomId: string, socket: Socket | null, enabled: b
     [],
   );
 
-  return { state, act, ctx, flush };
+  return { state, act, ctx, flush, startingGoldBonus };
 }

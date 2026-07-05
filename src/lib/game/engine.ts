@@ -1060,8 +1060,8 @@ export function endGame(state: GameState, logs: string[]) {
   logs.push("=".repeat(50));
 }
 
-export function restartGame(state: GameState, logs: string[]) {
-  const fresh = createInitialGameState();
+export function restartGame(state: GameState, logs: string[], startingGoldBonus: number = 0) {
+  const fresh = createInitialGameState(startingGoldBonus);
   Object.assign(state, fresh);
   logs.length = 0;
   showWelcome(state, logs);
