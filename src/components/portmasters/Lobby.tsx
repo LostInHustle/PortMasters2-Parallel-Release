@@ -458,7 +458,7 @@ export function Lobby({
       </main>
 
       <Dialog open={legacyOpen} onOpenChange={setLegacyOpen}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><Star className="h-5 w-5 text-amber-500" />Captain's Legacy</DialogTitle>
             <DialogDescription>Renown carries across every voyage this account ever sails, in any harbor.</DialogDescription>
