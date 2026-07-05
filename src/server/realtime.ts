@@ -72,12 +72,30 @@ export function attachRealtime(httpServer: HttpServer): Server {
     io.emit("presence:update", { users: onlineUsers() });
   }
 
+  // One row per *user*, never per socket. A captain can hold several
+  // sockets at once, legitimately (two browser tabs) or transiently (a
+  // reconnect's brand-new socket while the dropped one is still inside
+  // pingTimeout and so still sitting in `sockets` with its roomId set).
+  // The roster has to collapse all of them down to a single seat. This
+  // mirrors how onlineUsers() already dedupes presence by userId; without
+  // the same dedupe here, any network that recycles idle WebSockets (a
+  // hosting edge proxy is the common one) makes the same captain appear
+  // two or three times, each frozen on a different game:status, exactly
+  // the "duplicate me with different statuses" symptom.
   function roomMembers(roomId: string) {
-    const members: Array<PublicUser & { socketId: string }> = [];
-    for (const [sid, s] of sockets) {
-      if (s.roomId === roomId) members.push({ ...s.user, socketId: sid });
+    const byUser = new Map<string, PublicUser & { socketId: string }>();
+    // Reverse-iterate so the newest socket (inserted last) wins the dedup.
+    // When a hosting edge proxy recycles an idle WebSocket, the stale one
+    // hangs around in `sockets` until pingTimeout fires, if it wins the
+    // dedup, every other captain sees a frozen status for that user.  By
+    // walking newest-first, the freshly-reconnected (or even just more
+    // recently active) socket always claims the roster slot.
+    for (const [sid, s] of Array.from(sockets.entries()).reverse()) {
+      if (s.roomId === roomId && !byUser.has(s.userId)) {
+        byUser.set(s.userId, { ...s.user, socketId: sid });
+      }
     }
-    return members;
+    return Array.from(byUser.values());
   }
 
   // Includes the room's current host so a reassigned host (the original
@@ -120,6 +138,16 @@ export function attachRealtime(httpServer: HttpServer): Server {
     if (!m) return;
     m.delete(userId);
     if (m.size === 0) roomStatuses.delete(roomId);
+  }
+
+  // Like forgetStatus, but only actually forgets when the user has no live
+  // sockets left at all.  A socket disconnect (or a transport blip that
+  // looks like one to the server) shouldn't erase the one piece of data the
+  // roster uses to show live gold/reputation/phase, not while another tab
+  // or a just-reconnected socket is still around to keep it current.
+  function forgetStatusIfLastSocket(roomId: string, userId: string) {
+    const set = userSockets.get(userId);
+    if (!set || set.size === 0) forgetStatus(roomId, userId);
   }
 
   // ---------- Abandoned-room cleanup ----------
@@ -415,7 +443,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
       }
       if (state.roomId) {
         socket.leave(`room:${state.roomId}`);
-        forgetStatus(state.roomId, state.userId);
+        forgetStatusIfLastSocket(state.roomId, state.userId);
         emitRoomMembers(state.roomId);
       }
     }
@@ -472,7 +500,10 @@ export function attachRealtime(httpServer: HttpServer): Server {
       // Leave previous room channel if any.
       if (s.roomId) {
         socket.leave(`room:${s.roomId}`);
-        forgetStatus(s.roomId, s.userId);
+        // Guarded: the user may have another tab still sitting in the old
+        // room, and that tab's heartbeat is the only thing keeping the
+        // roster status live for them there.
+        forgetStatusIfLastSocket(s.roomId, s.userId);
         io.to(`room:${s.roomId}`).emit("room:system", {
           roomId: s.roomId,
           content: `${s.user.displayName} set sail for another port`,
@@ -539,6 +570,22 @@ export function attachRealtime(httpServer: HttpServer): Server {
       if (!s.roomId) return;
       const roomId = payload?.roomId ?? s.roomId;
       if (roomId !== s.roomId) return;
+
+      // Only the newest socket for a user is allowed to update the room's
+      // status cache and broadcast.  A stale socket that hasn't been cleaned
+      // up yet (Railway edge proxy recycling, pingTimeout not yet fired)
+      // would otherwise keep spraying frozen phase/gold/reputation data
+      // across the room, making the same captain flicker between two
+      // different statuses on everyone else's roster, the exact "duplicate
+      // me with different statuses" symptom.
+      {
+        let newest = false;
+        for (const [sid, st] of Array.from(sockets.entries()).reverse()) {
+          if (st.userId === s.userId) { newest = sid === socket.id; break; }
+        }
+        if (!newest) return;
+      }
+
       const broadcast = {
         roomId,
         user: s.user,
@@ -609,7 +656,16 @@ export function attachRealtime(httpServer: HttpServer): Server {
       // one connected at that instant) can't accidentally start the
       // voyage alone.
       if (cp.phase === "0") return;
-      if (payload?.round !== cp.round || String(payload?.phase) !== cp.phase) return;
+      if (payload?.round !== cp.round || String(payload?.phase) !== cp.phase) {
+        // The client is voting on a stale checkpoint.  Instead of
+        // silently dropping the vote (which leaves them stuck at
+        // "Waiting…" forever on a tunnelled connection where the
+        // earlier phase:advance was eaten by a proxy), send them the
+        // authoritative ready state right now so their self-healing /
+        // desync-catch-up in usePhaseSync can get them back in sync.
+        io.to(socket.id).emit("phase:ready_update", await readyStatePayload(roomId, cp));
+        return;
+      }
       cp.readyUserIds.add(s.userId);
       await broadcastReadyState(roomId, cp);
       await maybeAdvance(roomId, cp);
@@ -1048,7 +1104,11 @@ export function attachRealtime(httpServer: HttpServer): Server {
           if (set.size === 0) userSockets.delete(s.userId);
         }
         if (s.roomId) {
-          forgetStatus(s.roomId, s.userId);
+          // Don't erase the live status cache unless every socket the user
+          // owns is gone; a parallel tab or a freshly-reconnected socket
+          // that hasn't emitted game:status yet otherwise leaves a
+          // "loading…" gap on every other captain's roster.
+          forgetStatusIfLastSocket(s.roomId, s.userId);
           io.to(`room:${s.roomId}`).emit("room:system", {
             roomId: s.roomId,
             content: `${s.user.displayName} has gone ashore`,

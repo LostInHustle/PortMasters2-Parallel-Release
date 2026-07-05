@@ -45,7 +45,29 @@ export function MembersPanel({
 
     const onMembers = (data: { roomId: string; members: RoomMemberLive[] }) => {
       if (data.roomId !== roomId) return;
-      setMembers(data.members);
+      // Defensive dedupe by id. The server now collapses a captain's many
+      // sockets to one roster row, but a stale duplicate must never reach
+      // the render below: it would collide on React's `key={m.id}`, whose
+      // reconciliation is undefined and leaves a ghost row stuck on an old
+      // status next to the live one.
+      const seen = new Set<string>();
+      const filtered = data.members.filter((m) => (seen.has(m.id) ? false : (seen.add(m.id), true)));
+      setMembers(filtered);
+      // Prune status entries for captains who are no longer in the room.
+      // Over a long session the status map can accumulate departed members
+      // whose last-known gold/reputation is now meaningless, and if a new
+      // captain later joins with the same user id (impossible in practice
+      // but defensive), the stale status would briefly flash before the
+      // first live heartbeat overwrites it.
+      const memberIds = new Set(filtered.map((m) => m.id));
+      setStatuses((prev) => {
+        let changed = false;
+        const next: StatusMap = {};
+        for (const [id, st] of Object.entries(prev)) {
+          if (memberIds.has(id)) { next[id] = st; } else { changed = true; }
+        }
+        return changed ? next : prev;
+      });
     };
     const onStatus = (u: GameStatusUpdate) => {
       if (u.roomId !== roomId) return;
@@ -102,6 +124,9 @@ export function MembersPanel({
             <motion.button
               key={m.id}
               layout
+              whileHover={{ scale: 1.01, y: -1 }}
+              whileTap={{ scale: 0.97 }}
+              transition={{ duration: 0.12, ease: "easeOut" }}
               onClick={() => onSelectPlayer(m.id)}
               className={cn(
                 "w-full flex items-center gap-2.5 rounded-xl p-2 border text-left transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.05]",

@@ -147,13 +147,13 @@ export function GamePhasePanel({ game, ctx, act, members, myUserId, isHost, phas
   }
   return (
     <div className="pm-glass rounded-2xl p-4 sm:p-5 min-h-[520px]">
-      <AnimatePresence mode="wait">
+      <AnimatePresence mode="sync">
         <motion.div
           key={String(game.phase) + ":" + game.currentRound}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
-          transition={{ duration: 0.22, ease: "easeOut" }}
+          initial={{ opacity: 0, y: 12, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -12, scale: 0.98 }}
+          transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1.0] }}
         >
           {renderPhase()}
         </motion.div>
@@ -264,10 +264,16 @@ export function GamePhasePanel({ game, ctx, act, members, myUserId, isHost, phas
             {game.boonSwapUsed ? "✅ Boons Swapped This Voyage" : "🔄 Swap Boons (10💰, 1 use/voyage)"}
           </Button>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <motion.div
+          className="grid grid-cols-1 sm:grid-cols-3 gap-4"
+          initial="hidden"
+          animate="visible"
+          variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}
+        >
           {picks.map((b) => (
             <motion.div
               key={b.id}
+              variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0, transition: { duration: 0.22, ease: "easeOut" } } }}
               whileHover={{ y: -6 }}
               className="pm-glass rounded-2xl p-5 flex flex-col items-center text-center border border-amber-500/20"
             >
@@ -279,7 +285,7 @@ export function GamePhasePanel({ game, ctx, act, members, myUserId, isHost, phas
               </Button>
             </motion.div>
           ))}
-        </div>
+        </motion.div>
       </div>
     );
   }
@@ -856,9 +862,19 @@ export function GamePhasePanel({ game, ctx, act, members, myUserId, isHost, phas
                 {game.moduleSwapUsed ? "✅ Choices Swapped This Voyage" : "🎲 Swap Choices (1 use/voyage)"}
               </Button>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <motion.div
+              className="grid grid-cols-1 sm:grid-cols-3 gap-4"
+              initial="hidden"
+              animate="visible"
+              variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}
+            >
               {picks.map((m, i) => (
-                <motion.div key={m.id} whileHover={{ y: -6 }} className="pm-glass rounded-2xl p-5 flex flex-col items-center text-center border border-teal-500/20">
+                <motion.div
+                  key={m.id}
+                  variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0, transition: { duration: 0.22, ease: "easeOut" } } }}
+                  whileHover={{ y: -6 }}
+                  className="pm-glass rounded-2xl p-5 flex flex-col items-center text-center border border-teal-500/20"
+                >
                   <div className="text-5xl mb-2">{m.icon}</div>
                   <div className="font-semibold mb-2"><Term term={m.name}>{m.name}</Term></div>
                   <div className="text-xs text-muted-foreground leading-relaxed flex-1 mb-4">{m.desc}</div>
@@ -867,7 +883,7 @@ export function GamePhasePanel({ game, ctx, act, members, myUserId, isHost, phas
                   </Button>
                 </motion.div>
               ))}
-            </div>
+            </motion.div>
           </>
         )}
         <div className="mt-5">
