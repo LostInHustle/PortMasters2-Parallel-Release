@@ -255,10 +255,41 @@ export function TutorialModal({ open, onOpenChange }: { open: boolean; onOpenCha
   );
 }
 
+// One stat, its own tile instead of a pill sharing a row with three
+// others. Reused for every number the profile leads with (Gold,
+// Reputation, Ship Level), so a future stat is one more tile, not a
+// rework of a cramped row.
+function ProfileStatTile({
+  icon,
+  value,
+  label,
+  toneClassName,
+}: {
+  icon: React.ReactNode;
+  value: string | number;
+  label: string;
+  toneClassName: string;
+}) {
+  return (
+    <div className="rounded-lg bg-black/[0.03] dark:bg-white/[0.05] py-2 text-center">
+      <div className={cn("text-sm font-semibold flex items-center justify-center gap-1", toneClassName)}>
+        {icon} {value}
+      </div>
+      <div className="text-[10px] text-muted-foreground mt-0.5">{label}</div>
+    </div>
+  );
+}
+
 /**
  * The "click a collapsed roster bar, see everything" popup. Doubles as a
  * bankrupt captain's spectator window. There's no separate read-only
  * board, watching the rest of the room just means opening their popups.
+ *
+ * Laid out as a profile: an identity header, a headline stat row, Renown
+ * underneath it, then cargo/workers and modules/log side by side. The
+ * previous version stacked seven separate boxes in one narrow column
+ * inside a wide dialog, tightly packed text top to bottom while using
+ * barely half the available width; this uses the width instead.
  */
 export function PlayerDetailModal({
   open,
@@ -287,103 +318,127 @@ export function PlayerDetailModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2.5">
-            {player && <Avatar hue={player.avatarHue} name={player.displayName} size={32} />}
-            {player?.displayName ?? "Captain"} {isMe && <span className="text-xs text-muted-foreground font-normal">(you)</span>}
-          </DialogTitle>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3">
+              {player && <Avatar hue={player.avatarHue} name={player.displayName} size={44} />}
+              <div>
+                <DialogTitle className="flex items-center gap-2 text-base">
+                  {player?.displayName ?? "Captain"}
+                  {isMe && <span className="text-xs text-muted-foreground font-normal">(you)</span>}
+                </DialogTitle>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  {detail ? phaseLabel({ phase: detail.phase, currentRound: detail.round }) : loading ? "Loading…" : "Unavailable"}
+                </div>
+              </div>
+            </div>
+            {detail?.phase === "bankruptcy" && <Pill tone="rose" className="shrink-0">💥 Bankrupt, spectating</Pill>}
+            {detail?.phase === "endgame" && <Pill tone="amber" className="shrink-0">🏁 Voyage complete</Pill>}
+          </div>
           <DialogDescription className="sr-only">Detailed voyage status</DialogDescription>
         </DialogHeader>
-
-        {/* Renown is server side, account wide data (see src/lib/game/legacy.ts),
-            so it's shown independently of the live cargo/workers/log detail
-            below, which relies on that captain's own client relaying it back
-            and can be unavailable if they've stepped away. */}
-        {legacy && <CaptainLegacyCard legacy={legacy} compact />}
 
         {!detail ? (
           <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm py-10">
             {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Asking the harbor master…</> : "Not available right now, they may have stepped away."}
           </div>
         ) : (
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <Pill tone="emerald"><Coins className="h-3 w-3" /> {detail.money} Gold</Pill>
-              <Pill tone="gold"><Trophy className="h-3 w-3" /> {detail.score} Reputation</Pill>
-              <Pill tone="sea"><Ship className="h-3 w-3" /> Ship Lv {detail.shipLevel}</Pill>
-              <Pill tone="default">{phaseLabel({ phase: detail.phase, currentRound: detail.round })}</Pill>
-              {detail.phase === "bankruptcy" && <Pill tone="rose">💥 Bankrupt, spectating</Pill>}
-              {detail.phase === "endgame" && <Pill tone="amber">🏁 Voyage complete</Pill>}
+          <div className="space-y-3.5">
+            {/* Headline: this voyage's numbers, each in its own tile
+                instead of a row of pills competing for space. */}
+            <div className="grid grid-cols-3 gap-2">
+              <ProfileStatTile icon={<Coins className="h-3.5 w-3.5" />} value={detail.money} label="Gold" toneClassName="text-emerald-600 dark:text-emerald-400" />
+              <ProfileStatTile icon={<Trophy className="h-3.5 w-3.5" />} value={detail.score} label="Reputation" toneClassName="text-amber-600 dark:text-amber-400" />
+              <ProfileStatTile icon={<Ship className="h-3.5 w-3.5" />} value={detail.shipLevel} label="Ship Level" toneClassName="text-teal-600 dark:text-teal-400" />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="rounded-xl border border-teal-500/15 bg-teal-500/[0.03] p-3.5">
-                <h4 className="text-xs font-semibold text-muted-foreground mb-2">📦 Raw Materials</h4>
-                {RESOURCES.map((r) => (
-                  <div key={r} className="flex items-center text-[12px] py-0.5">
-                    <span className="mr-1.5">{ICONS[r]}</span>
-                    <span className="flex-1" style={{ color: COLORS[r] }}>{r}</span>
-                    <b style={{ color: COLORS[r] }}>{detail.inventory[r] || 0}</b>
-                  </div>
-                ))}
-              </div>
-              <div className="rounded-xl border border-teal-500/15 bg-teal-500/[0.03] p-3.5">
-                <h4 className="text-xs font-semibold text-muted-foreground mb-2">🧵 Finished Goods</h4>
-                {PRODUCTS.map((r) => (
-                  <div key={r} className="flex items-center text-[12px] py-0.5">
-                    <span className="mr-1.5">{ICONS[r]}</span>
-                    <span className="flex-1" style={{ color: COLORS[r] }}>{r}</span>
-                    <b style={{ color: COLORS[r] }}>{detail.inventory[r] || 0}</b>
-                  </div>
-                ))}
-              </div>
-            </div>
+            {/* Renown is server side, account wide data (see
+                src/lib/game/legacy.ts), so it's shown independently of
+                the live cargo/workers/log below, which relies on that
+                captain's own client relaying it back and can be
+                unavailable if they've stepped away. */}
+            {legacy && <CaptainLegacyCard legacy={legacy} compact />}
 
-            <div className="rounded-xl border border-black/10 dark:border-white/10 p-3.5">
-              <h4 className="text-xs font-semibold text-muted-foreground mb-2">👥 Workers</h4>
-              {workerGroups.every((g) => g.list.length === 0) ? (
-                <p className="text-xs text-muted-foreground">No artisans hired yet.</p>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  {workerGroups.filter((g) => g.list.length > 0).map((g) => (
-                    <div key={g.name}>
-                      <div className="text-[11px] font-semibold mb-1">{g.icon} {g.name} ({g.list.length})</div>
-                      {g.list.map((w, i) => (
-                        <div key={i} className="text-[11px] text-muted-foreground">
-                          {w.task ? `Working: ${w.task}${w.isSkilled ? " ⭐" : ""}` : `Idle${w.isSkilled ? " ⭐" : ""}`}
+            {/* Body: cargo and workers on the left, modules and the log
+                on the right, instead of four boxes stacked one under
+                the other in a single narrow column. */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
+              <div className="space-y-3.5">
+                <div className="rounded-xl border border-teal-500/15 bg-teal-500/[0.03] p-3.5">
+                  <h4 className="text-xs font-semibold text-muted-foreground mb-2">📦 Cargo</h4>
+                  <div className="grid grid-cols-2 gap-x-4">
+                    <div>
+                      <div className="text-[10px] font-medium text-muted-foreground mb-1">Raw Materials</div>
+                      {RESOURCES.map((r) => (
+                        <div key={r} className="flex items-center text-[12px] py-0.5">
+                          <span className="mr-1.5">{ICONS[r]}</span>
+                          <span className="flex-1" style={{ color: COLORS[r] }}>{r}</span>
+                          <b style={{ color: COLORS[r] }}>{detail.inventory[r] || 0}</b>
                         </div>
                       ))}
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="rounded-xl border border-black/10 dark:border-white/10 p-3.5">
-              <h4 className="text-xs font-semibold text-muted-foreground mb-2">🔧 Equipped Modules</h4>
-              {detail.equippedModules.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No modules installed.</p>
-              ) : (
-                <div className="space-y-1">
-                  {detail.equippedModules.map((m) => (
-                    <div key={m.id} className="text-[12px]">{m.icon} <strong>{m.name}</strong>: {m.desc}</div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="rounded-xl border border-black/10 dark:border-white/10 p-3.5">
-              <h4 className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1.5"><Eye className="h-3.5 w-3.5" /> Recent Log</h4>
-              <ScrollArea className="h-32 pr-2">
-                {detail.logs.length === 0 ? (
-                  <p className="text-xs text-muted-foreground/70 italic">Nothing logged yet.</p>
-                ) : (
-                  <div className="space-y-0.5 font-mono text-[11px] leading-relaxed">
-                    {detail.logs.map((l, i) => <div key={i} className="whitespace-pre-wrap break-words">{l}</div>)}
+                    <div>
+                      <div className="text-[10px] font-medium text-muted-foreground mb-1">Finished Goods</div>
+                      {PRODUCTS.map((r) => (
+                        <div key={r} className="flex items-center text-[12px] py-0.5">
+                          <span className="mr-1.5">{ICONS[r]}</span>
+                          <span className="flex-1" style={{ color: COLORS[r] }}>{r}</span>
+                          <b style={{ color: COLORS[r] }}>{detail.inventory[r] || 0}</b>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                )}
-              </ScrollArea>
+                </div>
+
+                <div className="rounded-xl border border-black/10 dark:border-white/10 p-3.5">
+                  <h4 className="text-xs font-semibold text-muted-foreground mb-2">👥 Workers</h4>
+                  {workerGroups.every((g) => g.list.length === 0) ? (
+                    <p className="text-xs text-muted-foreground">No artisans hired yet.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      {workerGroups.filter((g) => g.list.length > 0).map((g) => (
+                        <div key={g.name}>
+                          <div className="text-[11px] font-semibold mb-1">{g.icon} {g.name} ({g.list.length})</div>
+                          {g.list.map((w, i) => (
+                            <div key={i} className="text-[11px] text-muted-foreground">
+                              {w.task ? `Working: ${w.task}${w.isSkilled ? " ⭐" : ""}` : `Idle${w.isSkilled ? " ⭐" : ""}`}
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-3.5">
+                <div className="rounded-xl border border-black/10 dark:border-white/10 p-3.5">
+                  <h4 className="text-xs font-semibold text-muted-foreground mb-2">🔧 Equipped Modules</h4>
+                  {detail.equippedModules.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No modules installed.</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {detail.equippedModules.map((m) => (
+                        <div key={m.id} className="text-[12px]">{m.icon} <strong>{m.name}</strong>: {m.desc}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-xl border border-black/10 dark:border-white/10 p-3.5">
+                  <h4 className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1.5"><Eye className="h-3.5 w-3.5" /> Recent Log</h4>
+                  <ScrollArea className="h-40 pr-2">
+                    {detail.logs.length === 0 ? (
+                      <p className="text-xs text-muted-foreground/70 italic">Nothing logged yet.</p>
+                    ) : (
+                      <div className="space-y-0.5 font-mono text-[11px] leading-relaxed">
+                        {detail.logs.map((l, i) => <div key={i} className="whitespace-pre-wrap break-words">{l}</div>)}
+                      </div>
+                    )}
+                  </ScrollArea>
+                </div>
+              </div>
             </div>
           </div>
         )}
