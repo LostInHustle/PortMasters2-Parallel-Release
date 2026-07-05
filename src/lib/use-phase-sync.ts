@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
 import type { GameState } from "@/lib/game/types";
 import { restartGame, startBoonDrafting } from "@/lib/game/engine";
+import { renownStartingGoldBonus } from "@/lib/game/legacy";
+import { api } from "@/lib/api";
 
 export type ReadyState = {
   round: number;
@@ -155,12 +157,27 @@ export function usePhaseSync(
     // The host's "restart the voyage" went through. Every captain still in
     // the room, not just whoever clicked it, drops back to a fresh run, and
     // any ready vote in flight no longer means anything.
-    const onRestarted = (data: { roomId: string }) => {
+    //
+    // Re-fetch the captain's legacy before restarting so the starting gold
+    // bonus reflects any Renown gained from the voyage that just concluded.
+    // Without this, goldBonusRef (set once on mount from useGameSession)
+    // carries the pre-voyage Renown level and the bonus never updates until
+    // the captain leaves and rejoins the room.
+    const onRestarted = async (data: { roomId: string }) => {
       if (data.roomId !== roomId) return;
       pendingFn.current = null;
       setWaiting(false);
       setStartError(null);
-      act((state, logs) => restartGame(state, logs, goldBonusRef.current));
+      let bonus = goldBonusRef.current;
+      try {
+        const { legacy } = await api.getLegacy();
+        bonus = renownStartingGoldBonus(legacy.renownLevel);
+        goldBonusRef.current = bonus;
+      } catch {
+        // If the fetch fails (network blip, server restart), fall back to
+        // the last-known bonus rather than blocking the restart entirely.
+      }
+      act((state, logs) => restartGame(state, logs, bonus));
     };
 
     socket.on("phase:ready_update", onReadyUpdate);

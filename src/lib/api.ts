@@ -34,15 +34,20 @@ export type ChatMessage = {
 };
 
 async function jfetch<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    credentials: "include",
-    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
-    ...init,
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      credentials: "include",
+      headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
+      ...init,
+    });
+  } catch {
+    throw new Error("Cannot reach the server. It may be temporarily offline.");
+  }
   const text = await res.text();
   const data = text ? JSON.parse(text) : null;
   if (!res.ok) {
-    const msg = data?.error || `Request failed (${res.status})`;
+    const msg = data?.error || `Server error (${res.status}). Please try again later.`;
     throw new Error(msg);
   }
   return data as T;
