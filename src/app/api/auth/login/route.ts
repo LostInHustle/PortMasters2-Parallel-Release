@@ -24,8 +24,14 @@ export async function POST(req: NextRequest) {
   const { username, password } = parsed.data;
 
   const user = await db.user.findUnique({ where: { username } });
-  if (!user || !verifyPassword(password, user.passwordHash)) {
-    return NextResponse.json({ error: "Incorrect captain name or password" }, { status: 401 });
+  if (!user) {
+    return NextResponse.json(
+      { error: "No account found with that captain name. Please check the spelling or register a new account." },
+      { status: 401 },
+    );
+  }
+  if (!verifyPassword(password, user.passwordHash)) {
+    return NextResponse.json({ error: "The password you entered is incorrect." }, { status: 401 });
   }
 
   // Trim stale expired sessions for this user (housekeeping).
