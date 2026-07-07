@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import {
   APP_NAME,
   BARTER_ITEMS,
+  BROKERS_FAVOR_COMMISSION,
+  BROKERS_FAVOR_UNLOCK_LEVEL,
   COLORS,
   ESCORT_COST_RATE,
   ICONS,
@@ -18,6 +20,7 @@ import {
 import {
   assignTask,
   calcTransportCost,
+  callBrokersFavor,
   completeBarterPhase,
   completeOrder,
   completePhase1,
@@ -664,6 +667,9 @@ function Orders({
   phaseSync: PhaseSync;
   members: PublicUser[];
 }) {
+  const [favorOpen, setFavorOpen] = useState(false);
+  const favorUnlocked = game.renownLevel >= BROKERS_FAVOR_UNLOCK_LEVEL;
+  const sellableGoods = [...RESOURCES, ...PRODUCTS].filter((it) => (game.inventory[it] || 0) > 0);
   return (
     <div>
       <h2 className="text-lg font-semibold mb-4 flex items-center gap-2"><Coins className="h-5 w-5 text-amber-600 dark:text-amber-400" />Trade Manifest</h2>
@@ -677,6 +683,38 @@ function Orders({
             </span>
           ))}
           <span className="text-muted-foreground"> (look for the 🔮 badge below).</span>
+        </div>
+      )}
+      {favorUnlocked && !game.brokersFavorUsed && (
+        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/[0.07] px-3.5 py-2.5 mb-3.5 text-xs">
+          {!favorOpen ? (
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <span><strong>🤝 Broker's Favor</strong> (once per voyage): summon a guaranteed buyer for a good already in your hold. The Broker keeps {Math.round(BROKERS_FAVOR_COMMISSION * 100)}% of the reward.</span>
+              <Button size="sm" className="pm-grad-violet text-white font-semibold rounded-lg shrink-0 hover:opacity-95" onClick={() => setFavorOpen(true)}>Call in a Favor</Button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="font-semibold">🤝 Which good needs a buyer?</div>
+              {sellableGoods.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {sellableGoods.map((it) => (
+                    <Button
+                      key={it}
+                      size="sm"
+                      variant="secondary"
+                      className="rounded-lg"
+                      onClick={() => { act((g, l) => callBrokersFavor(g, it, l)); setFavorOpen(false); }}
+                    >
+                      {ICONS[it]} {it} ({game.inventory[it]})
+                    </Button>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-muted-foreground">Your hold is empty, so there is nothing for the Broker to sell right now.</div>
+              )}
+              <Button size="sm" variant="ghost" className="rounded-lg" onClick={() => setFavorOpen(false)}>Cancel</Button>
+            </div>
+          )}
         </div>
       )}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -695,12 +733,16 @@ function Orders({
             totalVat = vatBreakdown.final * o.resources[0].required!;
             netProfit -= totalVat;
           }
+          const brokerCommission = o.isBrokerFavor ? Math.floor(o.reward * BROKERS_FAVOR_COMMISSION) : 0;
+          netProfit -= brokerCommission;
           const matchesIntel = game.revealedIntel.some((i) => o.resources.some((r) => r.type === i.item));
           return (
-            <div key={o.id} className={cn("rounded-xl border overflow-hidden flex flex-col", matchesIntel ? "border-amber-500/40 bg-amber-500/[0.04]" : "border-black/10 dark:border-white/10 bg-background/50")}>
+            <div key={o.id} className={cn("rounded-xl border overflow-hidden flex flex-col", o.isBrokerFavor ? "border-emerald-500/45 bg-emerald-500/[0.05]" : matchesIntel ? "border-amber-500/40 bg-amber-500/[0.04]" : "border-black/10 dark:border-white/10 bg-background/50")}>
               <div className="px-3.5 py-2 text-xs font-semibold border-b border-black/5 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] flex items-center justify-between gap-2">
                 <span>📍 {o.demandPort} <span className="text-muted-foreground">{o.isProductOrder ? "· Finished Product Demand" : "· Raw Material Demand"}</span></span>
-                {matchesIntel && <span className="text-amber-600 dark:text-amber-400 shrink-0">🔮 Guaranteed</span>}
+                {o.isBrokerFavor
+                  ? <span className="text-emerald-600 dark:text-emerald-400 shrink-0">🤝 Broker's Favor</span>
+                  : matchesIntel && <span className="text-amber-600 dark:text-amber-400 shrink-0">🔮 Guaranteed</span>}
               </div>
               <div className="p-3.5 flex-1 space-y-1.5">
                 {o.resources.map((r, i) => {
@@ -721,6 +763,11 @@ function Orders({
                 <div className={cn("text-[13px] font-semibold mt-0.5", netProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
                   💰 Reward: {o.reward} Gold 📊 Net: {netProfit} Gold
                 </div>
+                {o.isBrokerFavor && (
+                  <div className="text-[10px] text-emerald-700 dark:text-emerald-300">
+                    🤝 Broker's cut ({Math.round(BROKERS_FAVOR_COMMISSION * 100)}%): {brokerCommission} Gold
+                  </div>
+                )}
                 {o.isProductOrder && vatBreakdown && (
                   <div className="text-[10px] text-muted-foreground">
                     <Term content={<PriceBreakdownTooltip breakdown={vatBreakdown} />}>🧾 Est. VAT: {totalVat} Gold (per unit shown on hover)</Term>
@@ -1120,8 +1167,8 @@ function Endgame({
   return (
     <div className="max-w-md mx-auto text-center py-4">
       <div className="text-2xl font-bold mb-4">🎮 Game Over!</div>
-      <div className="text-xl font-bold text-teal-700 dark:text-teal-300 my-3 flex items-center justify-center gap-2"><Trophy className="h-5 w-5" /> 🏆 Final Reputation: {game.score}</div>
-      <div className="text-lg text-emerald-600 dark:text-emerald-400 my-2 flex items-center justify-center gap-2"><Coins className="h-5 w-5" /> 💰 Final Funds: {game.money} Gold</div>
+      <div className="text-xl font-bold text-teal-700 dark:text-teal-300 my-3 flex items-center justify-center gap-2"><Trophy className="h-5 w-5" />Final Reputation: {game.score}</div>
+      <div className="text-lg text-emerald-600 dark:text-emerald-400 my-2 flex items-center justify-center gap-2"><Coins className="h-5 w-5" />Final Funds: {game.money} Gold</div>
       <div className="text-lg text-amber-600 dark:text-amber-400 my-4">📈 Merchant Rank: {rating}</div>
 
       {voyageResult ? (

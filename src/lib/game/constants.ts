@@ -123,6 +123,15 @@ export const MODULES: Module[] = [
 // constants here, since nothing else needs to reference them separately.
 export const MAX_ROUNDS = 8;
 
+// Broker's Favor: a Renown-gated, once-per-voyage skill a captain invokes in
+// Phase 2 to summon one extra guaranteed trade order for a good they are
+// already holding, so a hold full of otherwise unsellable stock still has a
+// buyer. Unlocks at Renown Level 5 (the Trade Officer tier, see
+// src/lib/game/legacy.ts), and the Broker keeps a 20% commission on that
+// order's reward.
+export const BROKERS_FAVOR_UNLOCK_LEVEL = 5;
+export const BROKERS_FAVOR_COMMISSION = 0.2;
+
 // =====================================================================
 // Tutorial steps, preserved verbatim from the original game.
 // =====================================================================

@@ -34,7 +34,7 @@ export function ExpectedPriceTooltip({ price }: { price: ExpectedPrice }) {
   return (
     <div className="space-y-1 min-w-[170px]">
       <div className="font-semibold">
-        Typically {price.min}–{price.max} Gold {price.isProduct ? "per item" : "per unit"}
+        Typically {price.min} to {price.max} Gold {price.isProduct ? "per item" : "per unit"}
       </div>
       {price.modifiers.map((m, i) => <div key={i} className="text-[11px]">{m}</div>)}
       {!price.isProduct && <div className="text-[11px] opacity-80">±1 Gold depending on the port</div>}

@@ -34,6 +34,11 @@ export type OrderCard = {
   reward: number;
   totalItems: number;
   isProductOrder: boolean;
+  // Set only on the extra order a captain conjures with Broker's Favor (see
+  // callBrokersFavor in engine.ts). completeOrder reads it to take the
+  // Broker's commission off this order's reward; every other order leaves it
+  // undefined and is unaffected.
+  isBrokerFavor?: boolean;
 };
 
 export type IntelItem = { item: string; port: string };
@@ -88,6 +93,18 @@ export type GameState = {
   phase2DemandTags: string[];
   revealedIntel: IntelItem[];
   intelCost: number;
+  // The captain's persistent Renown level (see src/lib/game/legacy.ts),
+  // copied onto the voyage state so the engine can gate Renown-locked skills
+  // like Broker's Favor without reaching back into account data. Personal to
+  // each captain, exactly like money, so it never touches the shared room
+  // seed. Refreshed from the captain's legacy on every load / restart.
+  renownLevel: number;
+  // Broker's Favor is a once-per-voyage skill (unlocks at Renown Level 5, see
+  // BROKERS_FAVOR_UNLOCK_LEVEL). Flipped true the moment it is used and reset
+  // only by starting a fresh voyage (createInitialGameState / restartGame),
+  // never in endRound, which is what keeps it to one use per game rather than
+  // one per round.
+  brokersFavorUsed: boolean;
   equippedModules: Module[];
   // Each round's boon and module draft pools, fixed once rolled (see
   // startBoonDrafting / startModuleDrafting in engine.ts) so reopening the
@@ -133,10 +150,15 @@ export type GameContext = {
 // little ahead, never behind. Defaults to 0 for any caller that doesn't
 // know the captain's Renown yet, so every existing call site keeps
 // working unchanged.
-export function createInitialGameState(startingGoldBonus: number = 0): GameState {
+// renownLevel defaults to 1 (Broker's Favor locked) for any caller that
+// doesn't know the captain's Renown yet, mirroring startingGoldBonus above,
+// so every existing call site keeps working unchanged.
+export function createInitialGameState(startingGoldBonus: number = 0, renownLevel: number = 1): GameState {
   return {
     inventory: { Hemp: 8, Silk: 5, Tea: 3, "Linen Clothes": 0, "Cotton Clothes": 0, Brocade: 0, Sachet: 0 },
     money: 100 + startingGoldBonus,
+    renownLevel,
+    brokersFavorUsed: false,
     score: 0,
     currentRound: 1,
     maxRounds: MAX_ROUNDS,

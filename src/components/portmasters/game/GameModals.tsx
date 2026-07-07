@@ -39,7 +39,7 @@ export function TipsModal({ open, onOpenChange }: { open: boolean; onOpenChange:
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><Lightbulb className="h-5 w-5 text-amber-600 dark:text-amber-400" /> 💡 Trade Strategy Advice</DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><Lightbulb className="h-5 w-5 text-amber-600 dark:text-amber-400" />Trade Strategy Advice</DialogTitle>
           <DialogDescription className="sr-only">Bankruptcy-avoidance strategies</DialogDescription>
         </DialogHeader>
         <pre className="whitespace-pre-wrap font-sans text-[12px] leading-relaxed bg-muted/40 rounded-lg p-3.5 max-h-[60vh] overflow-y-auto pm-scroll">{TIPS_TEXT}</pre>
@@ -129,7 +129,7 @@ export function RumorBoardModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-amber-600 dark:text-amber-400" /> 🗣️ Broker's Rumor Board</DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-amber-600 dark:text-amber-400" />Broker's Rumor Board</DialogTitle>
           <DialogDescription>Spend gold to reveal Phase 2 demand rumors!</DialogDescription>
         </DialogHeader>
         <div className="flex justify-center my-2">

@@ -201,6 +201,11 @@
   .pm-grad-rose {
     background-image: linear-gradient(135deg, oklch(0.62 0.19 20), oklch(0.66 0.2 10));
   }
+  /* Reserved for the Renown-gated Broker's Favor skill, so a rare, limited
+     action reads as distinct from every routine teal / gold / emerald button. */
+  .pm-grad-violet {
+    background-image: linear-gradient(135deg, oklch(0.56 0.18 300), oklch(0.6 0.19 285));
+  }
 
   /* Tactile feedback for clickable elements that aren't the <Button>
      primitive (raw <button> rows, the room-code chip, DM candidate rows).

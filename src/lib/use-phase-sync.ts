@@ -169,15 +169,19 @@ export function usePhaseSync(
       setWaiting(false);
       setStartError(null);
       let bonus = goldBonusRef.current;
+      let level: number | null = null;
       try {
         const { legacy } = await api.getLegacy();
         bonus = renownStartingGoldBonus(legacy.renownLevel);
+        level = legacy.renownLevel;
         goldBonusRef.current = bonus;
       } catch {
         // If the fetch fails (network blip, server restart), fall back to
         // the last-known bonus rather than blocking the restart entirely.
       }
-      act((state, logs) => restartGame(state, logs, bonus));
+      // Preserve the captain's current Renown level when the refetch failed,
+      // so restartGame never silently relocks a Renown-gated skill.
+      act((state, logs) => restartGame(state, logs, bonus, level ?? state.renownLevel));
     };
 
     socket.on("phase:ready_update", onReadyUpdate);
