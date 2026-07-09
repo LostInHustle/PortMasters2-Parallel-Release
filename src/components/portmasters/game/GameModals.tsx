@@ -39,7 +39,7 @@ export function TipsModal({ open, onOpenChange }: { open: boolean; onOpenChange:
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><Lightbulb className="h-5 w-5 text-amber-600 dark:text-amber-400" /> 💡 Trade Strategy Advice</DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><Lightbulb className="h-5 w-5 text-amber-600 dark:text-amber-400" />Trade Strategy Advice</DialogTitle>
           <DialogDescription className="sr-only">Bankruptcy-avoidance strategies</DialogDescription>
         </DialogHeader>
         <pre className="whitespace-pre-wrap font-sans text-[12px] leading-relaxed bg-muted/40 rounded-lg p-3.5 max-h-[60vh] overflow-y-auto pm-scroll">{TIPS_TEXT}</pre>
@@ -127,9 +127,9 @@ export function RumorBoardModal({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-amber-600 dark:text-amber-400" /> 🗣️ Broker's Rumor Board</DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-amber-600 dark:text-amber-400" />Broker's Rumor Board</DialogTitle>
           <DialogDescription>Spend gold to reveal Phase 2 demand rumors!</DialogDescription>
         </DialogHeader>
         <div className="flex justify-center my-2">
@@ -174,7 +174,7 @@ export function RestartConfirmModal({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <RotateCcw className="h-5 w-5 text-rose-600 dark:text-rose-400" /> Restart the voyage?
@@ -318,7 +318,7 @@ export function PlayerDetailModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl">
+      <DialogContent className="sm:max-w-5xl">
         <DialogHeader>
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">

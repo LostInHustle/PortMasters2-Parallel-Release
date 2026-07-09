@@ -22,7 +22,7 @@ type SessionState = {
 type Action =
   | { type: "INIT"; game: GameState; logs: string[] }
   | { type: "APPLY"; fn: (g: GameState, logs: string[]) => void; postDraft?: boolean }
-  | { type: "START_FRESH"; checkpoint?: { round: number; phase: string } | null; ctx?: GameContext; startingGoldBonus?: number }
+  | { type: "START_FRESH"; checkpoint?: { round: number; phase: string } | null; ctx?: GameContext; startingGoldBonus?: number; renownLevel?: number }
   | { type: "SET_SAVING"; saving: boolean; at: number };
 
 function reducer(state: SessionState, action: Action): SessionState {
@@ -30,7 +30,7 @@ function reducer(state: SessionState, action: Action): SessionState {
     case "INIT":
       return { ...state, game: action.game, logs: action.logs, loaded: true };
     case "START_FRESH": {
-      const g = createInitialGameState(action.startingGoldBonus ?? 0);
+      const g = createInitialGameState(action.startingGoldBonus ?? 0, action.renownLevel ?? 1);
       const logs: string[] = [];
       showWelcome(g, logs);
       // A genuinely new captain (no save of their own yet) joins wherever
@@ -100,6 +100,7 @@ export function useGameSession(roomId: string, socket: Socket | null, enabled: b
         if (!alive || loadTimedOut) return;
         clearTimeout(timeoutId);
         const goldBonus = legacyResult ? renownStartingGoldBonus(legacyResult.legacy.renownLevel) : 0;
+        const renownLevel = legacyResult ? legacyResult.legacy.renownLevel : 1;
         setStartingGoldBonus(goldBonus);
         if (raw) {
           const game = JSON.parse(raw) as GameState;
@@ -124,6 +125,11 @@ export function useGameSession(roomId: string, socket: Socket | null, enabled: b
           game.debts = game.debts ?? [];
           game.loansGiven = game.loansGiven ?? [];
           game.defaultedDebt = game.defaultedDebt ?? false;
+          // Refresh Renown from the freshly loaded legacy so a captain who
+          // leveled up since this voyage was saved gets the current unlock
+          // state; fall back to the saved value (then 1) if legacy is missing.
+          game.renownLevel = legacyResult ? renownLevel : (game.renownLevel ?? 1);
+          game.brokersFavorUsed = game.brokersFavorUsed ?? false;
           dispatch({ type: "INIT", game, logs: [] });
         } else {
           dispatch({
@@ -131,6 +137,7 @@ export function useGameSession(roomId: string, socket: Socket | null, enabled: b
             checkpoint: checkpoint ? { round: checkpoint.currentRound, phase: checkpoint.currentPhase } : null,
             ctx,
             startingGoldBonus: goldBonus,
+            renownLevel,
           });
         }
       } catch {

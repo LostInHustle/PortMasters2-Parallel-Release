@@ -12,11 +12,18 @@
 // orders, so shared sessions stay highly synchronized. Each captain's
 // gold, reputation, inventory, workers, and personal luck (Salvage
 // Crane refunds, Tax-Evasion audits, boon offerings) remain their own.
+//
+// One new gameplay skill, Broker's Favor, is layered on top of the faithful
+// port: a Renown-gated, once-per-voyage guaranteed buyer (see
+// callBrokersFavor). It draws with a captain's own randomness, so it stays
+// personal and never perturbs the shared market.
 // =====================================================================
 import {
   AID_REPUTATION_PER_GOLD,
   APP_NAME,
   BOONS,
+  BROKERS_FAVOR_COMMISSION,
+  BROKERS_FAVOR_UNLOCK_LEVEL,
   COMMODITIES,
   ESCORT_COST_RATE,
   ICONS,
@@ -482,6 +489,14 @@ export function completeOrder(state: GameState, orderId: number, logs: string[])
     state.roundCosts -= diff;
     state.totalCosts -= diff;
   }
+  // Broker's Favor commission: the Broker takes a flat cut of the order's
+  // reward, so the captain's own money, revenue, and score all reflect the
+  // amount net of the commission (see callBrokersFavor).
+  if (order.isBrokerFavor) {
+    const commission = Math.floor(order.reward * BROKERS_FAVOR_COMMISSION);
+    reward -= commission;
+    logs.push(`🤝 Broker's Commission (${Math.round(BROKERS_FAVOR_COMMISSION * 100)}%): ${commission} Gold`);
+  }
   state.money += reward;
   state.roundRevenue += reward;
   state.totalRevenue += reward;
@@ -492,6 +507,45 @@ export function completeOrder(state: GameState, orderId: number, logs: string[])
   logs.push(`📦 Completed Order at ${order.demandPort}: ${txt}`);
   logs.push(`   💰 Reward: ${reward} Gold - ⚓ Freight: ${transport} Gold = 📊 Net Profit: ${reward - transport} Gold`);
   logs.push(`📊 Completed ${state.orderCount} transactions`);
+}
+
+// Broker's Favor: the Renown-gated, once-per-voyage skill (see the flag on
+// GameState and BROKERS_FAVOR_UNLOCK_LEVEL). Appends one extra standard trade
+// order for a good this captain is currently holding, so a hold full of
+// otherwise unsellable stock still has a guaranteed buyer. Like the paid
+// Broker's Whisper guarantee in startPhase2, it draws with this captain's own
+// Math.random and only appends to their own customerCards, so it can never
+// shift the shared, room-wide market anyone else sees. The Broker's cut is
+// taken later, in completeOrder, off the order's reward.
+export function callBrokersFavor(state: GameState, item: string, logs: string[]) {
+  if (state.phase !== 2) return;
+  if (state.renownLevel < BROKERS_FAVOR_UNLOCK_LEVEL) {
+    logs.push(`❌ Broker's Favor unlocks at Renown Level ${BROKERS_FAVOR_UNLOCK_LEVEL}`);
+    return;
+  }
+  if (state.brokersFavorUsed) {
+    logs.push("❌ You've already called in a Broker's Favor this voyage");
+    return;
+  }
+  const isRaw = (RESOURCES as readonly string[]).includes(item);
+  const isProduct = (PRODUCTS as readonly string[]).includes(item);
+  if (!isRaw && !isProduct) {
+    logs.push(`❌ The Broker can't find a buyer for ${item}`);
+    return;
+  }
+  if ((state.inventory[item] || 0) <= 0) {
+    logs.push(`❌ You have no ${item} in the hold for the Broker to sell`);
+    return;
+  }
+  const localRng: Rng = Math.random;
+  const order = isRaw ? genRawOrder(localRng, item) : genProductOrder(localRng, item);
+  const nextId = state.customerCards.reduce((m, c) => Math.max(m, c.id), -1) + 1;
+  state.customerCards.push({ id: nextId, ...order, isBrokerFavor: true });
+  state.brokersFavorUsed = true;
+  const txt = order.resources.map((r) => `${ICONS[r.type]}${r.type}×${r.required}`).join(" + ");
+  logs.push(
+    `🤝 Broker's Favor called in: a buyer at ${order.demandPort} now wants ${txt}. The Broker keeps ${Math.round(BROKERS_FAVOR_COMMISSION * 100)}% of the reward.`,
+  );
 }
 
 export function hireWorker(state: GameState, type: string, logs: string[]) {
@@ -1088,8 +1142,8 @@ export function endGame(state: GameState, logs: string[]) {
   logs.push("=".repeat(50));
 }
 
-export function restartGame(state: GameState, logs: string[], startingGoldBonus: number = 0) {
-  const fresh = createInitialGameState(startingGoldBonus);
+export function restartGame(state: GameState, logs: string[], startingGoldBonus: number = 0, renownLevel: number = 1) {
+  const fresh = createInitialGameState(startingGoldBonus, renownLevel);
   Object.assign(state, fresh);
   logs.length = 0;
   showWelcome(state, logs);
