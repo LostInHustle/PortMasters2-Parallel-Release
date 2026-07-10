@@ -56,6 +56,7 @@ export type VoyageStanding = {
   renownTitle: string;
   xpGained: number;
   leveledUp: boolean;
+  brokersFavorUnlocked: boolean;
 };
 
 export type VoyageCompleteEvent = {

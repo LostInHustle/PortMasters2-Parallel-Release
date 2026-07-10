@@ -505,7 +505,7 @@ export function completeOrder(state: GameState, orderId: number, logs: string[])
   state.orderCount++;
   const txt = order.resources.map((r) => `${ICONS[r.type]}${r.type}×${r.required}`).join(" + ");
   logs.push(`📦 Completed Order at ${order.demandPort}: ${txt}`);
-  logs.push(`   💰 Reward: ${reward} Gold - ⚓ Freight: ${transport} Gold = 📊 Net Profit: ${reward - transport} Gold`);
+  logs.push(`   💰 Reward: ${reward} Gold · ⚓ Freight: ${transport} Gold = 📊 Net Profit: ${reward - transport} Gold`);
   logs.push(`📊 Completed ${state.orderCount} transactions`);
 }
 
@@ -841,7 +841,7 @@ export function startPhase1(state: GameState, ctx: GameContext, logs: string[]) 
     if (!state.phase2DemandTags.includes(t)) state.phase2DemandTags.push(t);
   }
   state.revealedIntel = [];
-  logs.push(`\n⚓=== Round ${state.currentRound} - Phase 1: Port Purchase ===`);
+  logs.push(`\n⚓=== Round ${state.currentRound} · Phase 1: Port Purchase ===`);
   logs.push(`💰 Current Funds: ${state.money} Gold`);
   // [ONLINE] Deterministic port market per (room, round).
   const marketRng = createRng(`${ctx.seedBase}:R${state.currentRound}:market`);
@@ -937,7 +937,7 @@ export function startPhase2(state: GameState, ctx: GameContext, logs: string[]) 
   state.phase = 2;
   state.orderCount = 0;
   state.completedOrders = [];
-  logs.push(`\n🤝=== Round ${state.currentRound} - Phase 2: Trade Transaction ===`);
+  logs.push(`\n🤝=== Round ${state.currentRound} · Phase 2: Trade Transaction ===`);
   // [ONLINE] Deterministic trade orders per (room, round): every captain
   // in the room independently derives the identical base 5 orders here,
   // since this loop never reads anything captain specific.
@@ -1025,7 +1025,7 @@ export function finishSettlement(state: GameState, logs: string[]) {
     state.phase = "bankruptcy";
     return;
   }
-  logs.push(`\n🔧=== Round ${state.currentRound} - Phase 3: Ship Maintenance ===`);
+  logs.push(`\n🔧=== Round ${state.currentRound} · Phase 3: Ship Maintenance ===`);
   const maintResult = payMaintenance(state, logs);
   if (maintResult === "bankruptcy") {
     state.gameOver = true;
@@ -1115,7 +1115,7 @@ export function settleOutstandingDebts(state: GameState, logs: string[]) {
 
 export function startPhase4(state: GameState, logs: string[]) {
   state.phase = 4;
-  logs.push(`\n🚢=== Round ${state.currentRound} - Phase 4: Shipyard & Modules ===`);
+  logs.push(`\n🚢=== Round ${state.currentRound} · Phase 4: Shipyard & Modules ===`);
 }
 
 export function skipUpgrade(state: GameState, logs: string[]) {
@@ -1127,7 +1127,7 @@ export function endGame(state: GameState, logs: string[]) {
   state.gameOver = true;
   state.phase = "endgame";
   logs.push("\n" + "=".repeat(50));
-  logs.push(`🎮 ${APP_NAME} - Game Over!`);
+  logs.push(`🎮 ${APP_NAME} · Game Over!`);
   logs.push(`💰 Final Funds: ${state.money} Gold`);
   logs.push(`🏆 Final Reputation: ${state.score}`);
   logs.push(`🧾 Total Taxes Paid: ${state.vatPaid + state.incomeTaxPaid} Gold`);

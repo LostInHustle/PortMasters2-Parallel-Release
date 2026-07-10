@@ -3,6 +3,7 @@
 import { Progress } from "@/components/ui/progress";
 import { Crown, Trophy, Ship, Star } from "lucide-react";
 import { renownProgress, renownTitleForLevel, type CaptainLegacySummary } from "@/lib/game/legacy";
+import { BROKERS_FAVOR_UNLOCK_LEVEL } from "@/lib/game/constants";
 import { cn } from "@/lib/utils";
 
 // Shown both in the Lobby (a captain's standing account of who they are
@@ -21,6 +22,8 @@ export function CaptainLegacyCard({
   const { level, xpIntoLevel, xpForNextLevel } = renownProgress(legacy.renownXP);
   const title = renownTitleForLevel(level);
   const pct = xpForNextLevel > 0 ? Math.min(100, Math.round((xpIntoLevel / xpForNextLevel) * 100)) : 100;
+  const favorUnlocked = level >= BROKERS_FAVOR_UNLOCK_LEVEL;
+  const favorLevelsToGo = BROKERS_FAVOR_UNLOCK_LEVEL - level;
 
   return (
     <div className={cn("rounded-xl border border-amber-500/20 bg-amber-500/[0.04] p-3.5", className)}>
@@ -34,8 +37,13 @@ export function CaptainLegacyCard({
         </div>
       </div>
       <Progress value={pct} className="h-1.5 mb-1" />
-      <div className="text-[10px] text-muted-foreground mb-2.5">
+      <div className="text-[10px] text-muted-foreground mb-1.5">
         {xpIntoLevel} / {xpForNextLevel} XP to Renown {level + 1}
+      </div>
+      <div className={cn("text-[10px] mb-2.5", favorUnlocked ? "text-violet-600 dark:text-violet-400 font-medium" : "text-muted-foreground")}>
+        {favorUnlocked
+          ? "🤝 Broker's Favor unlocked"
+          : `🔒 Broker's Favor unlocks at Renown ${BROKERS_FAVOR_UNLOCK_LEVEL}, ${renownTitleForLevel(BROKERS_FAVOR_UNLOCK_LEVEL)} (${favorLevelsToGo} level${favorLevelsToGo === 1 ? "" : "s"} to go)`}
       </div>
       {!compact && (
         <div className="grid grid-cols-3 gap-2 text-center">

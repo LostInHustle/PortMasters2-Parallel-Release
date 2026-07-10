@@ -685,6 +685,11 @@ function Orders({
           <span className="text-muted-foreground"> (look for the 🔮 badge below).</span>
         </div>
       )}
+      {!favorUnlocked && (
+        <div className="rounded-lg border border-dashed border-violet-500/25 bg-violet-500/[0.04] px-3.5 py-2.5 mb-3.5 text-xs text-muted-foreground">
+          🔒 <strong className="text-foreground">Broker's Favor</strong> unlocks at Renown Level {BROKERS_FAVOR_UNLOCK_LEVEL}: call one in once per voyage to summon a guaranteed buyer for a good already in your hold. You're Renown Level {game.renownLevel} now, {BROKERS_FAVOR_UNLOCK_LEVEL - game.renownLevel} to go.
+        </div>
+      )}
       {favorUnlocked && !game.brokersFavorUsed && (
         <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/[0.07] px-3.5 py-2.5 mb-3.5 text-xs">
           {!favorOpen ? (
@@ -1179,6 +1184,14 @@ function Endgame({
                 <Crown className="h-5 w-5" /> Crowned Sea Master!
               </div>
               <div className="text-xs text-muted-foreground mt-0.5">Highest Reputation in this harbor's voyage.</div>
+            </div>
+          )}
+          {mine?.brokersFavorUnlocked && (
+            <div className="rounded-xl border-2 border-violet-400 bg-violet-400/10 px-4 py-3 text-center">
+              <div className="text-lg font-bold text-violet-600 dark:text-violet-300 flex items-center justify-center gap-2">
+                🤝 Broker's Favor Unlocked!
+              </div>
+              <div className="text-xs text-muted-foreground mt-0.5">Renown Level {BROKERS_FAVOR_UNLOCK_LEVEL} reached. Starting next voyage, call one in from the Trade Manifest to summon a guaranteed buyer.</div>
             </div>
           )}
           <div className="rounded-xl border border-black/5 dark:border-white/10 overflow-hidden">
