@@ -59,7 +59,7 @@ export function GameRoom({
   onLeave: () => void;
 }) {
   const { socket, connected, authed, onlineUsers } = useRealtime(me);
-  const { state, act, ctx, flush, startingGoldBonus } = useGameSession(room.id, socket, true);
+  const { state, act, ctx, flush, startingGoldBonus } = useGameSession(room.id, socket, true, me.id);
   const phaseSync = usePhaseSync(room.id, socket, state.game, act, authed, me.id, startingGoldBonus);
 
   // A trade involving me just closed, on either side: as the one who

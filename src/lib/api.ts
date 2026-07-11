@@ -82,7 +82,7 @@ export const api = {
 
   // Game state
   getGameState: (roomId: string) =>
-    jfetch<{ state: string | null; checkpoint: { currentRound: number; currentPhase: string } | null }>(
+    jfetch<{ state: string | null; checkpoint: { currentRound: number; currentPhase: string; voyageEpoch: number } | null }>(
       `/api/game/state?roomId=${roomId}`,
     ),
   saveGameState: (roomId: string, data: unknown) =>

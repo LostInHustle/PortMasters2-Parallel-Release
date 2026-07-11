@@ -64,6 +64,11 @@ export type GameState = {
   score: number;
   currentRound: number;
   maxRounds: number;
+  // The room's voyage epoch (see Room.voyageEpoch in prisma/schema.prisma),
+  // stamped onto this state when the voyage is created and folded into the
+  // deterministic seed so a restart (which bumps the epoch) rerolls every
+  // captain's market, orders, and Broker intel into a brand-new voyage.
+  voyageEpoch: number;
   totalRevenue: number;
   totalCosts: number;
   materialCosts: number;
@@ -139,8 +144,11 @@ export type GameState = {
 };
 
 export type GameContext = {
-  // Deterministic seed base for the shared session (roomId) so the market
-  // and orders are identical for every captain on the same voyage.
+  // Per-captain deterministic seed identity, "roomId:userId" (see
+  // src/lib/use-game-session.ts). Combined with the per-voyage epoch on
+  // GameState, this gives every captain their own market, orders, and Broker
+  // intel, reproducible on reload but different from every other captain and
+  // rerolled whenever the host restarts the voyage.
   seedBase: string;
 };
 
@@ -153,12 +161,16 @@ export type GameContext = {
 // renownLevel defaults to 1 (Broker's Favor locked) for any caller that
 // doesn't know the captain's Renown yet, mirroring startingGoldBonus above,
 // so every existing call site keeps working unchanged.
-export function createInitialGameState(startingGoldBonus: number = 0, renownLevel: number = 1): GameState {
+// voyageEpoch defaults to 0 (the room's first voyage) for the same reason;
+// callers that know the room's current epoch pass it so a fresh voyage is
+// seeded distinctly from the ones before it.
+export function createInitialGameState(startingGoldBonus: number = 0, renownLevel: number = 1, voyageEpoch: number = 0): GameState {
   return {
     inventory: { Hemp: 8, Silk: 5, Tea: 3, "Linen Clothes": 0, "Cotton Clothes": 0, Brocade: 0, Sachet: 0 },
     money: 100 + startingGoldBonus,
     renownLevel,
     brokersFavorUsed: false,
+    voyageEpoch,
     score: 0,
     currentRound: 1,
     maxRounds: MAX_ROUNDS,

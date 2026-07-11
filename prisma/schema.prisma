@@ -75,6 +75,14 @@ model Room {
   currentRound Int      @default(1)
   currentPhase String   @default("0")
 
+  // Bumped by one every time the host restarts the voyage (see the
+  // "room:restart" handler in src/server/realtime.ts). Folded into each
+  // captain's deterministic seed (roomId + userId + voyageEpoch, see
+  // src/lib/use-game-session.ts) so a restart overwrites the room with a
+  // brand-new voyage (fresh market, orders, and Broker intel for everyone),
+  // while a mid-voyage reload still reproduces the current one.
+  voyageEpoch  Int      @default(0)
+
   // Flips to true the moment the host starts the voyage (see the
   // "room:start" handler in src/server/realtime.ts). A room sits open in
   // phase 0 with no minimum headcount before that, so anyone can join;

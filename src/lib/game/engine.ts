@@ -4,19 +4,21 @@
 // Ported faithfully from the original single-player build. All wording,
 // log messages, balance, and phase flow are preserved verbatim.
 //
-// [ONLINE EXTENSION] The only behavioural addition is a seedable PRNG
-// (mulberry32) used for the *shared* session economy. Port market
-// cards, trade orders, and the Broker's intel pool are now generated
-// deterministically from (roomId + round). Every captain in the same
-// room, on the same voyage, sees the identical market and identical
-// orders, so shared sessions stay highly synchronized. Each captain's
-// gold, reputation, inventory, workers, and personal luck (Salvage
-// Crane refunds, Tax-Evasion audits, boon offerings) remain their own.
+// [ONLINE EXTENSION] The one behavioural addition is a seedable PRNG
+// (mulberry32) used for the session economy. Port market cards, trade
+// orders, and the Broker's intel pool are generated deterministically from
+// (roomId + userId + voyageEpoch + round), so each captain has their own
+// market, orders, and intel: reproducible on reload, different from every
+// other captain, and rerolled into a brand-new voyage whenever the host
+// restarts (which bumps voyageEpoch, see prisma/schema.prisma and
+// src/lib/use-game-session.ts). Each captain's gold, reputation, inventory,
+// workers, and personal luck (Salvage Crane refunds, Tax-Evasion audits,
+// boon offerings) are their own too.
 //
 // One new gameplay skill, Broker's Favor, is layered on top of the faithful
 // port: a Renown-gated, once-per-voyage guaranteed buyer (see
-// callBrokersFavor). It draws with a captain's own randomness, so it stays
-// personal and never perturbs the shared market.
+// callBrokersFavor). It draws with a captain's own live randomness, so it
+// stays personal and never perturbs their seeded market.
 // =====================================================================
 import {
   AID_REPUTATION_PER_GOLD,
@@ -304,16 +306,15 @@ function genProductOrder(rng: Rng, filter: string | null = null): Omit<OrderCard
 
 // Deliberately a pure function of rng only. It used to also take `state`
 // so it could fold a captain's own revealed Broker's Whisper intel
-// straight into whichever of the 5 shared order slots it was generating
-// at the time, which meant the number of rng() calls this consumed
-// depended on that captain's own purchase history. Since orderRng below
-// is the same *shared, room-wide* seeded stream every captain's client
-// derives independently (see the file header), a captain who bought
-// intel silently shifted their own view of every order after the one
-// intel touched out of sync with everyone else's, breaking the "every
-// captain sees the identical market" guarantee this whole seeding scheme
-// exists for. See startPhase2 for where the intel guarantee actually
-// happens now: entirely after, and independent of, this shared draw.
+// straight into whichever of the 5 order slots it was generating at the
+// time, which meant the number of rng() calls this consumed depended on
+// that captain's own purchase history. orderRng below is a fixed
+// deterministic stream (seeded per captain and per voyage, see the file
+// header), so letting the draw depend on mutable intel state made a
+// captain's own orders non-reproducible: regenerating the draw after a
+// reload, with different intel state, silently shifted every order after
+// the one the intel touched. See startPhase2 for where the intel guarantee
+// happens now: entirely after, and independent of, this draw.
 function genMixedOrder(rng: Rng): Omit<OrderCard, "id"> {
   return rng() < 0.5 ? genRawOrder(rng) : genProductOrder(rng);
 }
@@ -834,7 +835,7 @@ export function startPhase1(state: GameState, ctx: GameContext, logs: string[]) 
   state.purchasedCards = [];
   state.phase2DemandTags = [];
   // [ONLINE] Deterministic intel pool per (room, round).
-  const intelRng = createRng(`${ctx.seedBase}:R${state.currentRound}:intel`);
+  const intelRng = createRng(`${ctx.seedBase}:V${state.voyageEpoch}:R${state.currentRound}:intel`);
   const allItems = [...RESOURCES, ...PRODUCTS];
   for (let i = 0; i < 5; i++) {
     let t = pick(intelRng, allItems as readonly string[]);
@@ -844,7 +845,7 @@ export function startPhase1(state: GameState, ctx: GameContext, logs: string[]) 
   logs.push(`\n⚓=== Round ${state.currentRound} · Phase 1: Port Purchase ===`);
   logs.push(`💰 Current Funds: ${state.money} Gold`);
   // [ONLINE] Deterministic port market per (room, round).
-  const marketRng = createRng(`${ctx.seedBase}:R${state.currentRound}:market`);
+  const marketRng = createRng(`${ctx.seedBase}:V${state.voyageEpoch}:R${state.currentRound}:market`);
   state.resourceCards = [];
   for (let i = 0; i < 5; i++) {
     state.resourceCards.push({ id: i, ...genResourceCard(marketRng) });
@@ -941,7 +942,7 @@ export function startPhase2(state: GameState, ctx: GameContext, logs: string[]) 
   // [ONLINE] Deterministic trade orders per (room, round): every captain
   // in the room independently derives the identical base 5 orders here,
   // since this loop never reads anything captain specific.
-  const orderRng = createRng(`${ctx.seedBase}:R${state.currentRound}:orders`);
+  const orderRng = createRng(`${ctx.seedBase}:V${state.voyageEpoch}:R${state.currentRound}:orders`);
   state.customerCards = [];
   for (let i = 0; i < 5; i++) {
     state.customerCards.push({ id: i, ...genMixedOrder(orderRng) });
@@ -1142,8 +1143,8 @@ export function endGame(state: GameState, logs: string[]) {
   logs.push("=".repeat(50));
 }
 
-export function restartGame(state: GameState, logs: string[], startingGoldBonus: number = 0, renownLevel: number = 1) {
-  const fresh = createInitialGameState(startingGoldBonus, renownLevel);
+export function restartGame(state: GameState, logs: string[], startingGoldBonus: number = 0, renownLevel: number = 1, voyageEpoch: number = 0) {
+  const fresh = createInitialGameState(startingGoldBonus, renownLevel, voyageEpoch);
   Object.assign(state, fresh);
   logs.length = 0;
   showWelcome(state, logs);
