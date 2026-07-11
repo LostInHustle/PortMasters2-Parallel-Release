@@ -123,6 +123,13 @@ export const MODULES: Module[] = [
 // constants here, since nothing else needs to reference them separately.
 export const MAX_ROUNDS = 8;
 
+// How many cards the port market (startPhase1) and the trade board
+// (startPhase2) each roll per round, in src/lib/game/engine.ts. Kept as
+// two separate constants, not one shared count, since the two boards are
+// free to diverge in a future balance pass even though they start equal.
+export const PURCHASE_CARD_COUNT = 6;
+export const ORDER_CARD_COUNT = 6;
+
 // Broker's Favor: a Renown-gated, once-per-voyage skill a captain invokes in
 // Phase 2 to summon one extra guaranteed trade order for a chosen quantity of
 // a good they are already holding, so a hold full of otherwise unsellable

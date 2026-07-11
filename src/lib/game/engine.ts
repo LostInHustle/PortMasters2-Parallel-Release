@@ -30,10 +30,12 @@ import {
   ESCORT_COST_RATE,
   ICONS,
   MODULES,
+  ORDER_CARD_COUNT,
   PIRATE_ATTACK_CHANCE,
   PORTS,
   PRODUCT_PRICES,
   PRODUCTS,
+  PURCHASE_CARD_COUNT,
   RECIPES,
   RESOURCE_PROBS,
   RESOURCES,
@@ -220,7 +222,8 @@ export type ExpectedPrice = { min: number; max: number; isProduct: boolean; modi
 // or product, independent of any specific market card. Used for the
 // hover preview during the buying phase (Phase 1) so a captain can size
 // up the whole market, including goods that didn't happen to roll onto
-// one of this round's five cards. Ports nudge a raw material's roll by
+// one of this round's PURCHASE_CARD_COUNT cards. Ports nudge a raw
+// material's roll by
 // 1 Gold up or down depending on whether the port specializes in it
 // (see genResourceCard), which is why the range carries a margin note
 // instead of trying to fold that into the numbers themselves.
@@ -309,8 +312,8 @@ function genProductOrder(rng: Rng, filter: string | null = null, quantityOverrid
 
 // Deliberately a pure function of rng only. It used to also take `state`
 // so it could fold a captain's own revealed Broker's Whisper intel
-// straight into whichever of the 5 order slots it was generating at the
-// time, which meant the number of rng() calls this consumed depended on
+// straight into whichever order slot it was generating at the time, which
+// meant the number of rng() calls this consumed depended on
 // that captain's own purchase history. orderRng below is a fixed
 // deterministic stream (seeded per captain and per voyage, see the file
 // header), so letting the draw depend on mutable intel state made a
@@ -872,7 +875,7 @@ export function startPhase1(state: GameState, ctx: GameContext, logs: string[]) 
   // [ONLINE] Deterministic port market per (room, round).
   const marketRng = createRng(`${ctx.seedBase}:V${state.voyageEpoch}:R${state.currentRound}:market`);
   state.resourceCards = [];
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < PURCHASE_CARD_COUNT; i++) {
     state.resourceCards.push({ id: i, ...genResourceCard(marketRng) });
   }
 }
@@ -965,11 +968,11 @@ export function startPhase2(state: GameState, ctx: GameContext, logs: string[]) 
   state.completedOrders = [];
   logs.push(`\n🤝=== Round ${state.currentRound} · Phase 2: Trade Transaction ===`);
   // [ONLINE] Deterministic trade orders per (room, round): every captain
-  // in the room independently derives the identical base 5 orders here,
-  // since this loop never reads anything captain specific.
+  // in the room independently derives the identical base ORDER_CARD_COUNT
+  // orders here, since this loop never reads anything captain specific.
   const orderRng = createRng(`${ctx.seedBase}:V${state.voyageEpoch}:R${state.currentRound}:orders`);
   state.customerCards = [];
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < ORDER_CARD_COUNT; i++) {
     state.customerCards.push({ id: i, ...genMixedOrder(orderRng) });
   }
   // Broker's Whisper guarantee, applied after the shared draw above and
