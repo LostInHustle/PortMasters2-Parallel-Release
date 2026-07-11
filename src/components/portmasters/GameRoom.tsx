@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { api, type ChatMessage, type PublicUser, type RoomDetail } from "@/lib/api";
 import type { VoyageCompleteEvent } from "@/lib/realtime";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
+import { BROKERS_FAVOR_UNLOCK_LEVEL } from "@/lib/game/constants";
 import { useRealtime } from "@/lib/use-realtime";
 import { useGameSession } from "@/lib/use-game-session";
 import { usePhaseSync } from "@/lib/use-phase-sync";
@@ -137,6 +138,9 @@ export function GameRoom({
       const mine = data.standings.find((s) => s.userId === me.id);
       if (mine?.crowned) {
         toast.success("Crowned Sea Master!", { description: `Highest Reputation in the harbor this voyage: ${mine.reputation}.` });
+      }
+      if (mine?.brokersFavorUnlocked) {
+        toast.success("🤝 Broker's Favor unlocked!", { description: `Renown Level ${BROKERS_FAVOR_UNLOCK_LEVEL} reached. The Broker owes you one, starting next voyage.` });
       }
     };
     const onRestarted = (data: { roomId: string }) => {

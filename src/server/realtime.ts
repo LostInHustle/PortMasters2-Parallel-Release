@@ -25,6 +25,7 @@ import { Server } from "socket.io";
 import { db } from "../lib/db";
 import { leaveRoomForUser, roomMemberIds } from "../lib/rooms";
 import { levelForRenownXP, renownTitleForLevel } from "../lib/game/legacy";
+import { BROKERS_FAVOR_UNLOCK_LEVEL } from "../lib/game/constants";
 
 // ---------- Types ----------
 type PublicUser = {
@@ -367,15 +368,21 @@ export function attachRealtime(httpServer: HttpServer): Server {
       renownTitle: string;
       xpGained: number;
       leveledUp: boolean;
+      brokersFavorUnlocked: boolean;
     }[] = [];
 
     for (const f of finished) {
       const xpGained = Math.max(0, f.reputation);
       const crowned = f.userId === winnerId;
       const prior = await db.captainLegacy.findUnique({ where: { userId: f.userId } });
+      const priorLevel = prior?.renownLevel ?? 1;
       const newXP = (prior?.renownXP ?? 0) + xpGained;
       const newLevel = levelForRenownXP(newXP);
-      const leveledUp = newLevel > (prior?.renownLevel ?? 1);
+      const leveledUp = newLevel > priorLevel;
+      // A big Reputation haul can jump several levels in one voyage, so this
+      // checks the whole span crossed rather than newLevel === the unlock
+      // level, which would miss a captain who skipped past it entirely.
+      const brokersFavorUnlocked = priorLevel < BROKERS_FAVOR_UNLOCK_LEVEL && newLevel >= BROKERS_FAVOR_UNLOCK_LEVEL;
       const newBestScore = Math.max(prior?.bestScore ?? 0, f.reputation);
       await db.captainLegacy.upsert({
         where: { userId: f.userId },
@@ -408,6 +415,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         renownTitle: renownTitleForLevel(newLevel),
         xpGained,
         leveledUp,
+        brokersFavorUnlocked,
       });
       if (leveledUp) {
         io.to(`room:${roomId}`).emit("room:system", {

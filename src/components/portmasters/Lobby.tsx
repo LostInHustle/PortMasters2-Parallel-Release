@@ -25,10 +25,13 @@ import {
   ArrowRight,
   MessageCircle,
   RefreshCw,
+  Gift,
 } from "lucide-react";
+import { toast } from "sonner";
 import { cn, normalizeRoomName } from "@/lib/utils";
 import { APP_NAME } from "@/lib/game/constants";
 import { DEFAULT_LEGACY_SUMMARY, renownProgress, type CaptainLegacySummary } from "@/lib/game/legacy";
+import { checkInStatus, type CheckInStatus } from "@/lib/game/checkin";
 
 export function Lobby({
   me,
@@ -43,6 +46,9 @@ export function Lobby({
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
   const [legacy, setLegacy] = useState(DEFAULT_LEGACY_SUMMARY);
   const [legacyOpen, setLegacyOpen] = useState(false);
+  const [checkIn, setCheckIn] = useState<CheckInStatus>(() => checkInStatus({ checkInCount: 0, lastCheckInDate: null }));
+  const [checkInOpen, setCheckInOpen] = useState(false);
+  const [claiming, setClaiming] = useState(false);
   const [loadingRooms, setLoadingRooms] = useState(true);
   const [newName, setNewName] = useState("");
   const [isPublic, setIsPublic] = useState(true);
@@ -80,8 +86,33 @@ export function Lobby({
   // polling needed like the room list above.
   useEffect(() => {
     let alive = true;
-    api.getLegacy().then(({ legacy }) => { if (alive) setLegacy(legacy); }).catch(() => {});
+    api.getLegacy().then(({ legacy, checkIn }) => { if (alive) { setLegacy(legacy); setCheckIn(checkIn); } }).catch(() => {});
     return () => { alive = false; };
+  }, []);
+
+  // Claim today's Daily Check-In. The server is the source of truth for the
+  // day math and the guard against a second claim, so we just render whatever
+  // state it returns, claimed or not, and surface the reward as a toast.
+  const claimCheckIn = useCallback(async () => {
+    setClaiming(true);
+    try {
+      const res = await api.checkIn();
+      setLegacy(res.legacy);
+      setCheckIn(res.checkIn);
+      if (res.claimed) {
+        toast.success(`Day ${res.day} claimed: +${res.xpGained} Renown XP`, {
+          description: res.leveledUp
+            ? "Renown level up! A bigger start-of-voyage Gold bonus awaits."
+            : "Fair winds. Come back tomorrow for the next reward.",
+        });
+      } else {
+        toast("Already checked in today", { description: "Come back tomorrow for the next reward." });
+      }
+    } catch {
+      toast.error("Check-in failed", { description: "Could not reach the harbour master. Try again." });
+    } finally {
+      setClaiming(false);
+    }
   }, []);
 
   // Renown for every other captain currently shown in "Captains Online"
@@ -204,6 +235,14 @@ export function Lobby({
             <Pill tone="sea" className="hidden sm:inline-flex">
               <Users className="h-3 w-3" /> {totalOnline} sailing
             </Pill>
+            <button onClick={() => setCheckInOpen(true)} className="pm-pressable relative" title="Daily Check-In">
+              <Pill tone="amber">
+                <Gift className="h-3 w-3" /> <span className="hidden sm:inline">Check-In</span>
+              </Pill>
+              {checkIn.canClaimToday && (
+                <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-background" />
+              )}
+            </button>
             <button onClick={() => setLegacyOpen(true)} className="pm-pressable">
               <Pill tone="gold">
                 <Star className="h-3 w-3" /> Renown {renownProgress(legacy.renownXP).level}
@@ -467,6 +506,52 @@ export function Lobby({
           <p className="text-xs text-muted-foreground leading-relaxed">
             Every Renown level grants a small Gold bonus at the start of your next fresh voyage. It grows from the Reputation you bank on the way to Round 8, so it only ever goes up, even on a voyage that ends in bankruptcy.
           </p>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={checkInOpen} onOpenChange={setCheckInOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Gift className="h-5 w-5 text-violet-500" />Daily Check-In</DialogTitle>
+            <DialogDescription>
+              Claim a Renown reward each day. The 7-day cycle picks up where you left off, even after a missed day, and restarts once Day 7 is claimed.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
+            {checkIn.rewards.map((xp, i) => {
+              const day = i + 1;
+              const claimed = day <= checkIn.claimedThisCycle;
+              const isCurrent = day === checkIn.currentDay;
+              return (
+                <div
+                  key={day}
+                  className={cn(
+                    "rounded-lg border px-1 py-2 text-center",
+                    claimed
+                      ? "border-emerald-500/40 bg-emerald-500/[0.07] opacity-70"
+                      : isCurrent
+                        ? "border-violet-500/50 bg-violet-500/[0.09]"
+                        : "border-black/10 dark:border-white/10 bg-background/40",
+                  )}
+                >
+                  <div className="text-[10px] text-muted-foreground">Day {day}</div>
+                  <div className="text-sm font-bold leading-tight">+{xp}</div>
+                  <div className="text-[9px] text-muted-foreground">{claimed ? "✓ XP" : "XP"}</div>
+                </div>
+              );
+            })}
+          </div>
+          <Button
+            className="pm-grad-violet text-white font-semibold rounded-lg w-full hover:opacity-95"
+            disabled={!checkIn.canClaimToday || claiming}
+            onClick={claimCheckIn}
+          >
+            {claiming
+              ? "Claiming…"
+              : checkIn.canClaimToday
+                ? `Claim Day ${checkIn.currentDay}: +${checkIn.rewards[checkIn.currentDay - 1]} Renown XP`
+                : "Checked in today · back tomorrow"}
+          </Button>
         </DialogContent>
       </Dialog>
     </div>
