@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import {
   APP_NAME,
   BARTER_ITEMS,
-  BROKERS_FAVOR_COMMISSION,
   BROKERS_FAVOR_UNLOCK_LEVEL,
   COLORS,
   ESCORT_COST_RATE,
@@ -19,6 +18,7 @@ import {
 } from "@/lib/game/constants";
 import {
   assignTask,
+  brokersFavorCommission,
   calcTransportCost,
   callBrokersFavor,
   completeBarterPhase,
@@ -668,8 +668,12 @@ function Orders({
   members: PublicUser[];
 }) {
   const [favorOpen, setFavorOpen] = useState(false);
+  const [favorItem, setFavorItem] = useState<string | null>(null);
+  const [favorQty, setFavorQty] = useState(1);
   const favorUnlocked = game.renownLevel >= BROKERS_FAVOR_UNLOCK_LEVEL;
   const sellableGoods = [...RESOURCES, ...PRODUCTS].filter((it) => (game.inventory[it] || 0) > 0);
+  const favorHeld = favorItem ? game.inventory[favorItem] || 0 : 0;
+  const closeFavor = () => { setFavorOpen(false); setFavorItem(null); };
   return (
     <div>
       <h2 className="text-lg font-semibold mb-4 flex items-center gap-2"><Coins className="h-5 w-5 text-amber-600 dark:text-amber-400" />Trade Manifest</h2>
@@ -694,10 +698,10 @@ function Orders({
         <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/[0.07] px-3.5 py-2.5 mb-3.5 text-xs">
           {!favorOpen ? (
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <span><strong>🤝 Broker's Favor</strong> (once per voyage): summon a guaranteed buyer for a good already in your hold. The Broker keeps {Math.round(BROKERS_FAVOR_COMMISSION * 100)}% of the reward.</span>
+              <span><strong>🤝 Broker's Favor</strong> (once per voyage): summon a guaranteed buyer for as much of a good as you choose from your hold. The bigger the ask, the bigger the Broker's cut.</span>
               <Button size="sm" className="pm-grad-violet text-white font-semibold rounded-lg shrink-0 hover:opacity-95" onClick={() => setFavorOpen(true)}>Call in a Favor</Button>
             </div>
-          ) : (
+          ) : !favorItem ? (
             <div className="space-y-2">
               <div className="font-semibold">🤝 Which good needs a buyer?</div>
               {sellableGoods.length > 0 ? (
@@ -708,7 +712,7 @@ function Orders({
                       size="sm"
                       variant="secondary"
                       className="rounded-lg"
-                      onClick={() => { act((g, l) => callBrokersFavor(g, it, l)); setFavorOpen(false); }}
+                      onClick={() => { setFavorItem(it); setFavorQty(game.inventory[it] || 1); }}
                     >
                       {ICONS[it]} {it} ({game.inventory[it]})
                     </Button>
@@ -717,7 +721,34 @@ function Orders({
               ) : (
                 <div className="text-muted-foreground">Your hold is empty, so there is nothing for the Broker to sell right now.</div>
               )}
-              <Button size="sm" variant="ghost" className="rounded-lg" onClick={() => setFavorOpen(false)}>Cancel</Button>
+              <Button size="sm" variant="ghost" className="rounded-lg" onClick={closeFavor}>Cancel</Button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="font-semibold">{ICONS[favorItem]} How much {favorItem} should the Broker sell?</div>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min={1}
+                  max={favorHeld}
+                  step={1}
+                  value={favorQty}
+                  onChange={(e) => setFavorQty(Math.min(favorHeld, Math.max(1, parseInt(e.target.value, 10) || 1)))}
+                  className="w-20 h-9"
+                />
+                <span className="text-muted-foreground">of {favorHeld} in your hold</span>
+              </div>
+              <p className="text-muted-foreground">A bigger ask pays out more, but the Broker's cut grows with it too, so a single favor can never swing the whole voyage.</p>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  className="pm-grad-violet text-white font-semibold rounded-lg hover:opacity-95"
+                  onClick={() => { act((g, l) => callBrokersFavor(g, favorItem, favorQty, l)); closeFavor(); }}
+                >
+                  Call in the Favor
+                </Button>
+                <Button size="sm" variant="ghost" className="rounded-lg" onClick={() => setFavorItem(null)}>Back</Button>
+              </div>
             </div>
           )}
         </div>
@@ -738,7 +769,8 @@ function Orders({
             totalVat = vatBreakdown.final * o.resources[0].required!;
             netProfit -= totalVat;
           }
-          const brokerCommission = o.isBrokerFavor ? Math.floor(o.reward * BROKERS_FAVOR_COMMISSION) : 0;
+          const brokerCommission = o.isBrokerFavor ? brokersFavorCommission(o.reward) : 0;
+          const brokerCommissionPct = o.reward > 0 ? Math.round((brokerCommission / o.reward) * 100) : 0;
           netProfit -= brokerCommission;
           const matchesIntel = game.revealedIntel.some((i) => o.resources.some((r) => r.type === i.item));
           return (
@@ -770,7 +802,7 @@ function Orders({
                 </div>
                 {o.isBrokerFavor && (
                   <div className="text-[10px] text-emerald-700 dark:text-emerald-300">
-                    🤝 Broker's cut ({Math.round(BROKERS_FAVOR_COMMISSION * 100)}%): {brokerCommission} Gold
+                    🤝 Broker's cut ({brokerCommissionPct}%): {brokerCommission} Gold
                   </div>
                 )}
                 {o.isProductOrder && vatBreakdown && (

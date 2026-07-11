@@ -24,7 +24,7 @@ import {
   AID_REPUTATION_PER_GOLD,
   APP_NAME,
   BOONS,
-  BROKERS_FAVOR_COMMISSION,
+  BROKERS_FAVOR_PAYOUT_CAP,
   BROKERS_FAVOR_UNLOCK_LEVEL,
   COMMODITIES,
   ESCORT_COST_RATE,
@@ -272,14 +272,17 @@ export function getHireCost(state: GameState, type: string): number {
 // ---------- Order / Card generation ----------
 // [ONLINE] These use a seeded RNG so the market is identical for every
 // captain in the same room on the same voyage.
-function genRawOrder(rng: Rng, filter: string | null = null): Omit<OrderCard, "id"> {
+// quantityOverride is only ever set by callBrokersFavor, letting a captain
+// choose exactly how much of a filtered good the guaranteed order asks for
+// instead of leaving it to the usual randInt roll below.
+function genRawOrder(rng: Rng, filter: string | null = null, quantityOverride?: number): Omit<OrderCard, "id"> {
   const num = randInt(rng, 1, 3);
   const resources: { type: string; required: number }[] = [];
   const available = [...RESOURCES];
   const port = pick(rng, PORTS as readonly string[]);
   let total = 0;
   if (filter && (RESOURCES as readonly string[]).includes(filter)) {
-    const req = randInt(rng, 2, 5);
+    const req = quantityOverride ?? randInt(rng, 2, 5);
     total += req;
     resources.push({ type: filter, required: req });
   } else {
@@ -296,9 +299,9 @@ function genRawOrder(rng: Rng, filter: string | null = null): Omit<OrderCard, "i
   return { demandPort: port, resources, reward: base + randInt(rng, 10, 25), totalItems: total, isProductOrder: false };
 }
 
-function genProductOrder(rng: Rng, filter: string | null = null): Omit<OrderCard, "id"> {
+function genProductOrder(rng: Rng, filter: string | null = null, quantityOverride?: number): Omit<OrderCard, "id"> {
   const product = filter && (PRODUCTS as readonly string[]).includes(filter) ? filter : pick(rng, PRODUCTS as readonly string[]);
-  const req = randInt(rng, 1, 3);
+  const req = quantityOverride ?? randInt(rng, 1, 3);
   const port = pick(rng, PORTS as readonly string[]);
   const basePrice = randInt(rng, PRODUCT_PRICES[product][0], PRODUCT_PRICES[product][1]);
   return { demandPort: port, resources: [{ type: product, required: req }], reward: basePrice * req, totalItems: req, isProductOrder: true };
@@ -444,6 +447,18 @@ export function purchaseCard(state: GameState, cardId: number, logs: string[]) {
   logs.push(`📊 Purchased ${state.purchaseCount} cargo batches`);
 }
 
+// The Broker's cut on a Broker's Favor order, a saturating curve rather
+// than a flat rate. Net payout climbs almost one for one with reward at
+// first (a small order keeps the feel of a low flat rate) but bends hard as
+// reward grows, approaching BROKERS_FAVOR_PAYOUT_CAP without ever reaching
+// it. That gives callBrokersFavor a hard ceiling on what a single favor can
+// pay out regardless of how large a quantity a captain asks for, instead of
+// needing to cap the quantity itself.
+export function brokersFavorCommission(reward: number): number {
+  const net = BROKERS_FAVOR_PAYOUT_CAP * (1 - Math.exp(-reward / BROKERS_FAVOR_PAYOUT_CAP));
+  return Math.max(0, reward - Math.floor(net));
+}
+
 export function completeOrder(state: GameState, orderId: number, logs: string[]) {
   const order = state.customerCards.find((o) => o.id === orderId);
   if (!order) return;
@@ -490,13 +505,14 @@ export function completeOrder(state: GameState, orderId: number, logs: string[])
     state.roundCosts -= diff;
     state.totalCosts -= diff;
   }
-  // Broker's Favor commission: the Broker takes a flat cut of the order's
-  // reward, so the captain's own money, revenue, and score all reflect the
-  // amount net of the commission (see callBrokersFavor).
+  // Broker's Favor commission: the Broker takes a cut of the order's
+  // reward (see brokersFavorCommission), so the captain's own money,
+  // revenue, and score all reflect the amount net of the commission.
   if (order.isBrokerFavor) {
-    const commission = Math.floor(order.reward * BROKERS_FAVOR_COMMISSION);
+    const commission = brokersFavorCommission(order.reward);
     reward -= commission;
-    logs.push(`🤝 Broker's Commission (${Math.round(BROKERS_FAVOR_COMMISSION * 100)}%): ${commission} Gold`);
+    const pct = order.reward > 0 ? Math.round((commission / order.reward) * 100) : 0;
+    logs.push(`🤝 Broker's Commission (${pct}%): ${commission} Gold`);
   }
   state.money += reward;
   state.roundRevenue += reward;
@@ -512,13 +528,16 @@ export function completeOrder(state: GameState, orderId: number, logs: string[])
 
 // Broker's Favor: the Renown-gated, once-per-voyage skill (see the flag on
 // GameState and BROKERS_FAVOR_UNLOCK_LEVEL). Appends one extra standard trade
-// order for a good this captain is currently holding, so a hold full of
-// otherwise unsellable stock still has a guaranteed buyer. Like the paid
-// Broker's Whisper guarantee in startPhase2, it draws with this captain's own
-// Math.random and only appends to their own customerCards, so it can never
-// shift the shared, room-wide market anyone else sees. The Broker's cut is
-// taken later, in completeOrder, off the order's reward.
-export function callBrokersFavor(state: GameState, item: string, logs: string[]) {
+// order for a chosen quantity of a good this captain is currently holding,
+// so a hold full of otherwise unsellable stock still has a guaranteed buyer.
+// Like the paid Broker's Whisper guarantee in startPhase2, it draws with
+// this captain's own Math.random and only appends to their own
+// customerCards, so it can never shift the shared, room-wide market anyone
+// else sees. Quantity is capped at the captain's own hold rather than the
+// usual 1-3/2-5 order range, since brokersFavorCommission (see
+// completeOrder) is what keeps an oversized ask from paying out too much,
+// not a quantity limit.
+export function callBrokersFavor(state: GameState, item: string, quantity: number, logs: string[]) {
   if (state.phase !== 2) return;
   if (state.renownLevel < BROKERS_FAVOR_UNLOCK_LEVEL) {
     logs.push(`❌ Broker's Favor unlocks at Renown Level ${BROKERS_FAVOR_UNLOCK_LEVEL}`);
@@ -534,18 +553,24 @@ export function callBrokersFavor(state: GameState, item: string, logs: string[])
     logs.push(`❌ The Broker can't find a buyer for ${item}`);
     return;
   }
-  if ((state.inventory[item] || 0) <= 0) {
+  const held = state.inventory[item] || 0;
+  if (held <= 0) {
     logs.push(`❌ You have no ${item} in the hold for the Broker to sell`);
     return;
   }
+  const qty = Math.floor(quantity);
+  if (!Number.isFinite(qty) || qty < 1 || qty > held) {
+    logs.push(`❌ Choose between 1 and ${held} ${item} for the Broker to sell`);
+    return;
+  }
   const localRng: Rng = Math.random;
-  const order = isRaw ? genRawOrder(localRng, item) : genProductOrder(localRng, item);
+  const order = isRaw ? genRawOrder(localRng, item, qty) : genProductOrder(localRng, item, qty);
   const nextId = state.customerCards.reduce((m, c) => Math.max(m, c.id), -1) + 1;
   state.customerCards.push({ id: nextId, ...order, isBrokerFavor: true });
   state.brokersFavorUsed = true;
   const txt = order.resources.map((r) => `${ICONS[r.type]}${r.type}×${r.required}`).join(" + ");
   logs.push(
-    `🤝 Broker's Favor called in: a buyer at ${order.demandPort} now wants ${txt}. The Broker keeps ${Math.round(BROKERS_FAVOR_COMMISSION * 100)}% of the reward.`,
+    `🤝 Broker's Favor called in: a buyer at ${order.demandPort} now wants ${txt}. The bigger the ask, the bigger the Broker's cut.`,
   );
 }
 
