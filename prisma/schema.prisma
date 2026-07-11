@@ -137,6 +137,15 @@ model CaptainLegacy {
   // everyone who reached the endgame screen (not bankrupt) in that room.
   seaMasterCrowns  Int      @default(0)
   bestScore        Int      @default(0)
+
+  // Daily Check-In (see src/lib/game/checkin.ts). checkInCount is how many
+  // days of the current 7-day cycle have been claimed (0..6, wrapping to 0
+  // the moment Day 7 is claimed); lastCheckInDate is the "YYYY-MM-DD" UTC
+  // key of the most recent claim, which enforces one claim per day. Kept on
+  // this account-level table since check-in, like Renown, spans every room.
+  checkInCount     Int      @default(0)
+  lastCheckInDate  String?
+
   updatedAt        DateTime @updatedAt
 
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)

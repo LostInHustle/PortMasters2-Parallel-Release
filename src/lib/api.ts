@@ -2,6 +2,7 @@
 // PortMasters 2 Parallel Release: REST API helpers (typed fetch wrappers)
 // =====================================================================
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
+import type { CheckInStatus } from "@/lib/game/checkin";
 
 export type PublicUser = {
   id: string;
@@ -94,12 +95,25 @@ export const api = {
   getDmHistory: (otherUserId: string) =>
     jfetch<{ other: PublicUser; messages: ChatMessage[] }>(`/api/messages/dm/${otherUserId}`),
 
-  // Captain's Legacy (persistent Renown, across every voyage the account has played)
-  getLegacy: () => jfetch<{ legacy: CaptainLegacySummary }>("/api/legacy"),
+  // Captain's Legacy (persistent Renown, across every voyage the account has played).
+  // The current user's own legacy also carries their Daily Check-In status.
+  getLegacy: () => jfetch<{ legacy: CaptainLegacySummary; checkIn: CheckInStatus }>("/api/legacy"),
   getLegacyFor: (userId: string) => jfetch<{ legacy: CaptainLegacySummary }>(`/api/legacy/${userId}`),
   getLegaciesFor: (userIds: string[]) =>
     jfetch<{ legacies: Record<string, CaptainLegacySummary> }>("/api/legacy/batch", {
       method: "POST",
       body: JSON.stringify({ userIds }),
     }),
+
+  // Daily Check-In: claim today's reward. Returns claimed:false (not an
+  // error) when today was already claimed, so the caller can just re-render.
+  checkIn: () =>
+    jfetch<{
+      claimed: boolean;
+      day?: number;
+      xpGained?: number;
+      leveledUp?: boolean;
+      legacy: CaptainLegacySummary;
+      checkIn: CheckInStatus;
+    }>("/api/check-in", { method: "POST" }),
 };

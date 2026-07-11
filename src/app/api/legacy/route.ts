@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/api-auth";
 import { DEFAULT_LEGACY_SUMMARY, type CaptainLegacySummary } from "@/lib/game/legacy";
+import { checkInStatus, utcDayKey } from "@/lib/game/checkin";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -22,5 +23,13 @@ export async function GET() {
       }
     : DEFAULT_LEGACY_SUMMARY;
 
-  return NextResponse.json({ legacy: summary });
+  // The current user's Daily Check-In state rides along here so the lobby
+  // renders the widget without a second request. Other players' legacy
+  // routes (batch, [userId]) stay read-only summaries with no check-in.
+  const checkIn = checkInStatus(
+    { checkInCount: legacy?.checkInCount ?? 0, lastCheckInDate: legacy?.lastCheckInDate ?? null },
+    utcDayKey(),
+  );
+
+  return NextResponse.json({ legacy: summary, checkIn });
 }

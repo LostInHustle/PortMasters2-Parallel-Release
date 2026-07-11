@@ -54,6 +54,7 @@ export const RENOWN_TITLES: RenownTitle[] = [
   { minLevel: 8, title: "Harbor Captain" },
   { minLevel: 12, title: "Fleet Commodore" },
   { minLevel: 16, title: "Silk Road Legend" },
+  { minLevel: 21, title: "Silk Road Sovereign" },
 ];
 
 export function renownTitleForLevel(level: number): string {
@@ -67,14 +68,14 @@ export function renownTitleForLevel(level: number): string {
 // The one gameplay effect Renown actually buys: a few extra Gold at the
 // very start of a fresh voyage, capped well below anything that would
 // make an experienced captain's early rounds trivial. +3 Gold per level
-// above 1, capped at +30 (reached at level 11), against a starting
+// above 1, capped at +60 (reached at level 21), against a starting
 // stake of 100. Applied once, in createInitialGameState (see
 // src/lib/game/types.ts): it only ever changes a captain's own starting
 // Gold, never the deterministic per round market and order seed shared
 // across the room, so it can't desync one captain's view of the harbor
 // from anyone else's.
 const RENOWN_GOLD_PER_LEVEL = 3;
-const RENOWN_GOLD_CAP = 30;
+const RENOWN_GOLD_CAP = 60;
 
 export function renownStartingGoldBonus(level: number): number {
   return Math.min(RENOWN_GOLD_CAP, Math.max(0, level - 1) * RENOWN_GOLD_PER_LEVEL);
