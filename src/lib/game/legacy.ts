@@ -81,16 +81,20 @@ export function renownStartingGoldBonus(level: number): number {
   return Math.min(RENOWN_GOLD_CAP, Math.max(0, level - 1) * RENOWN_GOLD_PER_LEVEL);
 }
 
-// Shape returned by GET /api/legacy and carried on room:voyage_complete
-// standings (see src/server/realtime.ts). A brand new captain with no
-// CaptainLegacy row yet is simply level 1 with nothing banked, rather
-// than a special "no data" case the UI needs to branch on.
+// Shape returned by GET /api/legacy (and its [userId]/batch siblings) and
+// carried on room:voyage_complete standings (see src/server/realtime.ts).
+// A brand new captain with no CaptainLegacy row yet is simply level 1
+// with nothing banked, rather than a special "no data" case the UI needs
+// to branch on. meritIds is every Captain's Merit (see merits.ts) this
+// account has ever earned, shown for any captain, not just the viewer,
+// the same as every other field here.
 export type CaptainLegacySummary = {
   renownLevel: number;
   renownXP: number;
   voyagesCompleted: number;
   seaMasterCrowns: number;
   bestScore: number;
+  meritIds: string[];
 };
 
 export const DEFAULT_LEGACY_SUMMARY: CaptainLegacySummary = {
@@ -99,4 +103,5 @@ export const DEFAULT_LEGACY_SUMMARY: CaptainLegacySummary = {
   voyagesCompleted: 0,
   seaMasterCrowns: 0,
   bestScore: 0,
+  meritIds: [],
 };

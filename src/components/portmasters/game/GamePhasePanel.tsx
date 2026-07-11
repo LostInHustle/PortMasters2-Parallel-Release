@@ -16,6 +16,7 @@ import {
   RESOURCES,
   WAGES,
 } from "@/lib/game/constants";
+import { meritById } from "@/lib/game/merits";
 import {
   assignTask,
   brokersFavorCommission,
@@ -37,6 +38,7 @@ import {
   handleModuleSelect,
   hireEscort,
   hireWorker,
+  merchantRatingForScore,
   postBarterOffer,
   purchaseCard,
   refundBarterOffer,
@@ -1194,12 +1196,16 @@ function Endgame({
   myLegacy: CaptainLegacySummary | null;
   myUserId: string;
 }) {
+  // Mirrors the same rank shown in the Captain's Ledger (see
+  // merchantRatingForScore in engine.ts). Checks defaultedDebt first, the
+  // one case a plain score lookup can't capture on its own.
   let rating: string;
-  if (game.score >= 300) rating = "👑 King of Silk Road";
-  else if (game.score >= 200) rating = "🏆 Maritime Tycoon";
-  else if (game.score >= 100) rating = "⭐ Successful Merchant";
-  else if (game.score >= 50) rating = "👍 Qualified Trader";
-  else rating = "🌊 Novice Merchant";
+  if (game.defaultedDebt) {
+    rating = "💥 Bankrupt: Defaulted on a Loan";
+  } else {
+    const r = merchantRatingForScore(game.score);
+    rating = `${r.icon} ${r.label}`;
+  }
   const mine = voyageResult?.standings.find((s) => s.userId === myUserId);
   return (
     <div className="max-w-md mx-auto text-center py-4">
@@ -1226,6 +1232,18 @@ function Endgame({
               <div className="text-xs text-muted-foreground mt-0.5">Renown Level {BROKERS_FAVOR_UNLOCK_LEVEL} reached. Starting next voyage, call one in from the Trade Manifest to summon a guaranteed buyer.</div>
             </div>
           )}
+          {mine?.newMerits.map((meritId) => {
+            const merit = meritById(meritId);
+            if (!merit) return null;
+            return (
+              <div key={meritId} className="rounded-xl border-2 border-amber-400 bg-amber-400/10 px-4 py-3 text-center">
+                <div className="text-lg font-bold text-amber-600 dark:text-amber-300 flex items-center justify-center gap-2">
+                  {merit.icon} Captain's Merit: {merit.name}
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5">{merit.desc}</div>
+              </div>
+            );
+          })}
           <div className="rounded-xl border border-black/5 dark:border-white/10 overflow-hidden">
             <div className="px-3 py-2 text-xs font-semibold bg-black/[0.03] dark:bg-white/[0.05]">🏁 Final Standings</div>
             <div className="divide-y divide-black/5 dark:divide-white/10">

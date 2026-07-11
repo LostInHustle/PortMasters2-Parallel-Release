@@ -26,6 +26,7 @@ import { db } from "../lib/db";
 import { leaveRoomForUser, roomMemberIds } from "../lib/rooms";
 import { levelForRenownXP, renownTitleForLevel } from "../lib/game/legacy";
 import { BROKERS_FAVOR_UNLOCK_LEVEL } from "../lib/game/constants";
+import { meritById, qualifyingMerits } from "../lib/game/merits";
 
 // ---------- Types ----------
 type PublicUser = {
@@ -369,11 +370,13 @@ export function attachRealtime(httpServer: HttpServer): Server {
       xpGained: number;
       leveledUp: boolean;
       brokersFavorUnlocked: boolean;
+      newMerits: string[];
     }[] = [];
 
     for (const f of finished) {
       const xpGained = Math.max(0, f.reputation);
       const crowned = f.userId === winnerId;
+      const bankrupt = f.phase === "bankruptcy";
       const prior = await db.captainLegacy.findUnique({ where: { userId: f.userId } });
       const priorLevel = prior?.renownLevel ?? 1;
       const newXP = (prior?.renownXP ?? 0) + xpGained;
@@ -384,6 +387,12 @@ export function attachRealtime(httpServer: HttpServer): Server {
       // level, which would miss a captain who skipped past it entirely.
       const brokersFavorUnlocked = priorLevel < BROKERS_FAVOR_UNLOCK_LEVEL && newLevel >= BROKERS_FAVOR_UNLOCK_LEVEL;
       const newBestScore = Math.max(prior?.bestScore ?? 0, f.reputation);
+      const newVoyagesCompleted = (prior?.voyagesCompleted ?? 0) + 1;
+      // Resets on any bankruptcy rather than only incrementing on a clean
+      // finish, so a single defaulted voyage costs the whole streak, the
+      // same "start over" feel as the streak-shaped systems this project
+      // already has (a missed pirate roll undoing an escort-free run).
+      const newConsecutiveSolventVoyages = bankrupt ? 0 : (prior?.consecutiveSolventVoyages ?? 0) + 1;
       await db.captainLegacy.upsert({
         where: { userId: f.userId },
         create: {
@@ -393,6 +402,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
           voyagesCompleted: 1,
           seaMasterCrowns: crowned ? 1 : 0,
           bestScore: newBestScore,
+          consecutiveSolventVoyages: newConsecutiveSolventVoyages,
         },
         update: {
           renownXP: newXP,
@@ -400,8 +410,39 @@ export function attachRealtime(httpServer: HttpServer): Server {
           voyagesCompleted: { increment: 1 },
           ...(crowned ? { seaMasterCrowns: { increment: 1 } } : {}),
           bestScore: newBestScore,
+          consecutiveSolventVoyages: newConsecutiveSolventVoyages,
         },
       });
+
+      // Captain's Merits (see src/lib/game/merits.ts): qualifyingMerits
+      // returns everything this account currently qualifies for, not just
+      // what's new, so the existing rows on file are what turn that into
+      // a delta. skipDuplicates is a second line of defense alongside the
+      // @@unique constraint, not load bearing on its own.
+      const existingMerits = await db.captainMerit.findMany({ where: { userId: f.userId }, select: { meritId: true } });
+      const existingMeritIds = new Set(existingMerits.map((m) => m.meritId));
+      const qualifying = qualifyingMerits({
+        newVoyagesCompleted,
+        crowned,
+        priorSeaMasterCrowns: prior?.seaMasterCrowns ?? 0,
+        reputation: f.reputation,
+        newRenownLevel: newLevel,
+        consecutiveSolventVoyages: newConsecutiveSolventVoyages,
+      });
+      const newMerits = qualifying.filter((id) => !existingMeritIds.has(id));
+      // One upsert per merit rather than a single createMany: SQLite's
+      // Prisma client (unlike Postgres/MySQL) doesn't support
+      // skipDuplicates, and there are never more than a handful of merits
+      // to grant in one voyage, so the per-row round trip costs nothing
+      // worth avoiding in exchange for a write that can't ever throw on
+      // the @@unique constraint racing with itself.
+      for (const meritId of newMerits) {
+        await db.captainMerit.upsert({
+          where: { userId_meritId: { userId: f.userId, meritId } },
+          create: { userId: f.userId, meritId },
+          update: {},
+        });
+      }
 
       standings.push({
         userId: f.userId,
@@ -410,17 +451,26 @@ export function attachRealtime(httpServer: HttpServer): Server {
         reputation: f.reputation,
         gold: f.gold,
         crowned,
-        bankrupt: f.phase === "bankruptcy",
+        bankrupt,
         renownLevel: newLevel,
         renownTitle: renownTitleForLevel(newLevel),
         xpGained,
         leveledUp,
         brokersFavorUnlocked,
+        newMerits,
       });
       if (leveledUp) {
         io.to(`room:${roomId}`).emit("room:system", {
           roomId,
           content: `${f.user.displayName} reached Renown Level ${newLevel}: ${renownTitleForLevel(newLevel)}!`,
+        });
+      }
+      for (const meritId of newMerits) {
+        const merit = meritById(meritId);
+        if (!merit) continue;
+        io.to(`room:${roomId}`).emit("room:system", {
+          roomId,
+          content: `${f.user.displayName} earned the Captain's Merit ${merit.icon} ${merit.name}!`,
         });
       }
     }

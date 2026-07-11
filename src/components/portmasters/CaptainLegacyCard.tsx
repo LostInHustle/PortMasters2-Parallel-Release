@@ -1,9 +1,11 @@
 "use client";
 
 import { Progress } from "@/components/ui/progress";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Crown, Trophy, Ship, Star } from "lucide-react";
 import { renownProgress, renownTitleForLevel, type CaptainLegacySummary } from "@/lib/game/legacy";
 import { BROKERS_FAVOR_UNLOCK_LEVEL } from "@/lib/game/constants";
+import { MERITS } from "@/lib/game/merits";
 import { cn } from "@/lib/utils";
 
 // Shown both in the Lobby (a captain's standing account of who they are
@@ -44,6 +46,32 @@ export function CaptainLegacyCard({
         {favorUnlocked
           ? "🤝 Broker's Favor unlocked"
           : `🔒 Broker's Favor unlocks at Renown ${BROKERS_FAVOR_UNLOCK_LEVEL}, ${renownTitleForLevel(BROKERS_FAVOR_UNLOCK_LEVEL)} (${favorLevelsToGo} level${favorLevelsToGo === 1 ? "" : "s"} to go)`}
+      </div>
+      <div className="flex flex-wrap gap-1.5 mb-2.5">
+        {MERITS.map((m) => {
+          const earned = legacy.meritIds.includes(m.id);
+          return (
+            <Tooltip key={m.id}>
+              <TooltipTrigger asChild>
+                <span
+                  className={cn(
+                    "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-sm cursor-default",
+                    earned
+                      ? "bg-amber-500/15 border-amber-500/40"
+                      : "bg-background/60 border-black/10 dark:border-white/10 opacity-35 grayscale",
+                  )}
+                >
+                  {m.icon}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                <div className="font-semibold">{m.icon} {m.name}</div>
+                <div className="text-muted-foreground">{m.desc}</div>
+                {!earned && <div className="text-muted-foreground mt-1">Not yet earned</div>}
+              </TooltipContent>
+            </Tooltip>
+          );
+        })}
       </div>
       {!compact && (
         <div className="grid grid-cols-3 gap-2 text-center">

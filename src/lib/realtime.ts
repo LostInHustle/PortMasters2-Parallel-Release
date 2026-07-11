@@ -57,6 +57,10 @@ export type VoyageStanding = {
   xpGained: number;
   leveledUp: boolean;
   brokersFavorUnlocked: boolean;
+  // Captain's Merit ids (see src/lib/game/merits.ts) newly earned by this
+  // voyage's outcome, not the account's full collection; that full list
+  // lives on CaptainLegacySummary.meritIds instead.
+  newMerits: string[];
 };
 
 export type VoyageCompleteEvent = {

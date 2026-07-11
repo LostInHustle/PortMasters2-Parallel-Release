@@ -123,6 +123,21 @@ export const MODULES: Module[] = [
 // constants here, since nothing else needs to reference them separately.
 export const MAX_ROUNDS = 8;
 
+// How a single voyage's final Reputation reads on the Endgame screen (see
+// merchantRatingForScore in engine.ts). Ordered highest threshold first so
+// the lookup is a plain first-match scan; the last entry's minScore of 0
+// is the catch-all floor. The top entry also doubles as the threshold for
+// the "king_of_silk_road" merit in src/lib/game/merits.ts, so retuning it
+// here moves both places at once instead of drifting apart.
+export type MerchantRating = { minScore: number; icon: string; label: string };
+export const MERCHANT_RATINGS: MerchantRating[] = [
+  { minScore: 300, icon: "👑", label: "King of Silk Road" },
+  { minScore: 200, icon: "🏆", label: "Maritime Tycoon" },
+  { minScore: 100, icon: "⭐", label: "Successful Merchant" },
+  { minScore: 50, icon: "👍", label: "Qualified Trader" },
+  { minScore: 0, icon: "🌊", label: "Novice Merchant" },
+];
+
 // How many cards the port market (startPhase1) and the trade board
 // (startPhase2) each roll per round, in src/lib/game/engine.ts. Kept as
 // two separate constants, not one shared count, since the two boards are

@@ -29,6 +29,7 @@ import {
   COMMODITIES,
   ESCORT_COST_RATE,
   ICONS,
+  MERCHANT_RATINGS,
   MODULES,
   ORDER_CARD_COUNT,
   PIRATE_ATTACK_CHANCE,
@@ -41,6 +42,7 @@ import {
   RESOURCES,
   WAGES,
   type Boon,
+  type MerchantRating,
   type Module,
 } from "./constants";
 import { createRng, pick, randInt, weightedPick, type Rng } from "./rng";
@@ -1152,6 +1154,17 @@ export function skipUpgrade(state: GameState, logs: string[]) {
   endRound(state, logs);
 }
 
+// The single lookup behind both the Endgame log line below and the
+// Endgame screen's rating badge (see GamePhasePanel.tsx), so the two
+// never drift the way they briefly did before this was pulled out: the
+// screen was missing the "defaulted on a loan" case entirely, still
+// showing a captain's score tier as if nothing had happened.
+// MERCHANT_RATINGS is ordered highest threshold first, so the first
+// match scanning down the list is always the correct tier.
+export function merchantRatingForScore(score: number): MerchantRating {
+  return MERCHANT_RATINGS.find((r) => score >= r.minScore) ?? MERCHANT_RATINGS[MERCHANT_RATINGS.length - 1];
+}
+
 export function endGame(state: GameState, logs: string[]) {
   state.gameOver = true;
   state.phase = "endgame";
@@ -1161,12 +1174,12 @@ export function endGame(state: GameState, logs: string[]) {
   logs.push(`🏆 Final Reputation: ${state.score}`);
   logs.push(`🧾 Total Taxes Paid: ${state.vatPaid + state.incomeTaxPaid} Gold`);
   let rating: string;
-  if (state.defaultedDebt) rating = "💥 Bankrupt: Defaulted on a Loan";
-  else if (state.score >= 300) rating = "👑 King of Silk Road";
-  else if (state.score >= 200) rating = "🏆 Maritime Tycoon";
-  else if (state.score >= 100) rating = "⭐ Successful Merchant";
-  else if (state.score >= 50) rating = "👍 Qualified Trader";
-  else rating = "🌊 Novice Merchant";
+  if (state.defaultedDebt) {
+    rating = "💥 Bankrupt: Defaulted on a Loan";
+  } else {
+    const r = merchantRatingForScore(state.score);
+    rating = `${r.icon} ${r.label}`;
+  }
   logs.push(`📈 Rank: ${rating}`);
   logs.push("=".repeat(50));
 }
