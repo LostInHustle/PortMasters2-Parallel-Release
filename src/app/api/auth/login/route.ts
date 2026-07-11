@@ -26,16 +26,24 @@ export async function POST(req: NextRequest) {
   const user = await db.user.findUnique({ where: { username } });
   if (!user) {
     return NextResponse.json(
-      { error: "No account found with that captain name. Please check the spelling or register a new account." },
+      {
+        error:
+          "No account found with that captain name. Please check the spelling or register a new account.",
+      },
       { status: 401 },
     );
   }
   if (!verifyPassword(password, user.passwordHash)) {
-    return NextResponse.json({ error: "The password you entered is incorrect." }, { status: 401 });
+    return NextResponse.json(
+      { error: "The password you entered is incorrect." },
+      { status: 401 },
+    );
   }
 
   // Trim stale expired sessions for this user (housekeeping).
-  await db.session.deleteMany({ where: { userId: user.id, expiresAt: { lt: new Date() } } }).catch(() => {});
+  await db.session
+    .deleteMany({ where: { userId: user.id, expiresAt: { lt: new Date() } } })
+    .catch(() => {});
 
   const { token, expiresAt } = await createSession(user.id);
   // Also handed back in the body (not just the httpOnly cookie) so the browser can

@@ -1,6 +1,10 @@
 "use client";
 
-import { explainExpectedPrice, type ExpectedPrice, type PriceBreakdown } from "@/lib/game/engine";
+import {
+  explainExpectedPrice,
+  type ExpectedPrice,
+  type PriceBreakdown,
+} from "@/lib/game/engine";
 import type { GameState } from "@/lib/game/types";
 import { GLOSSARY } from "@/lib/game/glossary";
 import { RESOURCES, PRODUCTS } from "@/lib/game/constants";
@@ -13,18 +17,29 @@ import { RESOURCES, PRODUCTS } from "@/lib/game/constants";
  * (ExpectedPriceTooltip, buying phase only, see the Term usages in
  * GameStatusPanel and GamePhasePanel).
  */
-export function PriceBreakdownTooltip({ breakdown }: { breakdown: PriceBreakdown }) {
+export function PriceBreakdownTooltip({
+  breakdown,
+}: {
+  breakdown: PriceBreakdown;
+}) {
   return (
     <div className="space-y-0.5 min-w-[160px]">
-      <div className="flex justify-between gap-3"><span>Base</span><span>{breakdown.base}g</span></div>
+      <div className="flex justify-between gap-3">
+        <span>Base</span>
+        <span>{breakdown.base}g</span>
+      </div>
       {breakdown.steps.map((s, i) => (
         <div key={i} className="flex justify-between gap-3">
           <span>{s.label}</span>
-          <span>{s.delta >= 0 ? "+" : ""}{s.delta}g</span>
+          <span>
+            {s.delta >= 0 ? "+" : ""}
+            {s.delta}g
+          </span>
         </div>
       ))}
       <div className="flex justify-between gap-3 font-semibold border-t border-current/15 pt-0.5 mt-0.5">
-        <span>Final</span><span>{breakdown.final}g</span>
+        <span>Final</span>
+        <span>{breakdown.final}g</span>
       </div>
     </div>
   );
@@ -34,10 +49,19 @@ export function ExpectedPriceTooltip({ price }: { price: ExpectedPrice }) {
   return (
     <div className="space-y-1 min-w-[170px]">
       <div className="font-semibold">
-        Typically {price.min} to {price.max} Gold {price.isProduct ? "per item" : "per unit"}
+        Typically {price.min} to {price.max} Gold{" "}
+        {price.isProduct ? "per item" : "per unit"}
       </div>
-      {price.modifiers.map((m, i) => <div key={i} className="text-[11px]">{m}</div>)}
-      {!price.isProduct && <div className="text-[11px] opacity-80">±1 Gold depending on the port</div>}
+      {price.modifiers.map((m, i) => (
+        <div key={i} className="text-[11px]">
+          {m}
+        </div>
+      ))}
+      {!price.isProduct && (
+        <div className="text-[11px] opacity-80">
+          ±1 Gold depending on the port
+        </div>
+      )}
       <div className="text-[11px] opacity-70 pt-0.5 border-t border-current/15 mt-1">
         Actual market cards this round can still vary
       </div>
@@ -55,7 +79,11 @@ export function ExpectedPriceTooltip({ price }: { price: ExpectedPrice }) {
 // demand and prices later in the voyage can vary.
 export function priceAwareTermContent(game: GameState, itemType: string) {
   if (game.phase !== 1) return undefined;
-  if (!(RESOURCES as readonly string[]).includes(itemType) && !(PRODUCTS as readonly string[]).includes(itemType)) return undefined;
+  if (
+    !(RESOURCES as readonly string[]).includes(itemType) &&
+    !(PRODUCTS as readonly string[]).includes(itemType)
+  )
+    return undefined;
   const description = GLOSSARY[itemType];
   const price = explainExpectedPrice(game, itemType);
   return (

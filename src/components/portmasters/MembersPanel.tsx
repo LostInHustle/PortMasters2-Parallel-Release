@@ -51,7 +51,9 @@ export function MembersPanel({
       // reconciliation is undefined and leaves a ghost row stuck on an old
       // status next to the live one.
       const seen = new Set<string>();
-      const filtered = data.members.filter((m) => (seen.has(m.id) ? false : (seen.add(m.id), true)));
+      const filtered = data.members.filter((m) =>
+        seen.has(m.id) ? false : (seen.add(m.id), true),
+      );
       setMembers(filtered);
       // Prune status entries for captains who are no longer in the room.
       // Over a long session the status map can accumulate departed members
@@ -64,7 +66,11 @@ export function MembersPanel({
         let changed = false;
         const next: StatusMap = {};
         for (const [id, st] of Object.entries(prev)) {
-          if (memberIds.has(id)) { next[id] = st; } else { changed = true; }
+          if (memberIds.has(id)) {
+            next[id] = st;
+          } else {
+            changed = true;
+          }
         }
         return changed ? next : prev;
       });
@@ -109,9 +115,12 @@ export function MembersPanel({
     <div className="pm-glass rounded-2xl flex flex-col overflow-hidden h-full">
       <div className="px-4 py-3 border-b border-black/5 dark:border-white/10 flex items-center justify-between">
         <h3 className="text-sm font-semibold flex items-center gap-2">
-          <Ship className="h-4 w-4 text-teal-600 dark:text-teal-400" /> Harbor Roster
+          <Ship className="h-4 w-4 text-teal-600 dark:text-teal-400" /> Harbor
+          Roster
         </h3>
-        <Pill tone="sea">{members.length} captain{members.length !== 1 ? "s" : ""}</Pill>
+        <Pill tone="sea">
+          {members.length} captain{members.length !== 1 ? "s" : ""}
+        </Pill>
       </div>
 
       <div className="pm-scroll flex-1 min-h-0 overflow-y-auto p-2.5 space-y-1.5">
@@ -130,28 +139,50 @@ export function MembersPanel({
               onClick={() => onSelectPlayer(m.id)}
               className={cn(
                 "w-full flex items-center gap-2.5 rounded-xl p-2 border text-left transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.05]",
-                isMe ? "border-teal-500/30 bg-teal-500/[0.06]" : "border-black/5 dark:border-white/10 bg-background/40",
+                isMe
+                  ? "border-teal-500/30 bg-teal-500/[0.06]"
+                  : "border-black/5 dark:border-white/10 bg-background/40",
               )}
             >
               <div className="relative shrink-0">
                 <Avatar hue={m.avatarHue} name={m.displayName} size={32} ring />
-                <OnlineDot online size={9} className="absolute -bottom-0.5 -right-0.5 ring-2 ring-background rounded-full" />
+                <OnlineDot
+                  online
+                  size={9}
+                  className="absolute -bottom-0.5 -right-0.5 ring-2 ring-background rounded-full"
+                />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-sm font-medium truncate">{m.displayName}</span>
-                  {isHost && <Crown className="h-3.5 w-3.5 text-amber-500 shrink-0" />}
-                  {isMe && <Pill tone="sea" className="!py-0">you</Pill>}
+                  <span className="text-sm font-medium truncate">
+                    {m.displayName}
+                  </span>
+                  {isHost && (
+                    <Crown className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                  )}
+                  {isMe && (
+                    <Pill tone="sea" className="!py-0">
+                      you
+                    </Pill>
+                  )}
                 </div>
-                <div className="text-[10px] text-muted-foreground truncate">{st ? `R${st.round} · ${st.phaseLabel}` : "loading…"}</div>
+                <div className="text-[10px] text-muted-foreground truncate">
+                  {st ? `R${st.round} · ${st.phaseLabel}` : "loading…"}
+                </div>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
                 {isBankrupt ? (
-                  <Pill tone="rose"><SkullIcon className="h-3 w-3" /> Bankrupt</Pill>
+                  <Pill tone="rose">
+                    <SkullIcon className="h-3 w-3" /> Bankrupt
+                  </Pill>
                 ) : (
                   <>
-                    <Pill tone="emerald"><Coins className="h-3 w-3" /> {st ? st.gold : "…"}</Pill>
-                    <Pill tone="gold"><Trophy className="h-3 w-3" /> {st ? st.reputation : "…"}</Pill>
+                    <Pill tone="emerald">
+                      <Coins className="h-3 w-3" /> {st ? st.gold : "…"}
+                    </Pill>
+                    <Pill tone="gold">
+                      <Trophy className="h-3 w-3" /> {st ? st.reputation : "…"}
+                    </Pill>
                   </>
                 )}
               </div>
@@ -159,7 +190,9 @@ export function MembersPanel({
           );
         })}
         {members.length === 0 && (
-          <div className="text-center text-xs text-muted-foreground py-6">No captains in this harbor yet.</div>
+          <div className="text-center text-xs text-muted-foreground py-6">
+            No captains in this harbor yet.
+          </div>
         )}
       </div>
 

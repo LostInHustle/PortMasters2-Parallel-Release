@@ -17,7 +17,14 @@ export type Phase =
   | "bankruptcy"
   | "endgame";
 
-export type ResourceRef = { type: string; required?: number; quantity?: number; price?: number; materialCost?: number; materialDetails?: string };
+export type ResourceRef = {
+  type: string;
+  required?: number;
+  quantity?: number;
+  price?: number;
+  materialCost?: number;
+  materialDetails?: string;
+};
 
 export type ResourceCard = {
   id: number;
@@ -43,7 +50,12 @@ export type OrderCard = {
 
 export type IntelItem = { item: string; port: string };
 
-export type Worker = { task: string | null; progress: number; producedCount: number; isSkilled: boolean };
+export type Worker = {
+  task: string | null;
+  progress: number;
+  producedCount: number;
+  isSkilled: boolean;
+};
 
 // A loan between two captains. The same shape is used on both sides: the
 // borrower's `debts` list and the lender's `loansGiven` list each hold one
@@ -140,7 +152,12 @@ export type GameState = {
   // socket event and then clear, since the pure engine functions that
   // populate it (settleOutstandingDebts) have no way to call socket.emit
   // themselves. Same convention as _draftChoices/_newModule above.
-  _pendingDebtSettlements?: { lenderId: string; lenderName: string; amount: number; debtId: string }[];
+  _pendingDebtSettlements?: {
+    lenderId: string;
+    lenderName: string;
+    amount: number;
+    debtId: string;
+  }[];
 };
 
 export type GameContext = {
@@ -164,9 +181,21 @@ export type GameContext = {
 // voyageEpoch defaults to 0 (the room's first voyage) for the same reason;
 // callers that know the room's current epoch pass it so a fresh voyage is
 // seeded distinctly from the ones before it.
-export function createInitialGameState(startingGoldBonus: number = 0, renownLevel: number = 1, voyageEpoch: number = 0): GameState {
+export function createInitialGameState(
+  startingGoldBonus: number = 0,
+  renownLevel: number = 1,
+  voyageEpoch: number = 0,
+): GameState {
   return {
-    inventory: { Hemp: 8, Silk: 5, Tea: 3, "Linen Clothes": 0, "Cotton Clothes": 0, Brocade: 0, Sachet: 0 },
+    inventory: {
+      Hemp: 8,
+      Silk: 5,
+      Tea: 3,
+      "Linen Clothes": 0,
+      "Cotton Clothes": 0,
+      Brocade: 0,
+      Sachet: 0,
+    },
     money: 100 + startingGoldBonus,
     renownLevel,
     brokersFavorUsed: false,

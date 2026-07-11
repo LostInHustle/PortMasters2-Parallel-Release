@@ -5,15 +5,24 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/api-auth";
-import { DEFAULT_LEGACY_SUMMARY, type CaptainLegacySummary } from "@/lib/game/legacy";
+import {
+  DEFAULT_LEGACY_SUMMARY,
+  type CaptainLegacySummary,
+} from "@/lib/game/legacy";
 import { checkInStatus, utcDayKey } from "@/lib/game/checkin";
 
 export async function GET() {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const legacy = await db.captainLegacy.findUnique({ where: { userId: user.id } });
-  const merits = await db.captainMerit.findMany({ where: { userId: user.id }, select: { meritId: true } });
+  const legacy = await db.captainLegacy.findUnique({
+    where: { userId: user.id },
+  });
+  const merits = await db.captainMerit.findMany({
+    where: { userId: user.id },
+    select: { meritId: true },
+  });
   const summary: CaptainLegacySummary = legacy
     ? {
         renownLevel: legacy.renownLevel,
@@ -29,7 +38,10 @@ export async function GET() {
   // renders the widget without a second request. Other players' legacy
   // routes (batch, [userId]) stay read-only summaries with no check-in.
   const checkIn = checkInStatus(
-    { checkInCount: legacy?.checkInCount ?? 0, lastCheckInDate: legacy?.lastCheckInDate ?? null },
+    {
+      checkInCount: legacy?.checkInCount ?? 0,
+      lastCheckInDate: legacy?.lastCheckInDate ?? null,
+    },
     utcDayKey(),
   );
 

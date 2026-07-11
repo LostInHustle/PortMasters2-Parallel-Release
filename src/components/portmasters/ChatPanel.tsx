@@ -35,11 +35,15 @@ export function ChatPanel({
   initialMessages?: ChatMessage[];
   className?: string;
 }) {
-  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages ?? []);
+  const [messages, setMessages] = useState<ChatMessage[]>(
+    initialMessages ?? [],
+  );
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const seenIds = useRef<Set<string>>(new Set((initialMessages ?? []).map((m) => m.id)));
+  const seenIds = useRef<Set<string>>(
+    new Set((initialMessages ?? []).map((m) => m.id)),
+  );
 
   // Seed with initial messages if they change (e.g. switching DM target).
   useEffect(() => {
@@ -54,7 +58,10 @@ export function ChatPanel({
       if (mode !== "room" || data.roomId !== roomId) return;
       if (seenIds.current.has(data.message.id)) return;
       seenIds.current.add(data.message.id);
-      setMessages((prev) => [...prev, { ...data.message, mine: data.message.sender.id === me.id }]);
+      setMessages((prev) => [
+        ...prev,
+        { ...data.message, mine: data.message.sender.id === me.id },
+      ]);
     };
     const onDm = (message: ChatMessage) => {
       if (mode !== "dm") return;
@@ -63,11 +70,15 @@ export function ChatPanel({
       if (!involvesMe) return;
       // Only show if this DM is between me and `other`.
       const otherId = other?.id;
-      const peerId = message.sender.id === me.id ? message.recipient?.id : message.sender.id;
+      const peerId =
+        message.sender.id === me.id ? message.recipient?.id : message.sender.id;
       if (otherId && peerId !== otherId) return;
       if (seenIds.current.has(message.id)) return;
       seenIds.current.add(message.id);
-      setMessages((prev) => [...prev, { ...message, mine: message.sender.id === me.id }]);
+      setMessages((prev) => [
+        ...prev,
+        { ...message, mine: message.sender.id === me.id },
+      ]);
     };
     socket.on("chat:room", onRoom);
     socket.on("chat:dm", onDm);
@@ -113,7 +124,9 @@ export function ChatPanel({
       >
         {messages.length === 0 ? (
           <div className="h-full flex items-center justify-center text-center px-6">
-            <p className="text-xs text-muted-foreground/80 leading-relaxed">{emptyText}</p>
+            <p className="text-xs text-muted-foreground/80 leading-relaxed">
+              {emptyText}
+            </p>
           </div>
         ) : (
           messages.map((m) => {
@@ -124,12 +137,26 @@ export function ChatPanel({
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.18 }}
-                className={cn("flex gap-2", mine ? "flex-row-reverse" : "flex-row")}
+                className={cn(
+                  "flex gap-2",
+                  mine ? "flex-row-reverse" : "flex-row",
+                )}
               >
-                <Avatar hue={m.sender.avatarHue} name={m.sender.displayName} size={26} />
-                <div className={cn("flex flex-col max-w-[78%]", mine ? "items-end" : "items-start")}>
+                <Avatar
+                  hue={m.sender.avatarHue}
+                  name={m.sender.displayName}
+                  size={26}
+                />
+                <div
+                  className={cn(
+                    "flex flex-col max-w-[78%]",
+                    mine ? "items-end" : "items-start",
+                  )}
+                >
                   {!mine && (
-                    <span className="text-[10px] text-muted-foreground mb-0.5 px-1">{m.sender.displayName}</span>
+                    <span className="text-[10px] text-muted-foreground mb-0.5 px-1">
+                      {m.sender.displayName}
+                    </span>
                   )}
                   <div
                     className={cn(
@@ -142,7 +169,10 @@ export function ChatPanel({
                     {m.content}
                   </div>
                   <span className="text-[9px] text-muted-foreground/70 mt-0.5 px-1">
-                    {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    {new Date(m.createdAt).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
                   </span>
                 </div>
               </motion.div>
@@ -160,7 +190,11 @@ export function ChatPanel({
               send();
             }
           }}
-          placeholder={mode === "room" ? "Message the harbor…" : `Message ${other?.displayName ?? ""}…`}
+          placeholder={
+            mode === "room"
+              ? "Message the harbor…"
+              : `Message ${other?.displayName ?? ""}…`
+          }
           className="h-9 rounded-full bg-black/5 dark:bg-white/10 border-0 text-sm"
           maxLength={1000}
         />
@@ -170,7 +204,11 @@ export function ChatPanel({
           disabled={!input.trim() || sending}
           className="h-9 w-9 rounded-full pm-grad-primary text-white shrink-0"
         >
-          {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendHorizontal className="h-4 w-4" />}
+          {sending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <SendHorizontal className="h-4 w-4" />
+          )}
         </Button>
       </div>
     </div>

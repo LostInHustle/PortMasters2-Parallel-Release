@@ -68,7 +68,15 @@ export default function Home() {
   }
 
   if (status === "auth" || !user) {
-    return <AuthScreen onAuthed={(u, token) => { setAuthToken(token); setUser(u); setStatus("lobby"); }} />;
+    return (
+      <AuthScreen
+        onAuthed={(u, token) => {
+          setAuthToken(token);
+          setUser(u);
+          setStatus("lobby");
+        }}
+      />
+    );
   }
 
   if (status === "lobby") {
@@ -77,14 +85,17 @@ export default function Home() {
         me={user}
         onEnterRoom={(r) => {
           // Fetch full room detail (members + chat) before entering.
-          api.getRoom(r.id).then(({ room: detail }) => {
-            setRoom(detail);
-            setStatus("game");
-          }).catch(() => {
-            // Fall back to the summary if detail fetch fails.
-            setRoom({ ...r, isMember: true } as RoomDetail);
-            setStatus("game");
-          });
+          api
+            .getRoom(r.id)
+            .then(({ room: detail }) => {
+              setRoom(detail);
+              setStatus("game");
+            })
+            .catch(() => {
+              // Fall back to the summary if detail fetch fails.
+              setRoom({ ...r, isMember: true } as RoomDetail);
+              setStatus("game");
+            });
         }}
         onLogout={handleLogout}
       />
@@ -105,7 +116,5 @@ export default function Home() {
   }
 
   // Fallback to lobby.
-  return (
-    <Lobby me={user} onEnterRoom={() => {}} onLogout={handleLogout} />
-  );
+  return <Lobby me={user} onEnterRoom={() => {}} onLogout={handleLogout} />;
 }

@@ -3,25 +3,57 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser, publicUser } from "@/lib/api-auth";
 
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
 
   const room = await db.room.findUnique({
     where: { id },
     include: {
-      members: { include: { user: { select: { id: true, username: true, displayName: true, avatarHue: true } } } },
-      host: { select: { id: true, username: true, displayName: true, avatarHue: true } },
+      members: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
+              displayName: true,
+              avatarHue: true,
+            },
+          },
+        },
+      },
+      host: {
+        select: {
+          id: true,
+          username: true,
+          displayName: true,
+          avatarHue: true,
+        },
+      },
       messages: {
         where: { recipientId: null },
         orderBy: { createdAt: "asc" },
         take: 100,
-        include: { sender: { select: { id: true, username: true, displayName: true, avatarHue: true } } },
+        include: {
+          sender: {
+            select: {
+              id: true,
+              username: true,
+              displayName: true,
+              avatarHue: true,
+            },
+          },
+        },
       },
     },
   });
-  if (!room) return NextResponse.json({ error: "Room not found" }, { status: 404 });
+  if (!room)
+    return NextResponse.json({ error: "Room not found" }, { status: 404 });
 
   const isMember = room.members.some((m) => m.userId === user.id);
 
@@ -35,7 +67,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       createdAt: room.createdAt,
       host: publicUser(room.host),
       memberCount: room.members.length,
-      members: room.members.map((m) => ({ ...publicUser(m.user), joinedAt: m.joinedAt })),
+      members: room.members.map((m) => ({
+        ...publicUser(m.user),
+        joinedAt: m.joinedAt,
+      })),
       isMember,
     },
     messages: room.messages.map((m) => ({

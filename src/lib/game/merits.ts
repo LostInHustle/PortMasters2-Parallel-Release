@@ -34,11 +34,31 @@ export type MeritDef = { id: MeritId; name: string; desc: string };
 // MERCHANT_RATINGS rather than repeating the numbers, so a future tier
 // added to either ladder can't silently leave this list one step behind.
 export const MERITS: MeritDef[] = [
-  { id: "first_voyage", name: "First Landfall", desc: "Complete your first voyage." },
-  { id: "first_crown", name: "Sea Master", desc: "Get crowned Sea Master for the first time." },
-  { id: "king_of_silk_road", name: topRating.label, desc: `End a single voyage with ${topRating.minScore}+ Reputation.` },
-  { id: "renown_legend", name: topTitle.title, desc: `Reach Renown Level ${topTitle.minLevel}.` },
-  { id: "iron_hull", name: "Iron Hull", desc: "Complete three voyages in a row without going bankrupt." },
+  {
+    id: "first_voyage",
+    name: "First Landfall",
+    desc: "Complete your first voyage.",
+  },
+  {
+    id: "first_crown",
+    name: "Sea Master",
+    desc: "Get crowned Sea Master for the first time.",
+  },
+  {
+    id: "king_of_silk_road",
+    name: topRating.label,
+    desc: `End a single voyage with ${topRating.minScore}+ Reputation.`,
+  },
+  {
+    id: "renown_legend",
+    name: topTitle.title,
+    desc: `Reach Renown Level ${topTitle.minLevel}.`,
+  },
+  {
+    id: "iron_hull",
+    name: "Iron Hull",
+    desc: "Complete three voyages in a row without going bankrupt.",
+  },
   { id: "century_club", name: "Century Club", desc: "Complete ten voyages." },
 ];
 
@@ -73,10 +93,13 @@ const CENTURY_CLUB_VOYAGES = 10;
 export function qualifyingMerits(input: MeritEvalInput): MeritId[] {
   const earned: MeritId[] = [];
   if (input.newVoyagesCompleted >= 1) earned.push("first_voyage");
-  if (input.crowned || input.priorSeaMasterCrowns > 0) earned.push("first_crown");
+  if (input.crowned || input.priorSeaMasterCrowns > 0)
+    earned.push("first_crown");
   if (input.reputation >= topRating.minScore) earned.push("king_of_silk_road");
   if (input.newRenownLevel >= topTitle.minLevel) earned.push("renown_legend");
-  if (input.consecutiveSolventVoyages >= IRON_HULL_STREAK) earned.push("iron_hull");
-  if (input.newVoyagesCompleted >= CENTURY_CLUB_VOYAGES) earned.push("century_club");
+  if (input.consecutiveSolventVoyages >= IRON_HULL_STREAK)
+    earned.push("iron_hull");
+  if (input.newVoyagesCompleted >= CENTURY_CLUB_VOYAGES)
+    earned.push("century_club");
   return earned;
 }

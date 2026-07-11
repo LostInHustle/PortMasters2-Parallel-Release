@@ -10,7 +10,10 @@ const Schema = z.object({
     .string()
     .min(3)
     .max(20)
-    .regex(/^[a-zA-Z0-9_]+$/, "Username may only contain letters, numbers and underscores"),
+    .regex(
+      /^[a-zA-Z0-9_]+$/,
+      "Username may only contain letters, numbers and underscores",
+    ),
   password: z.string().min(6).max(72),
   displayName: z.string().min(1).max(24).optional(),
 });
@@ -34,7 +37,10 @@ export async function POST(req: NextRequest) {
 
   const existing = await db.user.findUnique({ where: { username } });
   if (existing) {
-    return NextResponse.json({ error: "That captain name is already registered" }, { status: 409 });
+    return NextResponse.json(
+      { error: "That captain name is already registered" },
+      { status: 409 },
+    );
   }
 
   const user = await db.user.create({

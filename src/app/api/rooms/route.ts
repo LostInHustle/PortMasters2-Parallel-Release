@@ -8,13 +8,32 @@ import { normalizeRoomName } from "@/lib/utils";
 
 export async function GET() {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const rooms = await db.room.findMany({
     where: { isPublic: true },
     include: {
-      members: { include: { user: { select: { id: true, username: true, displayName: true, avatarHue: true } } } },
-      host: { select: { id: true, username: true, displayName: true, avatarHue: true } },
+      members: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
+              displayName: true,
+              avatarHue: true,
+            },
+          },
+        },
+      },
+      host: {
+        select: {
+          id: true,
+          username: true,
+          displayName: true,
+          avatarHue: true,
+        },
+      },
     },
     orderBy: { createdAt: "desc" },
     take: 50,
@@ -30,7 +49,10 @@ export async function GET() {
       createdAt: r.createdAt,
       host: publicUser(r.host),
       memberCount: r.members.length,
-      members: r.members.map((m) => ({ ...publicUser(m.user), joinedAt: m.joinedAt })),
+      members: r.members.map((m) => ({
+        ...publicUser(m.user),
+        joinedAt: m.joinedAt,
+      })),
     })),
   });
 }
@@ -42,7 +64,8 @@ const CreateSchema = z.object({
 
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let body: unknown;
   try {
@@ -52,7 +75,10 @@ export async function POST(req: NextRequest) {
   }
   const parsed = CreateSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? "Invalid input" },
+      { status: 400 },
+    );
   }
   const { name, isPublic } = parsed.data;
 
@@ -66,8 +92,26 @@ export async function POST(req: NextRequest) {
       members: { create: [{ userId: user.id }] },
     },
     include: {
-      members: { include: { user: { select: { id: true, username: true, displayName: true, avatarHue: true } } } },
-      host: { select: { id: true, username: true, displayName: true, avatarHue: true } },
+      members: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
+              displayName: true,
+              avatarHue: true,
+            },
+          },
+        },
+      },
+      host: {
+        select: {
+          id: true,
+          username: true,
+          displayName: true,
+          avatarHue: true,
+        },
+      },
     },
   });
 
@@ -81,7 +125,10 @@ export async function POST(req: NextRequest) {
       createdAt: room.createdAt,
       host: publicUser(room.host),
       memberCount: room.members.length,
-      members: room.members.map((m) => ({ ...publicUser(m.user), joinedAt: m.joinedAt })),
+      members: room.members.map((m) => ({
+        ...publicUser(m.user),
+        joinedAt: m.joinedAt,
+      })),
     },
   });
 }

@@ -8,7 +8,8 @@ const Schema = z.object({ code: z.string().length(6) });
 
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let body: unknown;
   try {
@@ -18,7 +19,10 @@ export async function POST(req: NextRequest) {
   }
   const parsed = Schema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "A 6-character room code is required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "A 6-character room code is required" },
+      { status: 400 },
+    );
   }
   const code = parsed.data.code.toUpperCase();
 
@@ -26,14 +30,31 @@ export async function POST(req: NextRequest) {
     where: { code },
     include: {
       members: true,
-      host: { select: { id: true, username: true, displayName: true, avatarHue: true } },
+      host: {
+        select: {
+          id: true,
+          username: true,
+          displayName: true,
+          avatarHue: true,
+        },
+      },
     },
   });
-  if (!room) return NextResponse.json({ error: "No room exists with that code" }, { status: 404 });
+  if (!room)
+    return NextResponse.json(
+      { error: "No room exists with that code" },
+      { status: 404 },
+    );
 
   const alreadyMember = room.members.some((m) => m.userId === user.id);
   if (!alreadyMember && room.started) {
-    return NextResponse.json({ error: "This voyage has already set sail. Ask the host to open a new room." }, { status: 403 });
+    return NextResponse.json(
+      {
+        error:
+          "This voyage has already set sail. Ask the host to open a new room.",
+      },
+      { status: 403 },
+    );
   }
 
   await db.roomMember.upsert({
@@ -44,7 +65,16 @@ export async function POST(req: NextRequest) {
 
   const members = await db.roomMember.findMany({
     where: { roomId: room.id },
-    include: { user: { select: { id: true, username: true, displayName: true, avatarHue: true } } },
+    include: {
+      user: {
+        select: {
+          id: true,
+          username: true,
+          displayName: true,
+          avatarHue: true,
+        },
+      },
+    },
   });
 
   return NextResponse.json({
@@ -57,7 +87,10 @@ export async function POST(req: NextRequest) {
       started: room.started,
       host: publicUser(room.host),
       memberCount: members.length,
-      members: members.map((m) => ({ ...publicUser(m.user), joinedAt: m.joinedAt })),
+      members: members.map((m) => ({
+        ...publicUser(m.user),
+        joinedAt: m.joinedAt,
+      })),
     },
   });
 }

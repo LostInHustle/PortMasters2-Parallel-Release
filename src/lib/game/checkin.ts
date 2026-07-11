@@ -65,10 +65,16 @@ export type CheckInStatus = {
 // back into a valid cycle position instead of throwing off every tile.
 function normalizeCount(count: number): number {
   if (!Number.isFinite(count)) return 0;
-  return ((Math.floor(count) % CHECK_IN_CYCLE_LENGTH) + CHECK_IN_CYCLE_LENGTH) % CHECK_IN_CYCLE_LENGTH;
+  return (
+    ((Math.floor(count) % CHECK_IN_CYCLE_LENGTH) + CHECK_IN_CYCLE_LENGTH) %
+    CHECK_IN_CYCLE_LENGTH
+  );
 }
 
-export function checkInStatus(state: CheckInState, today: string = utcDayKey()): CheckInStatus {
+export function checkInStatus(
+  state: CheckInState,
+  today: string = utcDayKey(),
+): CheckInStatus {
   const claimedThisCycle = normalizeCount(state.checkInCount);
   return {
     currentDay: claimedThisCycle + 1,
@@ -85,7 +91,10 @@ export function checkInStatus(state: CheckInState, today: string = utcDayKey()):
 // "already claimed" without a second guard of its own.
 export type CheckInResult = { day: number; xp: number; next: CheckInState };
 
-export function applyCheckIn(state: CheckInState, today: string = utcDayKey()): CheckInResult | null {
+export function applyCheckIn(
+  state: CheckInState,
+  today: string = utcDayKey(),
+): CheckInResult | null {
   if (state.lastCheckInDate === today) return null;
   const day = normalizeCount(state.checkInCount) + 1; // 1..7
   const xp = checkInRewardForDay(day);

@@ -18,7 +18,13 @@ export const metadata: Metadata = {
   title: `${APP_NAME}: Lords of the Silk Road Online`,
   description:
     "A multiplayer maritime trade game. Register, set sail in shared harbors, trade the Silk Road, and race rival captains across eight synchronized voyages.",
-  keywords: [APP_NAME, "multiplayer game", "Silk Road", "maritime trade", "Next.js"],
+  keywords: [
+    APP_NAME,
+    "multiplayer game",
+    "Silk Road",
+    "maritime trade",
+    "Next.js",
+  ],
   authors: [{ name: "Joe Zhou" }, { name: "Aaron Zhu" }],
 };
 
@@ -32,9 +38,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >
-        <Providers>
-          {children}
-        </Providers>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

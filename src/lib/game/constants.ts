@@ -35,7 +35,12 @@ export const COLORS: Record<string, string> = {
 };
 
 export const RESOURCES = ["Hemp", "Silk", "Tea"] as const;
-export const PRODUCTS = ["Linen Clothes", "Cotton Clothes", "Brocade", "Sachet"] as const;
+export const PRODUCTS = [
+  "Linen Clothes",
+  "Cotton Clothes",
+  "Brocade",
+  "Sachet",
+] as const;
 // Anything a captain can put up for barter: Gold plus every raw material
 // and finished good. Kept separate from RESOURCES/PRODUCTS (rather than
 // folding Gold into one of those) so the existing buying/inventory
@@ -49,14 +54,28 @@ export const PORTS = [
   "Hangzhou Port",
 ] as const;
 
-export const RECIPES: Record<string, { materials: Record<string, number>; value: number; worker_type: string }> = {
+export const RECIPES: Record<
+  string,
+  { materials: Record<string, number>; value: number; worker_type: string }
+> = {
   "Linen Clothes": { materials: { Hemp: 2 }, value: 15, worker_type: "weaver" },
-  "Cotton Clothes": { materials: { Hemp: 2, Silk: 1 }, value: 35, worker_type: "weaver" },
+  "Cotton Clothes": {
+    materials: { Hemp: 2, Silk: 1 },
+    value: 35,
+    worker_type: "weaver",
+  },
   Brocade: { materials: { Silk: 3 }, value: 60, worker_type: "master" },
-  Sachet: { materials: { Silk: 1, Tea: 2 }, value: 80, worker_type: "sachet_maker" },
+  Sachet: {
+    materials: { Silk: 1, Tea: 2 },
+    value: 80,
+    worker_type: "sachet_maker",
+  },
 };
 
-export const COMMODITIES: Record<string, { ports: string[]; basePrice: [number, number] }> = {
+export const COMMODITIES: Record<
+  string,
+  { ports: string[]; basePrice: [number, number] }
+> = {
   Hemp: { ports: ["Quanzhou Port", "Ningbo Port"], basePrice: [3, 6] },
   Silk: { ports: ["Hangzhou Port", "Yangzhou Port"], basePrice: [6, 10] },
   Tea: { ports: ["Guangzhou Port", "Quanzhou Port"], basePrice: [10, 14] },
@@ -69,8 +88,16 @@ export const PRODUCT_PRICES: Record<string, [number, number]> = {
   Sachet: [95, 120],
 };
 
-export const RESOURCE_PROBS: Record<string, number> = { Hemp: 0.4, Silk: 0.35, Tea: 0.25 };
-export const WAGES: Record<string, number> = { weaver: 8, master: 12, sachet_maker: 20 };
+export const RESOURCE_PROBS: Record<string, number> = {
+  Hemp: 0.4,
+  Silk: 0.35,
+  Tea: 0.25,
+};
+export const WAGES: Record<string, number> = {
+  weaver: 8,
+  master: 12,
+  sachet_maker: 20,
+};
 
 // Phase 3, resolved once per round before the wages-and-maintenance
 // settlement: the odds of losing every Gold on hand to pirates, and the
@@ -94,27 +121,115 @@ export type Boon = {
 };
 
 export const BOONS: Boon[] = [
-  { id: "silk_wind", name: "Silk Winds", icon: "🌬️", desc: "Transport cost for Silk & Silk products is halved this round.", modifiers: { transport_silk_discount: 0.5 } },
-  { id: "favorable_tides", name: "Favorable Tides", icon: "🌊", desc: "Base transport cost reduced by 4 Gold this round.", modifiers: { transport_flat_discount: 4 } },
-  { id: "merchant_charm", name: "Merchant's Charm", icon: "✨", desc: "15% discount on all port purchases this round.", modifiers: { purchase_discount: 0.15 } },
-  { id: "artisan_inspiration", name: "Artisan's Inspiration", icon: "🔨", desc: "All workers produce +1 extra item this round.", modifiers: { worker_bonus_production: 1 } },
-  { id: "emergency_loan", name: "Emergency Loan", icon: "💰", desc: "Gain 40 Gold immediately. No strings attached.", modifiers: { instant_gold: 40 } },
-  { id: "tax_shelter", name: "Tax Shelter", icon: "📜", desc: "Income tax rate reduced to 5% this round.", modifiers: { income_tax_override: 0.05 } },
-  { id: "hemp_monopoly", name: "Hemp Monopoly", icon: "🧶", desc: "Hemp purchase prices reduced by 2 Gold per unit.", modifiers: { hemp_price_reduction: 2 } },
-  { id: "master_apprentice", name: "Master's Apprentice", icon: "🎓", desc: "Hiring workers costs 50% less this round.", modifiers: { hire_discount: 0.5 } },
+  {
+    id: "silk_wind",
+    name: "Silk Winds",
+    icon: "🌬️",
+    desc: "Transport cost for Silk & Silk products is halved this round.",
+    modifiers: { transport_silk_discount: 0.5 },
+  },
+  {
+    id: "favorable_tides",
+    name: "Favorable Tides",
+    icon: "🌊",
+    desc: "Base transport cost reduced by 4 Gold this round.",
+    modifiers: { transport_flat_discount: 4 },
+  },
+  {
+    id: "merchant_charm",
+    name: "Merchant's Charm",
+    icon: "✨",
+    desc: "15% discount on all port purchases this round.",
+    modifiers: { purchase_discount: 0.15 },
+  },
+  {
+    id: "artisan_inspiration",
+    name: "Artisan's Inspiration",
+    icon: "🔨",
+    desc: "All workers produce +1 extra item this round.",
+    modifiers: { worker_bonus_production: 1 },
+  },
+  {
+    id: "emergency_loan",
+    name: "Emergency Loan",
+    icon: "💰",
+    desc: "Gain 40 Gold immediately. No strings attached.",
+    modifiers: { instant_gold: 40 },
+  },
+  {
+    id: "tax_shelter",
+    name: "Tax Shelter",
+    icon: "📜",
+    desc: "Income tax rate reduced to 5% this round.",
+    modifiers: { income_tax_override: 0.05 },
+  },
+  {
+    id: "hemp_monopoly",
+    name: "Hemp Monopoly",
+    icon: "🧶",
+    desc: "Hemp purchase prices reduced by 2 Gold per unit.",
+    modifiers: { hemp_price_reduction: 2 },
+  },
+  {
+    id: "master_apprentice",
+    name: "Master's Apprentice",
+    icon: "🎓",
+    desc: "Hiring workers costs 50% less this round.",
+    modifiers: { hire_discount: 0.5 },
+  },
 ];
 
 export type Module = { id: string; name: string; icon: string; desc: string };
 
 export const MODULES: Module[] = [
-  { id: "smugglers_hold", name: "Smuggler's Hold", icon: "🏴‍☠️", desc: "Purchase costs -15%. Income Tax +20%." },
-  { id: "bulk_hauler", name: "Bulk Hauler Rigging", icon: "🏗️", desc: "Transport cost -1 per item. Ship upgrades cost +15 Gold." },
-  { id: "artisans_workshop", name: "Artisan's Workshop", icon: "🛠️", desc: "Workers produce +1 item. Wages +20%." },
-  { id: "tax_evasion", name: "Tax Evasion Ledger", icon: "📕", desc: "Income Tax & VAT halved. 15% chance to lose 20 Gold on order complete (Audit)." },
-  { id: "silk_monopoly", name: "Silk Road Monopoly", icon: "👘", desc: "Silk transport cost is 0. Silk product orders yield +20% reward." },
-  { id: "brokers_network", name: "Broker's Network", icon: "🕵️", desc: "Intel costs 2 Gold. Reveals 2 rumors per purchase." },
-  { id: "salvage_crane", name: "Salvage Crane", icon: "♻️", desc: "30% chance to refund transport cost on order complete." },
-  { id: "overdrive_engine", name: "Overdrive Engine", icon: "⚙️", desc: "Transport cost -5 Gold. Maintenance +10 Gold." },
+  {
+    id: "smugglers_hold",
+    name: "Smuggler's Hold",
+    icon: "🏴‍☠️",
+    desc: "Purchase costs -15%. Income Tax +20%.",
+  },
+  {
+    id: "bulk_hauler",
+    name: "Bulk Hauler Rigging",
+    icon: "🏗️",
+    desc: "Transport cost -1 per item. Ship upgrades cost +15 Gold.",
+  },
+  {
+    id: "artisans_workshop",
+    name: "Artisan's Workshop",
+    icon: "🛠️",
+    desc: "Workers produce +1 item. Wages +20%.",
+  },
+  {
+    id: "tax_evasion",
+    name: "Tax Evasion Ledger",
+    icon: "📕",
+    desc: "Income Tax & VAT halved. 15% chance to lose 20 Gold on order complete (Audit).",
+  },
+  {
+    id: "silk_monopoly",
+    name: "Silk Road Monopoly",
+    icon: "👘",
+    desc: "Silk transport cost is 0. Silk product orders yield +20% reward.",
+  },
+  {
+    id: "brokers_network",
+    name: "Broker's Network",
+    icon: "🕵️",
+    desc: "Intel costs 2 Gold. Reveals 2 rumors per purchase.",
+  },
+  {
+    id: "salvage_crane",
+    name: "Salvage Crane",
+    icon: "♻️",
+    desc: "30% chance to refund transport cost on order complete.",
+  },
+  {
+    id: "overdrive_engine",
+    name: "Overdrive Engine",
+    icon: "⚙️",
+    desc: "Transport cost -5 Gold. Maintenance +10 Gold.",
+  },
 ];
 
 // Max rounds per game (a "voyage" set). The starting fixed cost, ship

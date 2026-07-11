@@ -78,7 +78,10 @@ const RENOWN_GOLD_PER_LEVEL = 3;
 const RENOWN_GOLD_CAP = 60;
 
 export function renownStartingGoldBonus(level: number): number {
-  return Math.min(RENOWN_GOLD_CAP, Math.max(0, level - 1) * RENOWN_GOLD_PER_LEVEL);
+  return Math.min(
+    RENOWN_GOLD_CAP,
+    Math.max(0, level - 1) * RENOWN_GOLD_PER_LEVEL,
+  );
 }
 
 // Shape returned by GET /api/legacy (and its [userId]/batch siblings) and

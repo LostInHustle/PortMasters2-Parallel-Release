@@ -36,16 +36,27 @@ export function NotificationToast({
     <div
       role={clickable ? "button" : undefined}
       tabIndex={clickable ? 0 : undefined}
-      onClick={clickable ? () => { onActivate!(); dismiss(toastId); } : undefined}
+      onClick={
+        clickable
+          ? () => {
+              onActivate!();
+              dismiss(toastId);
+            }
+          : undefined
+      }
       className={cn(
         "relative w-full text-left pm-glass-strong rounded-xl px-4 py-3 pr-8 shadow-xl border border-teal-500/25",
-        clickable && "cursor-pointer hover:border-teal-500/50 transition-colors",
+        clickable &&
+          "cursor-pointer hover:border-teal-500/50 transition-colors",
       )}
     >
       <button
         type="button"
         aria-label="Dismiss notification"
-        onClick={(e) => { e.stopPropagation(); dismiss(toastId); }}
+        onClick={(e) => {
+          e.stopPropagation();
+          dismiss(toastId);
+        }}
         className="absolute top-2.5 right-2.5 rounded-md p-0.5 text-muted-foreground/70 hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
       >
         <X className="h-3.5 w-3.5" />
@@ -55,7 +66,12 @@ export function NotificationToast({
       </div>
       <div className="space-y-0.5">
         {lines.map((line, i) => (
-          <div key={i} className="text-[13px] text-foreground/85 leading-snug break-words">{line}</div>
+          <div
+            key={i}
+            className="text-[13px] text-foreground/85 leading-snug break-words"
+          >
+            {line}
+          </div>
         ))}
       </div>
     </div>

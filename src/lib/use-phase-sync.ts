@@ -17,7 +17,16 @@ export type ReadyState = {
 // Mirrors the server's CHECKPOINT_PHASE_ORDER + checkpointRank (see
 // src/server/realtime.ts).  Used on the client to detect when we've fallen
 // behind the room's synchronized checkpoint so we can catch up.
-const CHECKPOINT_PHASE_ORDER = ["0", "5", "1", "barter", "worker_mgmt", "2", "3", "4"];
+const CHECKPOINT_PHASE_ORDER = [
+  "0",
+  "5",
+  "1",
+  "barter",
+  "worker_mgmt",
+  "2",
+  "3",
+  "4",
+];
 function checkpointRank(round: number, phase: string): number | null {
   const idx = CHECKPOINT_PHASE_ORDER.indexOf(phase);
   if (idx === -1) return null;
@@ -54,7 +63,9 @@ export function usePhaseSync(
   const [waiting, setWaiting] = useState(false);
   const [ready, setReady] = useState<ReadyState | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
-  const pendingFn = useRef<((g: GameState, logs: string[]) => void) | null>(null);
+  const pendingFn = useRef<((g: GameState, logs: string[]) => void) | null>(
+    null,
+  );
 
   // Keep the latest game snapshot available to the listeners below
   // without re-subscribing them on every change.
@@ -124,10 +135,18 @@ export function usePhaseSync(
         data.phase === String(g.phase) &&
         !data.readyUserIds.includes(myUserId)
       ) {
-        socket.emit("phase:ready", { roomId, round: g.currentRound, phase: g.phase });
+        socket.emit("phase:ready", {
+          roomId,
+          round: g.currentRound,
+          phase: g.phase,
+        });
       }
     };
-    const onAdvance = (data: { roomId: string; round: number; phase: string }) => {
+    const onAdvance = (data: {
+      roomId: string;
+      round: number;
+      phase: string;
+    }) => {
       if (data.roomId !== roomId) return;
       const g = gameRef.current;
       const advanceRank = checkpointRank(data.round, data.phase);
@@ -163,7 +182,10 @@ export function usePhaseSync(
     // Without this, goldBonusRef (set once on mount from useGameSession)
     // carries the pre-voyage Renown level and the bonus never updates until
     // the captain leaves and rejoins the room.
-    const onRestarted = async (data: { roomId: string; voyageEpoch?: number }) => {
+    const onRestarted = async (data: {
+      roomId: string;
+      voyageEpoch?: number;
+    }) => {
       if (data.roomId !== roomId) return;
       pendingFn.current = null;
       setWaiting(false);
@@ -185,7 +207,13 @@ export function usePhaseSync(
       // changes. Preserve the captain's current Renown level when the legacy
       // refetch failed, so restartGame never silently relocks a Renown skill.
       act((state, logs) =>
-        restartGame(state, logs, bonus, level ?? state.renownLevel, data.voyageEpoch ?? state.voyageEpoch + 1),
+        restartGame(
+          state,
+          logs,
+          bonus,
+          level ?? state.renownLevel,
+          data.voyageEpoch ?? state.voyageEpoch + 1,
+        ),
       );
     };
 
@@ -226,7 +254,11 @@ export function usePhaseSync(
       if (!socket) return;
       pendingFn.current = fn;
       setWaiting(true);
-      socket.emit("phase:ready", { roomId, round: game.currentRound, phase: game.phase });
+      socket.emit("phase:ready", {
+        roomId,
+        round: game.currentRound,
+        phase: game.phase,
+      });
     },
     [socket, roomId, game.currentRound, game.phase],
   );
@@ -256,5 +288,15 @@ export function usePhaseSync(
   const readyCount = ready?.readyUserIds.length ?? 0;
   const requiredCount = ready?.requiredUserIds.length ?? 0;
 
-  return { waiting, ready, readyCount, requiredCount, markReady, cancelReady, startGame, restartVoyage, startError };
+  return {
+    waiting,
+    ready,
+    readyCount,
+    requiredCount,
+    markReady,
+    cancelReady,
+    startGame,
+    restartVoyage,
+    startError,
+  };
 }
