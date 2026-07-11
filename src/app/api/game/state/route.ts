@@ -19,9 +19,9 @@ export async function GET(req: NextRequest) {
   // wherever the room currently is, not back at round 1. The room's
   // checkpoint is what the synchronized ready-check (src/server/realtime.ts)
   // keeps everyone else lined up against.
-  let checkpoint: { currentRound: number; currentPhase: string } | null = null;
+  let checkpoint: { currentRound: number; currentPhase: string; voyageEpoch: number } | null = null;
   if (!state) {
-    const room = await db.room.findUnique({ where: { id: roomId }, select: { currentRound: true, currentPhase: true } });
+    const room = await db.room.findUnique({ where: { id: roomId }, select: { currentRound: true, currentPhase: true, voyageEpoch: true } });
     if (room) checkpoint = room;
   }
 

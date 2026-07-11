@@ -4,25 +4,27 @@
 // Ported faithfully from the original single-player build. All wording,
 // log messages, balance, and phase flow are preserved verbatim.
 //
-// [ONLINE EXTENSION] The only behavioural addition is a seedable PRNG
-// (mulberry32) used for the *shared* session economy. Port market
-// cards, trade orders, and the Broker's intel pool are now generated
-// deterministically from (roomId + round). Every captain in the same
-// room, on the same voyage, sees the identical market and identical
-// orders, so shared sessions stay highly synchronized. Each captain's
-// gold, reputation, inventory, workers, and personal luck (Salvage
-// Crane refunds, Tax-Evasion audits, boon offerings) remain their own.
+// [ONLINE EXTENSION] The one behavioural addition is a seedable PRNG
+// (mulberry32) used for the session economy. Port market cards, trade
+// orders, and the Broker's intel pool are generated deterministically from
+// (roomId + userId + voyageEpoch + round), so each captain has their own
+// market, orders, and intel: reproducible on reload, different from every
+// other captain, and rerolled into a brand-new voyage whenever the host
+// restarts (which bumps voyageEpoch, see prisma/schema.prisma and
+// src/lib/use-game-session.ts). Each captain's gold, reputation, inventory,
+// workers, and personal luck (Salvage Crane refunds, Tax-Evasion audits,
+// boon offerings) are their own too.
 //
 // One new gameplay skill, Broker's Favor, is layered on top of the faithful
 // port: a Renown-gated, once-per-voyage guaranteed buyer (see
-// callBrokersFavor). It draws with a captain's own randomness, so it stays
-// personal and never perturbs the shared market.
+// callBrokersFavor). It draws with a captain's own live randomness, so it
+// stays personal and never perturbs their seeded market.
 // =====================================================================
 import {
   AID_REPUTATION_PER_GOLD,
   APP_NAME,
   BOONS,
-  BROKERS_FAVOR_COMMISSION,
+  BROKERS_FAVOR_PAYOUT_CAP,
   BROKERS_FAVOR_UNLOCK_LEVEL,
   COMMODITIES,
   ESCORT_COST_RATE,
@@ -270,14 +272,17 @@ export function getHireCost(state: GameState, type: string): number {
 // ---------- Order / Card generation ----------
 // [ONLINE] These use a seeded RNG so the market is identical for every
 // captain in the same room on the same voyage.
-function genRawOrder(rng: Rng, filter: string | null = null): Omit<OrderCard, "id"> {
+// quantityOverride is only ever set by callBrokersFavor, letting a captain
+// choose exactly how much of a filtered good the guaranteed order asks for
+// instead of leaving it to the usual randInt roll below.
+function genRawOrder(rng: Rng, filter: string | null = null, quantityOverride?: number): Omit<OrderCard, "id"> {
   const num = randInt(rng, 1, 3);
   const resources: { type: string; required: number }[] = [];
   const available = [...RESOURCES];
   const port = pick(rng, PORTS as readonly string[]);
   let total = 0;
   if (filter && (RESOURCES as readonly string[]).includes(filter)) {
-    const req = randInt(rng, 2, 5);
+    const req = quantityOverride ?? randInt(rng, 2, 5);
     total += req;
     resources.push({ type: filter, required: req });
   } else {
@@ -294,9 +299,9 @@ function genRawOrder(rng: Rng, filter: string | null = null): Omit<OrderCard, "i
   return { demandPort: port, resources, reward: base + randInt(rng, 10, 25), totalItems: total, isProductOrder: false };
 }
 
-function genProductOrder(rng: Rng, filter: string | null = null): Omit<OrderCard, "id"> {
+function genProductOrder(rng: Rng, filter: string | null = null, quantityOverride?: number): Omit<OrderCard, "id"> {
   const product = filter && (PRODUCTS as readonly string[]).includes(filter) ? filter : pick(rng, PRODUCTS as readonly string[]);
-  const req = randInt(rng, 1, 3);
+  const req = quantityOverride ?? randInt(rng, 1, 3);
   const port = pick(rng, PORTS as readonly string[]);
   const basePrice = randInt(rng, PRODUCT_PRICES[product][0], PRODUCT_PRICES[product][1]);
   return { demandPort: port, resources: [{ type: product, required: req }], reward: basePrice * req, totalItems: req, isProductOrder: true };
@@ -304,16 +309,15 @@ function genProductOrder(rng: Rng, filter: string | null = null): Omit<OrderCard
 
 // Deliberately a pure function of rng only. It used to also take `state`
 // so it could fold a captain's own revealed Broker's Whisper intel
-// straight into whichever of the 5 shared order slots it was generating
-// at the time, which meant the number of rng() calls this consumed
-// depended on that captain's own purchase history. Since orderRng below
-// is the same *shared, room-wide* seeded stream every captain's client
-// derives independently (see the file header), a captain who bought
-// intel silently shifted their own view of every order after the one
-// intel touched out of sync with everyone else's, breaking the "every
-// captain sees the identical market" guarantee this whole seeding scheme
-// exists for. See startPhase2 for where the intel guarantee actually
-// happens now: entirely after, and independent of, this shared draw.
+// straight into whichever of the 5 order slots it was generating at the
+// time, which meant the number of rng() calls this consumed depended on
+// that captain's own purchase history. orderRng below is a fixed
+// deterministic stream (seeded per captain and per voyage, see the file
+// header), so letting the draw depend on mutable intel state made a
+// captain's own orders non-reproducible: regenerating the draw after a
+// reload, with different intel state, silently shifted every order after
+// the one the intel touched. See startPhase2 for where the intel guarantee
+// happens now: entirely after, and independent of, this draw.
 function genMixedOrder(rng: Rng): Omit<OrderCard, "id"> {
   return rng() < 0.5 ? genRawOrder(rng) : genProductOrder(rng);
 }
@@ -443,6 +447,18 @@ export function purchaseCard(state: GameState, cardId: number, logs: string[]) {
   logs.push(`📊 Purchased ${state.purchaseCount} cargo batches`);
 }
 
+// The Broker's cut on a Broker's Favor order, a saturating curve rather
+// than a flat rate. Net payout climbs almost one for one with reward at
+// first (a small order keeps the feel of a low flat rate) but bends hard as
+// reward grows, approaching BROKERS_FAVOR_PAYOUT_CAP without ever reaching
+// it. That gives callBrokersFavor a hard ceiling on what a single favor can
+// pay out regardless of how large a quantity a captain asks for, instead of
+// needing to cap the quantity itself.
+export function brokersFavorCommission(reward: number): number {
+  const net = BROKERS_FAVOR_PAYOUT_CAP * (1 - Math.exp(-reward / BROKERS_FAVOR_PAYOUT_CAP));
+  return Math.max(0, reward - Math.floor(net));
+}
+
 export function completeOrder(state: GameState, orderId: number, logs: string[]) {
   const order = state.customerCards.find((o) => o.id === orderId);
   if (!order) return;
@@ -489,13 +505,14 @@ export function completeOrder(state: GameState, orderId: number, logs: string[])
     state.roundCosts -= diff;
     state.totalCosts -= diff;
   }
-  // Broker's Favor commission: the Broker takes a flat cut of the order's
-  // reward, so the captain's own money, revenue, and score all reflect the
-  // amount net of the commission (see callBrokersFavor).
+  // Broker's Favor commission: the Broker takes a cut of the order's
+  // reward (see brokersFavorCommission), so the captain's own money,
+  // revenue, and score all reflect the amount net of the commission.
   if (order.isBrokerFavor) {
-    const commission = Math.floor(order.reward * BROKERS_FAVOR_COMMISSION);
+    const commission = brokersFavorCommission(order.reward);
     reward -= commission;
-    logs.push(`🤝 Broker's Commission (${Math.round(BROKERS_FAVOR_COMMISSION * 100)}%): ${commission} Gold`);
+    const pct = order.reward > 0 ? Math.round((commission / order.reward) * 100) : 0;
+    logs.push(`🤝 Broker's Commission (${pct}%): ${commission} Gold`);
   }
   state.money += reward;
   state.roundRevenue += reward;
@@ -511,13 +528,16 @@ export function completeOrder(state: GameState, orderId: number, logs: string[])
 
 // Broker's Favor: the Renown-gated, once-per-voyage skill (see the flag on
 // GameState and BROKERS_FAVOR_UNLOCK_LEVEL). Appends one extra standard trade
-// order for a good this captain is currently holding, so a hold full of
-// otherwise unsellable stock still has a guaranteed buyer. Like the paid
-// Broker's Whisper guarantee in startPhase2, it draws with this captain's own
-// Math.random and only appends to their own customerCards, so it can never
-// shift the shared, room-wide market anyone else sees. The Broker's cut is
-// taken later, in completeOrder, off the order's reward.
-export function callBrokersFavor(state: GameState, item: string, logs: string[]) {
+// order for a chosen quantity of a good this captain is currently holding,
+// so a hold full of otherwise unsellable stock still has a guaranteed buyer.
+// Like the paid Broker's Whisper guarantee in startPhase2, it draws with
+// this captain's own Math.random and only appends to their own
+// customerCards, so it can never shift the shared, room-wide market anyone
+// else sees. Quantity is capped at the captain's own hold rather than the
+// usual 1-3/2-5 order range, since brokersFavorCommission (see
+// completeOrder) is what keeps an oversized ask from paying out too much,
+// not a quantity limit.
+export function callBrokersFavor(state: GameState, item: string, quantity: number, logs: string[]) {
   if (state.phase !== 2) return;
   if (state.renownLevel < BROKERS_FAVOR_UNLOCK_LEVEL) {
     logs.push(`❌ Broker's Favor unlocks at Renown Level ${BROKERS_FAVOR_UNLOCK_LEVEL}`);
@@ -533,18 +553,24 @@ export function callBrokersFavor(state: GameState, item: string, logs: string[])
     logs.push(`❌ The Broker can't find a buyer for ${item}`);
     return;
   }
-  if ((state.inventory[item] || 0) <= 0) {
+  const held = state.inventory[item] || 0;
+  if (held <= 0) {
     logs.push(`❌ You have no ${item} in the hold for the Broker to sell`);
     return;
   }
+  const qty = Math.floor(quantity);
+  if (!Number.isFinite(qty) || qty < 1 || qty > held) {
+    logs.push(`❌ Choose between 1 and ${held} ${item} for the Broker to sell`);
+    return;
+  }
   const localRng: Rng = Math.random;
-  const order = isRaw ? genRawOrder(localRng, item) : genProductOrder(localRng, item);
+  const order = isRaw ? genRawOrder(localRng, item, qty) : genProductOrder(localRng, item, qty);
   const nextId = state.customerCards.reduce((m, c) => Math.max(m, c.id), -1) + 1;
   state.customerCards.push({ id: nextId, ...order, isBrokerFavor: true });
   state.brokersFavorUsed = true;
   const txt = order.resources.map((r) => `${ICONS[r.type]}${r.type}×${r.required}`).join(" + ");
   logs.push(
-    `🤝 Broker's Favor called in: a buyer at ${order.demandPort} now wants ${txt}. The Broker keeps ${Math.round(BROKERS_FAVOR_COMMISSION * 100)}% of the reward.`,
+    `🤝 Broker's Favor called in: a buyer at ${order.demandPort} now wants ${txt}. The bigger the ask, the bigger the Broker's cut.`,
   );
 }
 
@@ -834,7 +860,7 @@ export function startPhase1(state: GameState, ctx: GameContext, logs: string[]) 
   state.purchasedCards = [];
   state.phase2DemandTags = [];
   // [ONLINE] Deterministic intel pool per (room, round).
-  const intelRng = createRng(`${ctx.seedBase}:R${state.currentRound}:intel`);
+  const intelRng = createRng(`${ctx.seedBase}:V${state.voyageEpoch}:R${state.currentRound}:intel`);
   const allItems = [...RESOURCES, ...PRODUCTS];
   for (let i = 0; i < 5; i++) {
     let t = pick(intelRng, allItems as readonly string[]);
@@ -844,7 +870,7 @@ export function startPhase1(state: GameState, ctx: GameContext, logs: string[]) 
   logs.push(`\n⚓=== Round ${state.currentRound} · Phase 1: Port Purchase ===`);
   logs.push(`💰 Current Funds: ${state.money} Gold`);
   // [ONLINE] Deterministic port market per (room, round).
-  const marketRng = createRng(`${ctx.seedBase}:R${state.currentRound}:market`);
+  const marketRng = createRng(`${ctx.seedBase}:V${state.voyageEpoch}:R${state.currentRound}:market`);
   state.resourceCards = [];
   for (let i = 0; i < 5; i++) {
     state.resourceCards.push({ id: i, ...genResourceCard(marketRng) });
@@ -941,7 +967,7 @@ export function startPhase2(state: GameState, ctx: GameContext, logs: string[]) 
   // [ONLINE] Deterministic trade orders per (room, round): every captain
   // in the room independently derives the identical base 5 orders here,
   // since this loop never reads anything captain specific.
-  const orderRng = createRng(`${ctx.seedBase}:R${state.currentRound}:orders`);
+  const orderRng = createRng(`${ctx.seedBase}:V${state.voyageEpoch}:R${state.currentRound}:orders`);
   state.customerCards = [];
   for (let i = 0; i < 5; i++) {
     state.customerCards.push({ id: i, ...genMixedOrder(orderRng) });
@@ -1142,8 +1168,8 @@ export function endGame(state: GameState, logs: string[]) {
   logs.push("=".repeat(50));
 }
 
-export function restartGame(state: GameState, logs: string[], startingGoldBonus: number = 0, renownLevel: number = 1) {
-  const fresh = createInitialGameState(startingGoldBonus, renownLevel);
+export function restartGame(state: GameState, logs: string[], startingGoldBonus: number = 0, renownLevel: number = 1, voyageEpoch: number = 0) {
+  const fresh = createInitialGameState(startingGoldBonus, renownLevel, voyageEpoch);
   Object.assign(state, fresh);
   logs.length = 0;
   showWelcome(state, logs);

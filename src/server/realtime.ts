@@ -1206,7 +1206,14 @@ export function attachRealtime(httpServer: HttpServer): Server {
 
       restartingRooms.add(roomId);
       try {
-        await db.room.update({ where: { id: roomId }, data: { started: false, currentRound: 1, currentPhase: "0" } });
+        // Bumping voyageEpoch is what makes a restart a brand-new voyage:
+        // every captain folds it into their deterministic seed (see
+        // src/lib/use-game-session.ts and the engine's seed strings), so the
+        // whole harbor rerolls fresh market, orders, and Broker intel.
+        const restarted = await db.room.update({
+          where: { id: roomId },
+          data: { started: false, currentRound: 1, currentPhase: "0", voyageEpoch: { increment: 1 } },
+        });
         await db.gameState.deleteMany({ where: { roomId } });
 
         roomCheckpoints.delete(roomId);
@@ -1216,7 +1223,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         // A restarted room can sail, and conclude, all over again.
         concludedRooms.delete(roomId);
 
-        io.to(`room:${roomId}`).emit("room:restarted", { roomId });
+        io.to(`room:${roomId}`).emit("room:restarted", { roomId, voyageEpoch: restarted.voyageEpoch });
         const cp = await getCheckpoint(roomId);
         await broadcastReadyState(roomId, cp);
       } finally {

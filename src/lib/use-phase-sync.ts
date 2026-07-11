@@ -163,7 +163,7 @@ export function usePhaseSync(
     // Without this, goldBonusRef (set once on mount from useGameSession)
     // carries the pre-voyage Renown level and the bonus never updates until
     // the captain leaves and rejoins the room.
-    const onRestarted = async (data: { roomId: string }) => {
+    const onRestarted = async (data: { roomId: string; voyageEpoch?: number }) => {
       if (data.roomId !== roomId) return;
       pendingFn.current = null;
       setWaiting(false);
@@ -179,9 +179,14 @@ export function usePhaseSync(
         // If the fetch fails (network blip, server restart), fall back to
         // the last-known bonus rather than blocking the restart entirely.
       }
-      // Preserve the captain's current Renown level when the refetch failed,
-      // so restartGame never silently relocks a Renown-gated skill.
-      act((state, logs) => restartGame(state, logs, bonus, level ?? state.renownLevel));
+      // Stamp the room's bumped voyage epoch (from the server) onto the fresh
+      // voyage so its market, orders, and intel reroll into a brand-new one.
+      // If the payload somehow lacks it, advance locally so content still
+      // changes. Preserve the captain's current Renown level when the legacy
+      // refetch failed, so restartGame never silently relocks a Renown skill.
+      act((state, logs) =>
+        restartGame(state, logs, bonus, level ?? state.renownLevel, data.voyageEpoch ?? state.voyageEpoch + 1),
+      );
     };
 
     socket.on("phase:ready_update", onReadyUpdate);

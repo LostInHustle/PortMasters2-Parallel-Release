@@ -22,7 +22,7 @@ type SessionState = {
 type Action =
   | { type: "INIT"; game: GameState; logs: string[] }
   | { type: "APPLY"; fn: (g: GameState, logs: string[]) => void; postDraft?: boolean }
-  | { type: "START_FRESH"; checkpoint?: { round: number; phase: string } | null; ctx?: GameContext; startingGoldBonus?: number; renownLevel?: number }
+  | { type: "START_FRESH"; checkpoint?: { round: number; phase: string } | null; ctx?: GameContext; startingGoldBonus?: number; renownLevel?: number; voyageEpoch?: number }
   | { type: "SET_SAVING"; saving: boolean; at: number };
 
 function reducer(state: SessionState, action: Action): SessionState {
@@ -30,7 +30,7 @@ function reducer(state: SessionState, action: Action): SessionState {
     case "INIT":
       return { ...state, game: action.game, logs: action.logs, loaded: true };
     case "START_FRESH": {
-      const g = createInitialGameState(action.startingGoldBonus ?? 0, action.renownLevel ?? 1);
+      const g = createInitialGameState(action.startingGoldBonus ?? 0, action.renownLevel ?? 1, action.voyageEpoch ?? 0);
       const logs: string[] = [];
       showWelcome(g, logs);
       // A genuinely new captain (no save of their own yet) joins wherever
@@ -55,8 +55,11 @@ function reducer(state: SessionState, action: Action): SessionState {
   }
 }
 
-export function useGameSession(roomId: string, socket: Socket | null, enabled: boolean) {
-  const ctx: GameContext = useMemo(() => ({ seedBase: roomId }), [roomId]);
+export function useGameSession(roomId: string, socket: Socket | null, enabled: boolean, userId: string = "") {
+  // The captain's own deterministic seed identity. Folding userId in is what
+  // gives every captain their own market, orders, and Broker intel instead of
+  // the room-wide identical economy this used to derive from roomId alone.
+  const ctx: GameContext = useMemo(() => ({ seedBase: userId ? `${roomId}:${userId}` : roomId }), [roomId, userId]);
   const [state, dispatch] = useReducer(reducer, {
     game: createInitialGameState(),
     logs: [],
@@ -130,6 +133,10 @@ export function useGameSession(roomId: string, socket: Socket | null, enabled: b
           // state; fall back to the saved value (then 1) if legacy is missing.
           game.renownLevel = legacyResult ? renownLevel : (game.renownLevel ?? 1);
           game.brokersFavorUsed = game.brokersFavorUsed ?? false;
+          // Old saves predate per-voyage seeding; default their epoch to 0.
+          // Their already-generated cards restore from the blob untouched, so
+          // only a future round would reseed, which is fine.
+          game.voyageEpoch = game.voyageEpoch ?? 0;
           dispatch({ type: "INIT", game, logs: [] });
         } else {
           dispatch({
@@ -138,6 +145,7 @@ export function useGameSession(roomId: string, socket: Socket | null, enabled: b
             ctx,
             startingGoldBonus: goldBonus,
             renownLevel,
+            voyageEpoch: checkpoint?.voyageEpoch ?? 0,
           });
         }
       } catch {
