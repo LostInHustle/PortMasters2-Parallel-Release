@@ -13,6 +13,7 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const legacy = await db.captainLegacy.findUnique({ where: { userId: user.id } });
+  const merits = await db.captainMerit.findMany({ where: { userId: user.id }, select: { meritId: true } });
   const summary: CaptainLegacySummary = legacy
     ? {
         renownLevel: legacy.renownLevel,
@@ -20,6 +21,7 @@ export async function GET() {
         voyagesCompleted: legacy.voyagesCompleted,
         seaMasterCrowns: legacy.seaMasterCrowns,
         bestScore: legacy.bestScore,
+        meritIds: merits.map((m) => m.meritId),
       }
     : DEFAULT_LEGACY_SUMMARY;
 

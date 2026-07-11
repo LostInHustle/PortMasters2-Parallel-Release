@@ -6,6 +6,7 @@ import { api, type ChatMessage, type PublicUser, type RoomDetail } from "@/lib/a
 import type { VoyageCompleteEvent } from "@/lib/realtime";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import { BROKERS_FAVOR_UNLOCK_LEVEL } from "@/lib/game/constants";
+import { meritById } from "@/lib/game/merits";
 import { useRealtime } from "@/lib/use-realtime";
 import { useGameSession } from "@/lib/use-game-session";
 import { usePhaseSync } from "@/lib/use-phase-sync";
@@ -21,7 +22,7 @@ import { GameLogPanel } from "./game/GameLogPanel";
 import { GuideModal, TipsModal, RumorBoardModal, TutorialModal, RestartConfirmModal, NotificationHistoryModal } from "./game/GameModals";
 import { MembersPanel } from "./MembersPanel";
 import { ChatPanel } from "./ChatPanel";
-import { Avatar, OnlineDot, Pill } from "./shared";
+import { Avatar, MeritIcon, OnlineDot, Pill } from "./shared";
 import { NotificationCenter } from "./NotificationCenter";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -141,6 +142,11 @@ export function GameRoom({
       }
       if (mine?.brokersFavorUnlocked) {
         toast.success("🤝 Broker's Favor unlocked!", { description: `Renown Level ${BROKERS_FAVOR_UNLOCK_LEVEL} reached. The Broker owes you one, starting next voyage.` });
+      }
+      for (const meritId of mine?.newMerits ?? []) {
+        const merit = meritById(meritId);
+        if (!merit) continue;
+        toast.success(`Captain's Merit earned: ${merit.name}`, { description: merit.desc, icon: <MeritIcon id={merit.id} className="h-4 w-4" /> });
       }
     };
     const onRestarted = (data: { roomId: string }) => {

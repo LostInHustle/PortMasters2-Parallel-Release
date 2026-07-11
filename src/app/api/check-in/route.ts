@@ -23,7 +23,10 @@ type LegacyRow = {
   lastCheckInDate: string | null;
 };
 
-function toSummary(row: LegacyRow | null): CaptainLegacySummary {
+// meritIds is threaded in rather than queried here, since every call in
+// this file is for the one signed in user and a check-in claim never
+// changes their merits, so one query up front in POST covers all of them.
+function toSummary(row: LegacyRow | null, meritIds: string[]): CaptainLegacySummary {
   if (!row) return DEFAULT_LEGACY_SUMMARY;
   return {
     renownLevel: row.renownLevel,
@@ -31,6 +34,7 @@ function toSummary(row: LegacyRow | null): CaptainLegacySummary {
     voyagesCompleted: row.voyagesCompleted,
     seaMasterCrowns: row.seaMasterCrowns,
     bestScore: row.bestScore,
+    meritIds,
   };
 }
 
@@ -44,6 +48,8 @@ export async function POST() {
 
   const today = utcDayKey();
   const prior = (await db.captainLegacy.findUnique({ where: { userId: user.id } })) as LegacyRow | null;
+  const meritRows = await db.captainMerit.findMany({ where: { userId: user.id }, select: { meritId: true } });
+  const meritIds = meritRows.map((m) => m.meritId);
 
   const result = applyCheckIn(stateOf(prior), today);
   if (!result) {
@@ -51,7 +57,7 @@ export async function POST() {
     // render "come back tomorrow" rather than treat it as an error.
     return NextResponse.json({
       claimed: false,
-      legacy: toSummary(prior),
+      legacy: toSummary(prior, meritIds),
       checkIn: checkInStatus(stateOf(prior), today),
     });
   }
@@ -104,7 +110,7 @@ export async function POST() {
     const fresh = (await db.captainLegacy.findUnique({ where: { userId: user.id } })) as LegacyRow | null;
     return NextResponse.json({
       claimed: false,
-      legacy: toSummary(fresh),
+      legacy: toSummary(fresh, meritIds),
       checkIn: checkInStatus(stateOf(fresh), today),
     });
   }
@@ -114,7 +120,7 @@ export async function POST() {
     day: result.day,
     xpGained: result.xp,
     leveledUp: newLevel > priorLevel,
-    legacy: { ...toSummary(prior), renownXP: newXP, renownLevel: newLevel },
+    legacy: { ...toSummary(prior, meritIds), renownXP: newXP, renownLevel: newLevel },
     checkIn: checkInStatus(result.next, today),
   });
 }

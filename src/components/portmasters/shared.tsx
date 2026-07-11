@@ -1,5 +1,7 @@
 "use client";
 
+import { Anchor, Crown, Trophy, Gem, Shield, Medal, type LucideIcon } from "lucide-react";
+import type { MeritId } from "@/lib/game/merits";
 import { cn } from "@/lib/utils";
 
 // A circular gradient avatar keyed off the user's avatarHue.
@@ -83,4 +85,23 @@ export function Pill({
       {children}
     </span>
   );
+}
+
+// Which lucide-react icon represents each Captain's Merit (see
+// src/lib/game/merits.ts, which deliberately carries no icon of its own
+// since it's shared with the server). Kept here rather than duplicated at
+// each call site, since a trophy case, an Endgame banner, and a toast all
+// need the same mapping.
+const MERIT_ICONS: Record<MeritId, LucideIcon> = {
+  first_voyage: Anchor,
+  first_crown: Crown,
+  king_of_silk_road: Trophy,
+  renown_legend: Gem,
+  iron_hull: Shield,
+  century_club: Medal,
+};
+
+export function MeritIcon({ id, className }: { id: MeritId; className?: string }) {
+  const Icon = MERIT_ICONS[id];
+  return <Icon className={className} aria-hidden />;
 }

@@ -43,6 +43,7 @@ model User {
   sentMessages Message[]   @relation("MessageSender")
   recvMessages Message[]   @relation("MessageRecipient")
   legacy       CaptainLegacy?
+  merits       CaptainMerit[]
 }
 
 model Session {
@@ -130,11 +131,12 @@ model GameState {
 // A captain's progression across every voyage they've ever sailed, in
 // any room. Everything else in this schema is scoped to one room (or
 // one player within one room); this table is deliberately the one
-// exception, keyed only on userId. Written in exactly one place: the
-// voyage conclusion check in src/server/realtime.ts, the moment every
-// current member of a room has reported reaching either the endgame
-// screen or bankruptcy. See src/lib/game/legacy.ts for the level curve,
-// titles, and the starting Gold bonus this unlocks.
+// exception, keyed only on userId. The voyage conclusion check in
+// src/server/realtime.ts is where Renown, crowns, and
+// consecutiveSolventVoyages get written; Daily Check-In's two columns
+// are written from POST /api/check-in instead (see src/lib/game/checkin.ts).
+// See src/lib/game/legacy.ts for the level curve, titles, and the
+// starting Gold bonus this unlocks.
 model CaptainLegacy {
   id               String   @id @default(cuid())
   userId           String   @unique
@@ -145,6 +147,11 @@ model CaptainLegacy {
   // everyone who reached the endgame screen (not bankrupt) in that room.
   seaMasterCrowns  Int      @default(0)
   bestScore        Int      @default(0)
+
+  // Voyages completed back to back without going bankrupt, reset to 0 the
+  // moment one ends in bankruptcy. Powers the "iron_hull" merit (see
+  // src/lib/game/merits.ts); nothing else reads it.
+  consecutiveSolventVoyages Int @default(0)
 
   // Daily Check-In (see src/lib/game/checkin.ts). checkInCount is how many
   // days of the current 7-day cycle have been claimed (0..6, wrapping to 0
@@ -157,6 +164,24 @@ model CaptainLegacy {
   updatedAt        DateTime @updatedAt
 
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// One row per merit a captain has ever earned (see src/lib/game/merits.ts
+// for the catalog and the rules). Account wide like CaptainLegacy, and
+// written from the same voyage conclusion check, but kept as its own
+// table rather than more CaptainLegacy columns since the merit list is
+// open ended: a plain "one row per earned badge" model needs no schema
+// change to grow, where a fixed column per merit would.
+model CaptainMerit {
+  id       String   @id @default(cuid())
+  userId   String
+  meritId  String
+  earnedAt DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, meritId])
+  @@index([userId])
 }
 
 model Message {

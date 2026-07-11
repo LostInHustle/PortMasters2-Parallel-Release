@@ -19,6 +19,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ use
   if (!other) return NextResponse.json({ error: "Captain not found" }, { status: 404 });
 
   const legacy = await db.captainLegacy.findUnique({ where: { userId } });
+  const merits = await db.captainMerit.findMany({ where: { userId }, select: { meritId: true } });
   const summary: CaptainLegacySummary = legacy
     ? {
         renownLevel: legacy.renownLevel,
@@ -26,6 +27,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ use
         voyagesCompleted: legacy.voyagesCompleted,
         seaMasterCrowns: legacy.seaMasterCrowns,
         bestScore: legacy.bestScore,
+        meritIds: merits.map((m) => m.meritId),
       }
     : DEFAULT_LEGACY_SUMMARY;
 

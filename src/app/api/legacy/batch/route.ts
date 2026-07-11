@@ -28,6 +28,14 @@ export async function POST(req: NextRequest) {
   const rows = await db.captainLegacy.findMany({ where: { userId: { in: ids } } });
   const byUserId = new Map(rows.map((r) => [r.userId, r]));
 
+  const meritRows = await db.captainMerit.findMany({ where: { userId: { in: ids } }, select: { userId: true, meritId: true } });
+  const meritsByUserId = new Map<string, string[]>();
+  for (const m of meritRows) {
+    const list = meritsByUserId.get(m.userId);
+    if (list) list.push(m.meritId);
+    else meritsByUserId.set(m.userId, [m.meritId]);
+  }
+
   const legacies: Record<string, CaptainLegacySummary> = {};
   for (const id of ids) {
     const row = byUserId.get(id);
@@ -38,6 +46,7 @@ export async function POST(req: NextRequest) {
           voyagesCompleted: row.voyagesCompleted,
           seaMasterCrowns: row.seaMasterCrowns,
           bestScore: row.bestScore,
+          meritIds: meritsByUserId.get(id) ?? [],
         }
       : DEFAULT_LEGACY_SUMMARY;
   }
