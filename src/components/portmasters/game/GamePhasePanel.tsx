@@ -2048,6 +2048,33 @@ function Bankruptcy({ game }: { game: GameState }) {
           <b>{game.vatPaid + game.incomeTaxPaid} Gold</b>
         </div>
       </div>
+      {game.loansGiven.length > 0 && (
+        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] px-4 py-3 mt-4 text-left">
+          <div className="text-sm font-semibold text-foreground/90 mb-1.5 flex items-center gap-1.5">
+            🤝 Silent Partner
+          </div>
+          <p className="text-xs text-muted-foreground mb-2.5">
+            Gold you lent before the wreck is still out there, and it lands
+            the moment each captain repays it.
+          </p>
+          <div className="space-y-1">
+            {game.loansGiven.map((l) => (
+              <div
+                key={l.id}
+                className="flex items-center justify-between text-sm"
+              >
+                <span className="text-muted-foreground">
+                  Owed by{" "}
+                  <b className="text-foreground/90">{l.counterpartyName}</b>
+                </span>
+                <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                  {l.amount}g
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="rounded-xl border border-teal-500/15 bg-teal-500/[0.04] px-4 py-3 mt-4 text-sm text-muted-foreground">
         Your voyage has ended, but the others are still sailing. Click any
         captain in the <strong>Harbor Roster</strong> to watch their cargo,
