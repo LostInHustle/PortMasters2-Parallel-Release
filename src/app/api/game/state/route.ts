@@ -7,7 +7,8 @@ import { getCurrentUser } from "@/lib/api-auth";
 
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const roomId = req.nextUrl.searchParams.get("roomId");
   if (!roomId) return NextResponse.json({ state: null });
 
@@ -19,9 +20,16 @@ export async function GET(req: NextRequest) {
   // wherever the room currently is, not back at round 1. The room's
   // checkpoint is what the synchronized ready-check (src/server/realtime.ts)
   // keeps everyone else lined up against.
-  let checkpoint: { currentRound: number; currentPhase: string; voyageEpoch: number } | null = null;
+  let checkpoint: {
+    currentRound: number;
+    currentPhase: string;
+    voyageEpoch: number;
+  } | null = null;
   if (!state) {
-    const room = await db.room.findUnique({ where: { id: roomId }, select: { currentRound: true, currentPhase: true, voyageEpoch: true } });
+    const room = await db.room.findUnique({
+      where: { id: roomId },
+      select: { currentRound: true, currentPhase: true, voyageEpoch: true },
+    });
     if (room) checkpoint = room;
   }
 
@@ -35,7 +43,8 @@ const SaveSchema = z.object({
 
 export async function PUT(req: NextRequest) {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let body: unknown;
   try {
@@ -53,7 +62,11 @@ export async function PUT(req: NextRequest) {
   const member = await db.roomMember.findUnique({
     where: { userId_roomId: { userId: user.id, roomId } },
   });
-  if (!member) return NextResponse.json({ error: "Not a member of that room" }, { status: 403 });
+  if (!member)
+    return NextResponse.json(
+      { error: "Not a member of that room" },
+      { status: 403 },
+    );
 
   const json = JSON.stringify(data);
   const record = await db.gameState.upsert({

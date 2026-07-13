@@ -2,7 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { api, type ChatMessage, type PublicUser, type RoomDetail } from "@/lib/api";
+import {
+  api,
+  type ChatMessage,
+  type PublicUser,
+  type RoomDetail,
+} from "@/lib/api";
 import type { VoyageCompleteEvent } from "@/lib/realtime";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import { BROKERS_FAVOR_UNLOCK_LEVEL } from "@/lib/game/constants";
@@ -10,7 +15,10 @@ import { meritById } from "@/lib/game/merits";
 import { useRealtime } from "@/lib/use-realtime";
 import { useGameSession } from "@/lib/use-game-session";
 import { usePhaseSync } from "@/lib/use-phase-sync";
-import { usePlayerDetail, type PlayerDetailData } from "@/lib/use-player-detail";
+import {
+  usePlayerDetail,
+  type PlayerDetailData,
+} from "@/lib/use-player-detail";
 import { useBarter, type BarterOffer } from "@/lib/use-barter";
 import { useAid, type GrantedLoan, type RepaidLoan } from "@/lib/use-aid";
 import { useNotificationCenter } from "@/lib/use-notifications";
@@ -19,7 +27,14 @@ import { GameStatusPanel } from "./game/GameStatusPanel";
 import { GamePhasePanel } from "./game/GamePhasePanel";
 import { GameControlPanel } from "./game/GameControlPanel";
 import { GameLogPanel } from "./game/GameLogPanel";
-import { GuideModal, TipsModal, RumorBoardModal, TutorialModal, RestartConfirmModal, NotificationHistoryModal } from "./game/GameModals";
+import {
+  GuideModal,
+  TipsModal,
+  RumorBoardModal,
+  TutorialModal,
+  RestartConfirmModal,
+  NotificationHistoryModal,
+} from "./game/GameModals";
 import { MembersPanel } from "./MembersPanel";
 import { ChatPanel } from "./ChatPanel";
 import { Avatar, MeritIcon, OnlineDot, Pill } from "./shared";
@@ -56,12 +71,35 @@ export function GameRoom({
   onLeave,
 }: {
   me: PublicUser;
-  room: RoomDetail | PublicUser & { id: string; code: string; name: string; isPublic: boolean; host: PublicUser; memberCount: number; members: Array<PublicUser & { joinedAt: string }> };
+  room:
+    | RoomDetail
+    | (PublicUser & {
+        id: string;
+        code: string;
+        name: string;
+        isPublic: boolean;
+        host: PublicUser;
+        memberCount: number;
+        members: Array<PublicUser & { joinedAt: string }>;
+      });
   onLeave: () => void;
 }) {
   const { socket, connected, authed, onlineUsers } = useRealtime(me);
-  const { state, act, ctx, flush, startingGoldBonus } = useGameSession(room.id, socket, true, me.id);
-  const phaseSync = usePhaseSync(room.id, socket, state.game, act, authed, me.id, startingGoldBonus);
+  const { state, act, ctx, flush, startingGoldBonus } = useGameSession(
+    room.id,
+    socket,
+    true,
+    me.id,
+  );
+  const phaseSync = usePhaseSync(
+    room.id,
+    socket,
+    state.game,
+    act,
+    authed,
+    me.id,
+    startingGoldBonus,
+  );
 
   // A trade involving me just closed, on either side: as the one who
   // clicked Trade (pay the requested item, receive the offered one), or
@@ -70,9 +108,20 @@ export function GameRoom({
   const onBarterFulfilled = useCallback(
     (offer: BarterOffer, accepterId: string) => {
       if (accepterId === me.id) {
-        act((g, l) => acceptBarterOffer(g, offer.requestItem, offer.requestAmount, offer.offerItem, offer.offerAmount, l));
+        act((g, l) =>
+          acceptBarterOffer(
+            g,
+            offer.requestItem,
+            offer.requestAmount,
+            offer.offerItem,
+            offer.offerAmount,
+            l,
+          ),
+        );
       } else if (offer.fromUserId === me.id) {
-        act((g, l) => settleBarterTrade(g, offer.requestItem, offer.requestAmount, l));
+        act((g, l) =>
+          settleBarterTrade(g, offer.requestItem, offer.requestAmount, l),
+        );
       }
     },
     [act, me.id],
@@ -85,9 +134,31 @@ export function GameRoom({
   const onAidGranted = useCallback(
     (loan: GrantedLoan, role: "borrower" | "helper") => {
       if (role === "borrower") {
-        act((g, l) => receiveLoan(g, { id: loan.requestId, fromUserId: loan.helperId, fromName: loan.helperName, amount: loan.amount }, l));
+        act((g, l) =>
+          receiveLoan(
+            g,
+            {
+              id: loan.requestId,
+              fromUserId: loan.helperId,
+              fromName: loan.helperName,
+              amount: loan.amount,
+            },
+            l,
+          ),
+        );
       } else {
-        act((g, l) => grantLoan(g, { id: loan.requestId, borrowerId: loan.borrowerId, borrowerName: loan.borrowerName, amount: loan.amount }, l));
+        act((g, l) =>
+          grantLoan(
+            g,
+            {
+              id: loan.requestId,
+              borrowerId: loan.borrowerId,
+              borrowerName: loan.borrowerName,
+              amount: loan.amount,
+            },
+            l,
+          ),
+        );
       }
     },
     [act],
@@ -97,7 +168,9 @@ export function GameRoom({
   // _pendingDebtSettlements effect below), identical from this side.
   const onAidRepaid = useCallback(
     (loan: RepaidLoan) => {
-      act((g, l) => receiveRepayment(g, loan.debtId, loan.amount, loan.fromName, l));
+      act((g, l) =>
+        receiveRepayment(g, loan.debtId, loan.amount, loan.fromName, l),
+      );
     },
     [act],
   );
@@ -128,25 +201,37 @@ export function GameRoom({
   // level, and Sea Master crown count actually change. Cleared on
   // "room:restarted" so a fresh voyage's Endgame screen doesn't show the
   // previous one's standings while waiting on the new one to conclude.
-  const [voyageResult, setVoyageResult] = useState<VoyageCompleteEvent | null>(null);
+  const [voyageResult, setVoyageResult] = useState<VoyageCompleteEvent | null>(
+    null,
+  );
   const [myLegacy, setMyLegacy] = useState<CaptainLegacySummary | null>(null);
   useEffect(() => {
     if (!socket) return;
     const onVoyageComplete = (data: VoyageCompleteEvent) => {
       if (data.roomId !== room.id) return;
       setVoyageResult(data);
-      api.getLegacy().then(({ legacy }) => setMyLegacy(legacy)).catch(() => {});
+      api
+        .getLegacy()
+        .then(({ legacy }) => setMyLegacy(legacy))
+        .catch(() => {});
       const mine = data.standings.find((s) => s.userId === me.id);
       if (mine?.crowned) {
-        toast.success("Crowned Sea Master!", { description: `Highest Reputation in the harbor this voyage: ${mine.reputation}.` });
+        toast.success("Crowned Sea Master!", {
+          description: `Highest Reputation in the harbor this voyage: ${mine.reputation}.`,
+        });
       }
       if (mine?.brokersFavorUnlocked) {
-        toast.success("🤝 Broker's Favor unlocked!", { description: `Renown Level ${BROKERS_FAVOR_UNLOCK_LEVEL} reached. The Broker owes you one, starting next voyage.` });
+        toast.success("🤝 Broker's Favor unlocked!", {
+          description: `Renown Level ${BROKERS_FAVOR_UNLOCK_LEVEL} reached. The Broker owes you one, starting next voyage.`,
+        });
       }
       for (const meritId of mine?.newMerits ?? []) {
         const merit = meritById(meritId);
         if (!merit) continue;
-        toast.success(`Captain's Merit earned: ${merit.name}`, { description: merit.desc, icon: <MeritIcon id={merit.id} className="h-4 w-4" /> });
+        toast.success(`Captain's Merit earned: ${merit.name}`, {
+          description: merit.desc,
+          icon: <MeritIcon id={merit.id} className="h-4 w-4" />,
+        });
       }
     };
     const onRestarted = (data: { roomId: string }) => {
@@ -170,7 +255,9 @@ export function GameRoom({
     const pending = state.game._pendingDebtSettlements;
     if (!pending || pending.length === 0) return;
     for (const s of pending) aid.repay(s.lenderId, s.amount, s.debtId);
-    act((g) => { g._pendingDebtSettlements = []; });
+    act((g) => {
+      g._pendingDebtSettlements = [];
+    });
   }, [state.game._pendingDebtSettlements, aid.repay, act]);
 
   const handleRepayLoan = useCallback(
@@ -213,7 +300,9 @@ export function GameRoom({
   const [restartConfirmOpen, setRestartConfirmOpen] = useState(false);
 
   const [roomMessages, setRoomMessages] = useState<ChatMessage[]>([]);
-  const [members, setMembers] = useState<Array<PublicUser & { joinedAt?: string }>>(room.members ?? []);
+  const [members, setMembers] = useState<
+    Array<PublicUser & { joinedAt?: string }>
+  >(room.members ?? []);
 
   // The host can change (the original one left before the voyage even
   // started, say), so this is kept live from the room:members broadcast
@@ -224,7 +313,11 @@ export function GameRoom({
   const [hostId, setHostId] = useState<string>((room as any).host?.id ?? me.id);
   useEffect(() => {
     if (!socket) return;
-    const onMembers = (data: { roomId: string; members?: Array<PublicUser & { joinedAt?: string }>; hostId: string | null }) => {
+    const onMembers = (data: {
+      roomId: string;
+      members?: Array<PublicUser & { joinedAt?: string }>;
+      hostId: string | null;
+    }) => {
       if (data.roomId !== room.id) return;
       if (data.hostId) setHostId(data.hostId);
       if (data.members) setMembers(data.members);
@@ -276,9 +369,15 @@ export function GameRoom({
     lastLogCountRef.current = state.logs.length;
     if (prevCount === null) return; // first observation after load: history, not a new action
     if (state.logs.length <= prevCount) return; // reset/restart, nothing new to announce
-    const newLines = state.logs.slice(prevCount).filter((l) => l.trim().length > 0);
+    const newLines = state.logs
+      .slice(prevCount)
+      .filter((l) => l.trim().length > 0);
     if (newLines.length === 0) return;
-    notifications.push({ icon: "📜", title: "Captain's Ledger", lines: newLines });
+    notifications.push({
+      icon: "📜",
+      title: "Captain's Ledger",
+      lines: newLines,
+    });
   }, [state.logs, state.loaded, notifications.push]);
 
   // Every room/DM message pops up as its own 15-second notification too,
@@ -301,7 +400,10 @@ export function GameRoom({
         icon: "✉️",
         title: `${message.sender.displayName} · Direct`,
         lines: [message.content],
-        onActivate: () => { setChatTab("dm"); openDm(message.sender); },
+        onActivate: () => {
+          setChatTab("dm");
+          openDm(message.sender);
+        },
       });
     };
     socket.on("chat:room", onRoomMsg);
@@ -314,7 +416,10 @@ export function GameRoom({
 
   // First-time tutorial hint.
   useEffect(() => {
-    const seen = typeof window !== "undefined" ? localStorage.getItem("portmasters_tutorial_seen") : null;
+    const seen =
+      typeof window !== "undefined"
+        ? localStorage.getItem("portmasters_tutorial_seen")
+        : null;
     if (!seen && state.loaded && state.game.phase === 0) {
       const t = setTimeout(() => setTutOpen(true), 600);
       return () => clearTimeout(t);
@@ -324,9 +429,13 @@ export function GameRoom({
   const handleSave = useCallback(async () => {
     try {
       await api.saveGameState(room.id, state.game);
-      toast.success("Progress saved", { description: "Your voyage is recorded on the server." });
+      toast.success("Progress saved", {
+        description: "Your voyage is recorded on the server.",
+      });
     } catch {
-      toast.error("Save failed", { description: "Could not reach the harbour master." });
+      toast.error("Save failed", {
+        description: "Could not reach the harbour master.",
+      });
     }
   }, [room.id, state.game]);
 
@@ -353,11 +462,24 @@ export function GameRoom({
   // Keyboard shortcuts (preserved from original).
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.ctrlKey && e.key === "s") { e.preventDefault(); handleSave(); }
-      else if (e.ctrlKey && e.key === "n") { e.preventDefault(); handleNext(); }
-      else if (e.ctrlKey && e.key === "r") { e.preventDefault(); handleRestart(); }
-      else if (e.key === "F1") { e.preventDefault(); setGuideOpen(true); }
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      )
+        return;
+      if (e.ctrlKey && e.key === "s") {
+        e.preventDefault();
+        handleSave();
+      } else if (e.ctrlKey && e.key === "n") {
+        e.preventDefault();
+        handleNext();
+      } else if (e.ctrlKey && e.key === "r") {
+        e.preventDefault();
+        handleRestart();
+      } else if (e.key === "F1") {
+        e.preventDefault();
+        setGuideOpen(true);
+      }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -384,13 +506,18 @@ export function GameRoom({
   // cached indefinitely, same as playerDetail.requestDetail below, so a
   // captain who just finished another voyage elsewhere shows their
   // current standing.
-  const [otherLegacy, setOtherLegacy] = useState<Record<string, CaptainLegacySummary>>({});
+  const [otherLegacy, setOtherLegacy] = useState<
+    Record<string, CaptainLegacySummary>
+  >({});
   const handleSelectPlayer = useCallback(
     (userId: string) => {
       setSelectedPlayerId(userId);
       playerDetail.requestDetail(userId);
-      api.getLegacyFor(userId)
-        .then(({ legacy }) => setOtherLegacy((prev) => ({ ...prev, [userId]: legacy })))
+      api
+        .getLegacyFor(userId)
+        .then(({ legacy }) =>
+          setOtherLegacy((prev) => ({ ...prev, [userId]: legacy })),
+        )
         .catch(() => {});
     },
     [playerDetail],
@@ -420,7 +547,8 @@ export function GameRoom({
     return (
       <div className="pm-canvas min-h-screen flex items-center justify-center">
         <div className="text-muted-foreground flex items-center gap-2">
-          <Ship className="h-5 w-5 animate-pulse text-teal-500" /> Weighing anchor…
+          <Ship className="h-5 w-5 animate-pulse text-teal-500" /> Weighing
+          anchor…
         </div>
       </div>
     );
@@ -437,10 +565,17 @@ export function GameRoom({
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h1 className="font-bold leading-tight truncate">{normalizeRoomName(room.name)}</h1>
-                <Pill tone="sea" className="shrink-0"><Users className="h-3 w-3" /> {members.length}</Pill>
+                <h1 className="font-bold leading-tight truncate">
+                  {normalizeRoomName(room.name)}
+                </h1>
+                <Pill tone="sea" className="shrink-0">
+                  <Users className="h-3 w-3" /> {members.length}
+                </Pill>
               </div>
-              <button onClick={copyCode} className="pm-pressable text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1">
+              <button
+                onClick={copyCode}
+                className="pm-pressable text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1"
+              >
                 <span className="font-mono tracking-widest">{room.code}</span>
                 <Copy className="h-3 w-3" />
               </button>
@@ -448,25 +583,39 @@ export function GameRoom({
           </div>
           <div className="flex items-center gap-2">
             <Pill tone="emerald" className="hidden sm:inline-flex">
-              <OnlineDot online={connected && authed} size={8} /> {connected && authed ? "Live" : "Linking…"}
+              <OnlineDot online={connected && authed} size={8} />{" "}
+              {connected && authed ? "Live" : "Linking…"}
             </Pill>
             <Button
               variant="ghost"
               size="sm"
               className="rounded-lg relative"
-              onClick={() => { setNotificationsOpen((v) => !v); notifications.markAllRead(); }}
+              onClick={() => {
+                setNotificationsOpen((v) => !v);
+                notifications.markAllRead();
+              }}
               title="Notifications"
             >
               <Bell className="h-4 w-4" />
               {notifications.unreadCount > 0 && (
-                <Pill tone="rose" className="absolute -top-1 -right-1 !px-1 !py-0 min-w-[16px] h-4 justify-center text-[10px]">
-                  {notifications.unreadCount > 9 ? "9+" : notifications.unreadCount}
+                <Pill
+                  tone="rose"
+                  className="absolute -top-1 -right-1 !px-1 !py-0 min-w-[16px] h-4 justify-center text-[10px]"
+                >
+                  {notifications.unreadCount > 9
+                    ? "9+"
+                    : notifications.unreadCount}
                 </Pill>
               )}
             </Button>
             <div className="flex items-center gap-2 pl-2 border-l border-black/5 dark:border-white/10">
               <Avatar hue={me.avatarHue} name={me.displayName} size={30} ring />
-              <Button variant="ghost" size="sm" className="rounded-lg" onClick={handleLeave}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="rounded-lg"
+                onClick={handleLeave}
+              >
                 <DoorOpen className="h-4 w-4 mr-1.5" /> Leave
               </Button>
             </div>
@@ -480,7 +629,10 @@ export function GameRoom({
           {/* Left: status + log */}
           <div className="space-y-3 order-2 lg:order-1">
             <div className="pm-glass rounded-2xl p-3">
-              <GameStatusPanel game={state.game} onRepayLoan={handleRepayLoan} />
+              <GameStatusPanel
+                game={state.game}
+                onRepayLoan={handleRepayLoan}
+              />
             </div>
             <GameLogPanel logs={state.logs} />
           </div>
@@ -520,34 +672,79 @@ export function GameRoom({
               onCancelReady={phaseSync.cancelReady}
             />
             <div className="flex items-center justify-center gap-2 text-[10px] text-muted-foreground/70">
-              <kbd className="rounded bg-black/5 dark:bg-white/10 px-1.5 py-0.5">Ctrl+S</kbd> Save
-              <kbd className="rounded bg-black/5 dark:bg-white/10 px-1.5 py-0.5">Ctrl+N</kbd> Next Phase
-              <kbd className="rounded bg-black/5 dark:bg-white/10 px-1.5 py-0.5">Ctrl+R</kbd> Restart
-              <kbd className="rounded bg-black/5 dark:bg-white/10 px-1.5 py-0.5">F1</kbd> Guide
+              <kbd className="rounded bg-black/5 dark:bg-white/10 px-1.5 py-0.5">
+                Ctrl+S
+              </kbd>{" "}
+              Save
+              <kbd className="rounded bg-black/5 dark:bg-white/10 px-1.5 py-0.5">
+                Ctrl+N
+              </kbd>{" "}
+              Next Phase
+              <kbd className="rounded bg-black/5 dark:bg-white/10 px-1.5 py-0.5">
+                Ctrl+R
+              </kbd>{" "}
+              Restart
+              <kbd className="rounded bg-black/5 dark:bg-white/10 px-1.5 py-0.5">
+                F1
+              </kbd>{" "}
+              Guide
             </div>
           </div>
 
           {/* Right: roster + chat */}
           <div className="order-3 space-y-3 min-w-0">
             <div className="h-[320px]">
-              <MembersPanel socket={socket} roomId={room.id} me={me} initialMembers={members} hostId={hostId} onSelectPlayer={handleSelectPlayer} />
+              <MembersPanel
+                socket={socket}
+                roomId={room.id}
+                me={me}
+                initialMembers={members}
+                hostId={hostId}
+                onSelectPlayer={handleSelectPlayer}
+              />
             </div>
-            <div className="pm-glass rounded-2xl overflow-hidden flex flex-col" style={{ height: 380 }}>
-              <Tabs value={chatTab} onValueChange={(v) => setChatTab(v as "room" | "dm")} className="flex flex-col h-full">
+            <div
+              className="pm-glass rounded-2xl overflow-hidden flex flex-col"
+              style={{ height: 380 }}
+            >
+              <Tabs
+                value={chatTab}
+                onValueChange={(v) => setChatTab(v as "room" | "dm")}
+                className="flex flex-col h-full"
+              >
                 <TabsList className="grid grid-cols-2 m-2 mb-0">
-                  <TabsTrigger value="room"><MessageCircle className="h-3.5 w-3.5 mr-1.5" /> Harbor</TabsTrigger>
-                  <TabsTrigger value="dm"><MessageCircle className="h-3.5 w-3.5 mr-1.5" /> Direct</TabsTrigger>
+                  <TabsTrigger value="room">
+                    <MessageCircle className="h-3.5 w-3.5 mr-1.5" /> Harbor
+                  </TabsTrigger>
+                  <TabsTrigger value="dm">
+                    <MessageCircle className="h-3.5 w-3.5 mr-1.5" /> Direct
+                  </TabsTrigger>
                 </TabsList>
-                <TabsContent value="room" className="flex-1 min-h-0 mt-0 data-[state=inactive]:hidden">
-                  <ChatPanel socket={socket} me={me} mode="room" roomId={room.id} initialMessages={roomMessages} />
+                <TabsContent
+                  value="room"
+                  className="flex-1 min-h-0 mt-0 data-[state=inactive]:hidden"
+                >
+                  <ChatPanel
+                    socket={socket}
+                    me={me}
+                    mode="room"
+                    roomId={room.id}
+                    initialMessages={roomMessages}
+                  />
                 </TabsContent>
-                <TabsContent value="dm" className="flex-1 min-h-0 mt-0 data-[state=inactive]:hidden">
+                <TabsContent
+                  value="dm"
+                  className="flex-1 min-h-0 mt-0 data-[state=inactive]:hidden"
+                >
                   <DmTab
                     socket={socket}
                     me={me}
                     target={dmTarget}
                     history={dmHistory}
-                    candidates={[...members.map((m) => ({ ...m, roomId: room.id })), ...onlineInLobby]}
+                    candidates={[
+                      ...members.map((m) => ({ ...m, roomId: room.id })),
+                      ...onlineInLobby,
+                    ]}
                     onPick={openDm}
                     onClear={() => setDmTarget(null)}
                   />
@@ -567,21 +764,45 @@ export function GameRoom({
         onBuy={() => act((g, l) => purchaseIntel(g, l))}
       />
       <TutorialModal open={tutOpen} onOpenChange={setTutOpen} />
-      <RestartConfirmModal open={restartConfirmOpen} onOpenChange={setRestartConfirmOpen} onConfirm={confirmRestart} />
-      <NotificationHistoryModal open={notificationsOpen} onOpenChange={setNotificationsOpen} items={notifications.items} />
-      <NotificationCenter current={notifications.current} dismiss={notifications.dismissCurrent} />
+      <RestartConfirmModal
+        open={restartConfirmOpen}
+        onOpenChange={setRestartConfirmOpen}
+        onConfirm={confirmRestart}
+      />
+      <NotificationHistoryModal
+        open={notificationsOpen}
+        onOpenChange={setNotificationsOpen}
+        items={notifications.items}
+      />
+      <NotificationCenter
+        current={notifications.current}
+        dismiss={notifications.dismissCurrent}
+      />
       <PlayerDetailModal
         open={selectedPlayerId !== null}
-        onOpenChange={(v) => { if (!v) setSelectedPlayerId(null); }}
-        player={selectedPlayerId ? members.find((m) => m.id === selectedPlayerId) ?? null : null}
+        onOpenChange={(v) => {
+          if (!v) setSelectedPlayerId(null);
+        }}
+        player={
+          selectedPlayerId
+            ? (members.find((m) => m.id === selectedPlayerId) ?? null)
+            : null
+        }
         isMe={selectedPlayerId === me.id}
-        detail={selectedPlayerId ? playerDetail.detail[selectedPlayerId] : undefined}
-        loading={selectedPlayerId ? Boolean(playerDetail.loading[selectedPlayerId]) : false}
+        detail={
+          selectedPlayerId ? playerDetail.detail[selectedPlayerId] : undefined
+        }
+        loading={
+          selectedPlayerId
+            ? Boolean(playerDetail.loading[selectedPlayerId])
+            : false
+        }
         legacy={selectedPlayerId ? otherLegacy[selectedPlayerId] : undefined}
       />
 
       {/* Floating help when bankrupt / endgame */}
-      {(state.game.phase === "bankruptcy" || state.game.phase === "endgame") && (
+      {(state.game.phase === "bankruptcy" ||
+        state.game.phase === "endgame") && (
         <motion.button
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -615,7 +836,8 @@ function DmTab({
 }) {
   // Deduplicate candidates by id, exclude self.
   const seen = new Map<string, PublicUser & { roomId?: string | null }>();
-  for (const c of candidates) if (c.id !== me.id && !seen.has(c.id)) seen.set(c.id, c);
+  for (const c of candidates)
+    if (c.id !== me.id && !seen.has(c.id)) seen.set(c.id, c);
   const list = Array.from(seen.values());
 
   if (target) {
@@ -623,13 +845,26 @@ function DmTab({
       <div className="h-full flex flex-col">
         <div className="px-3 py-2 border-b border-black/5 dark:border-white/10 flex items-center gap-2">
           <Avatar hue={target.avatarHue} name={target.displayName} size={24} />
-          <span className="text-xs font-medium truncate">{target.displayName}</span>
-          <Button variant="ghost" size="sm" className="ml-auto h-7 px-2 text-[11px]" onClick={onClear}>
+          <span className="text-xs font-medium truncate">
+            {target.displayName}
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto h-7 px-2 text-[11px]"
+            onClick={onClear}
+          >
             Switch
           </Button>
         </div>
         <div className="flex-1 min-h-0">
-          <ChatPanel socket={socket} me={me} mode="dm" other={target} initialMessages={history} />
+          <ChatPanel
+            socket={socket}
+            me={me}
+            mode="dm"
+            other={target}
+            initialMessages={history}
+          />
         </div>
       </div>
     );
@@ -644,7 +879,8 @@ function DmTab({
         <div className="p-2 space-y-1">
           {list.length === 0 ? (
             <p className="text-center text-xs text-muted-foreground py-6 px-4">
-              No other captains available right now. They'll appear here once they're online.
+              No other captains available right now. They'll appear here once
+              they're online.
             </p>
           ) : (
             list.map((u) => (
@@ -655,8 +891,12 @@ function DmTab({
               >
                 <Avatar hue={u.avatarHue} name={u.displayName} size={28} />
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">{u.displayName}</div>
-                  <div className="text-[10px] text-muted-foreground truncate">@{u.username}</div>
+                  <div className="text-sm font-medium truncate">
+                    {u.displayName}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground truncate">
+                    @{u.username}
+                  </div>
                 </div>
                 <MessageCircle className="h-4 w-4 text-muted-foreground/60" />
               </button>

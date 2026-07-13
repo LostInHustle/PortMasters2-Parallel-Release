@@ -4,7 +4,15 @@ import { Button } from "@/components/ui/button";
 import type { GameState } from "@/lib/game/types";
 import { phaseLabel } from "@/lib/game/engine";
 import { cn } from "@/lib/utils";
-import { BookOpen, Save, RotateCcw, Play, ChevronRight, Loader2, Cloud } from "lucide-react";
+import {
+  BookOpen,
+  Save,
+  RotateCcw,
+  Play,
+  ChevronRight,
+  Loader2,
+  Cloud,
+} from "lucide-react";
 
 export function GameControlPanel({
   game,
@@ -83,7 +91,10 @@ export function GameControlPanel({
   return (
     <div className="pm-glass rounded-2xl px-3 py-2.5 flex items-center gap-2 flex-wrap">
       <Button
-        className={cn("rounded-lg", !startDisabled && "pm-grad-primary text-white")}
+        className={cn(
+          "rounded-lg",
+          !startDisabled && "pm-grad-primary text-white",
+        )}
         variant={startDisabled ? "secondary" : "default"}
         disabled={startDisabled}
         onClick={onSetSail}
@@ -91,7 +102,10 @@ export function GameControlPanel({
         <Play className="h-4 w-4 mr-1.5" /> {startText}
       </Button>
       <Button
-        className={cn("rounded-lg", !nextDisabled && !waiting && "pm-grad-emerald text-white")}
+        className={cn(
+          "rounded-lg",
+          !nextDisabled && !waiting && "pm-grad-emerald text-white",
+        )}
         variant={nextDisabled ? "secondary" : waiting ? "secondary" : "default"}
         disabled={nextDisabled}
         onClick={waiting ? onCancelReady : onNextPhase}
@@ -101,18 +115,40 @@ export function GameControlPanel({
       <div className="flex-1" />
       <div className="flex items-center gap-2">
         <span className="hidden md:inline-flex items-center gap-1.5 text-[11px] text-muted-foreground px-2">
-          {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Cloud className="h-3.5 w-3.5 text-emerald-500" />}
+          {saving ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Cloud className="h-3.5 w-3.5 text-emerald-500" />
+          )}
           {saving ? "Saving…" : "Saved"}
           <span className="text-muted-foreground/60">· {phaseLabel(game)}</span>
         </span>
-        <Button variant="ghost" size="sm" className="rounded-lg" onClick={onGuide}><BookOpen className="h-4 w-4 mr-1.5" /> Guide</Button>
-        <Button variant="ghost" size="sm" className="rounded-lg" onClick={onSave}><Save className="h-4 w-4 mr-1.5" /> Save</Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="rounded-lg"
+          onClick={onGuide}
+        >
+          <BookOpen className="h-4 w-4 mr-1.5" /> Guide
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="rounded-lg"
+          onClick={onSave}
+        >
+          <Save className="h-4 w-4 mr-1.5" /> Save
+        </Button>
         <Button
           variant="ghost"
           size="sm"
           className="rounded-lg"
           disabled={!isHost}
-          title={isHost ? "Restart the voyage for everyone in the harbor" : "Only the host can restart the voyage"}
+          title={
+            isHost
+              ? "Restart the voyage for everyone in the harbor"
+              : "Only the host can restart the voyage"
+          }
           onClick={onRestart}
         >
           <RotateCcw className="h-4 w-4 mr-1.5" /> Restart

@@ -41,7 +41,12 @@ export function publicUser(u: {
   displayName: string;
   avatarHue: number;
 }) {
-  return { id: u.id, username: u.username, displayName: u.displayName, avatarHue: u.avatarHue };
+  return {
+    id: u.id,
+    username: u.username,
+    displayName: u.displayName,
+    avatarHue: u.avatarHue,
+  };
 }
 
 // 6-char human-friendly room join code (no ambiguous chars).
@@ -50,7 +55,8 @@ export function generateRoomCode(): string {
   let out = "";
   const bytes = new Uint8Array(6);
   crypto.getRandomValues(bytes);
-  for (let i = 0; i < 6; i++) out += CODE_ALPHABET[bytes[i] % CODE_ALPHABET.length];
+  for (let i = 0; i < 6; i++)
+    out += CODE_ALPHABET[bytes[i] % CODE_ALPHABET.length];
   return out;
 }
 

@@ -10,7 +10,11 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Loader2, Anchor, Ship, Waves } from "lucide-react";
 import { APP_NAME } from "@/lib/game/constants";
 
-export function AuthScreen({ onAuthed }: { onAuthed: (u: PublicUser, token: string) => void }) {
+export function AuthScreen({
+  onAuthed,
+}: {
+  onAuthed: (u: PublicUser, token: string) => void;
+}) {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +33,11 @@ export function AuthScreen({ onAuthed }: { onAuthed: (u: PublicUser, token: stri
       const { user, token } =
         mode === "login"
           ? await api.login({ username: username.trim(), password })
-          : await api.register({ username: username.trim(), password, displayName: displayName.trim() || undefined });
+          : await api.register({
+              username: username.trim(),
+              password,
+              displayName: displayName.trim() || undefined,
+            });
       onAuthed(user, token);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -43,13 +51,19 @@ export function AuthScreen({ onAuthed }: { onAuthed: (u: PublicUser, token: stri
       {/* Decorative floating orbs */}
       <motion.div
         className="pointer-events-none absolute -top-32 -left-24 h-80 w-80 rounded-full blur-3xl"
-        style={{ background: "radial-gradient(circle, oklch(0.7 0.14 190 / 0.45), transparent 70%)" }}
+        style={{
+          background:
+            "radial-gradient(circle, oklch(0.7 0.14 190 / 0.45), transparent 70%)",
+        }}
         animate={{ y: [0, 18, 0], x: [0, 10, 0] }}
         transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }}
       />
       <motion.div
         className="pointer-events-none absolute -bottom-32 -right-20 h-96 w-96 rounded-full blur-3xl"
-        style={{ background: "radial-gradient(circle, oklch(0.78 0.14 85 / 0.4), transparent 70%)" }}
+        style={{
+          background:
+            "radial-gradient(circle, oklch(0.78 0.14 85 / 0.4), transparent 70%)",
+        }}
         animate={{ y: [0, -20, 0], x: [0, -12, 0] }}
         transition={{ duration: 11, repeat: Infinity, ease: "easeInOut" }}
       />
@@ -77,7 +91,13 @@ export function AuthScreen({ onAuthed }: { onAuthed: (u: PublicUser, token: stri
             </p>
           </div>
 
-          <Tabs value={mode} onValueChange={(v) => { setMode(v as "login" | "register"); setError(null); }}>
+          <Tabs
+            value={mode}
+            onValueChange={(v) => {
+              setMode(v as "login" | "register");
+              setError(null);
+            }}
+          >
             <TabsList className="grid w-full grid-cols-2 mb-5">
               <TabsTrigger value="login">Sign In</TabsTrigger>
               <TabsTrigger value="register">Register</TabsTrigger>
@@ -108,7 +128,10 @@ export function AuthScreen({ onAuthed }: { onAuthed: (u: PublicUser, token: stri
               </TabsContent>
 
               <TabsContent value="register" className="space-y-4 mt-0">
-                <Field label="Captain Name" hint="3 to 20 chars, letters / numbers / _">
+                <Field
+                  label="Captain Name"
+                  hint="3 to 20 chars, letters / numbers / _"
+                >
                   <Input
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
@@ -182,12 +205,22 @@ export function AuthScreen({ onAuthed }: { onAuthed: (u: PublicUser, token: stri
   );
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="space-y-1.5">
       <div className="flex items-baseline justify-between">
         <Label className="text-sm font-medium">{label}</Label>
-        {hint && <span className="text-[10px] text-muted-foreground">{hint}</span>}
+        {hint && (
+          <span className="text-[10px] text-muted-foreground">{hint}</span>
+        )}
       </div>
       {children}
     </div>

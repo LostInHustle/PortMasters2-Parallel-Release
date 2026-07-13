@@ -1,14 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
 import { api } from "@/lib/api";
 import type { Socket } from "socket.io-client";
+import { phaseLabel, showWelcome, snapToCheckpoint } from "@/lib/game/engine";
 import {
-  phaseLabel,
-  showWelcome,
-  snapToCheckpoint,
-} from "@/lib/game/engine";
-import { createInitialGameState, type GameContext, type GameState } from "@/lib/game/types";
+  createInitialGameState,
+  type GameContext,
+  type GameState,
+} from "@/lib/game/types";
 import { renownStartingGoldBonus } from "@/lib/game/legacy";
 
 type SessionState = {
@@ -21,8 +28,19 @@ type SessionState = {
 
 type Action =
   | { type: "INIT"; game: GameState; logs: string[] }
-  | { type: "APPLY"; fn: (g: GameState, logs: string[]) => void; postDraft?: boolean }
-  | { type: "START_FRESH"; checkpoint?: { round: number; phase: string } | null; ctx?: GameContext; startingGoldBonus?: number; renownLevel?: number; voyageEpoch?: number }
+  | {
+      type: "APPLY";
+      fn: (g: GameState, logs: string[]) => void;
+      postDraft?: boolean;
+    }
+  | {
+      type: "START_FRESH";
+      checkpoint?: { round: number; phase: string } | null;
+      ctx?: GameContext;
+      startingGoldBonus?: number;
+      renownLevel?: number;
+      voyageEpoch?: number;
+    }
   | { type: "SET_SAVING"; saving: boolean; at: number };
 
 function reducer(state: SessionState, action: Action): SessionState {
@@ -30,7 +48,11 @@ function reducer(state: SessionState, action: Action): SessionState {
     case "INIT":
       return { ...state, game: action.game, logs: action.logs, loaded: true };
     case "START_FRESH": {
-      const g = createInitialGameState(action.startingGoldBonus ?? 0, action.renownLevel ?? 1, action.voyageEpoch ?? 0);
+      const g = createInitialGameState(
+        action.startingGoldBonus ?? 0,
+        action.renownLevel ?? 1,
+        action.voyageEpoch ?? 0,
+      );
       const logs: string[] = [];
       showWelcome(g, logs);
       // A genuinely new captain (no save of their own yet) joins wherever
@@ -55,11 +77,19 @@ function reducer(state: SessionState, action: Action): SessionState {
   }
 }
 
-export function useGameSession(roomId: string, socket: Socket | null, enabled: boolean, userId: string = "") {
+export function useGameSession(
+  roomId: string,
+  socket: Socket | null,
+  enabled: boolean,
+  userId: string = "",
+) {
   // The captain's own deterministic seed identity. Folding userId in is what
   // gives every captain their own market, orders, and Broker intel instead of
   // the room-wide identical economy this used to derive from roomId alone.
-  const ctx: GameContext = useMemo(() => ({ seedBase: userId ? `${roomId}:${userId}` : roomId }), [roomId, userId]);
+  const ctx: GameContext = useMemo(
+    () => ({ seedBase: userId ? `${roomId}:${userId}` : roomId }),
+    [roomId, userId],
+  );
   const [state, dispatch] = useReducer(reducer, {
     game: createInitialGameState(),
     logs: [],
@@ -102,7 +132,9 @@ export function useGameSession(roomId: string, socket: Socket | null, enabled: b
         ]);
         if (!alive || loadTimedOut) return;
         clearTimeout(timeoutId);
-        const goldBonus = legacyResult ? renownStartingGoldBonus(legacyResult.legacy.renownLevel) : 0;
+        const goldBonus = legacyResult
+          ? renownStartingGoldBonus(legacyResult.legacy.renownLevel)
+          : 0;
         const renownLevel = legacyResult ? legacyResult.legacy.renownLevel : 1;
         setStartingGoldBonus(goldBonus);
         if (raw) {
@@ -131,7 +163,9 @@ export function useGameSession(roomId: string, socket: Socket | null, enabled: b
           // Refresh Renown from the freshly loaded legacy so a captain who
           // leveled up since this voyage was saved gets the current unlock
           // state; fall back to the saved value (then 1) if legacy is missing.
-          game.renownLevel = legacyResult ? renownLevel : (game.renownLevel ?? 1);
+          game.renownLevel = legacyResult
+            ? renownLevel
+            : (game.renownLevel ?? 1);
           game.brokersFavorUsed = game.brokersFavorUsed ?? false;
           // Old saves predate per-voyage seeding; default their epoch to 0.
           // Their already-generated cards restore from the blob untouched, so
@@ -141,7 +175,12 @@ export function useGameSession(roomId: string, socket: Socket | null, enabled: b
         } else {
           dispatch({
             type: "START_FRESH",
-            checkpoint: checkpoint ? { round: checkpoint.currentRound, phase: checkpoint.currentPhase } : null,
+            checkpoint: checkpoint
+              ? {
+                  round: checkpoint.currentRound,
+                  phase: checkpoint.currentPhase,
+                }
+              : null,
             ctx,
             startingGoldBonus: goldBonus,
             renownLevel,
@@ -204,7 +243,18 @@ export function useGameSession(roomId: string, socket: Socket | null, enabled: b
       });
     }, 8000);
     return () => clearInterval(t);
-  }, [state.loaded, socket, roomId, enabled, state.game.currentRound, state.game.phase, state.game.money, state.game.score, state.game.shipLevel, state.game.gameOver]);
+  }, [
+    state.loaded,
+    socket,
+    roomId,
+    enabled,
+    state.game.currentRound,
+    state.game.phase,
+    state.game.money,
+    state.game.score,
+    state.game.shipLevel,
+    state.game.gameOver,
+  ]);
 
   // Autosave (debounced) to the server.
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -225,7 +275,11 @@ export function useGameSession(roomId: string, socket: Socket | null, enabled: b
         dirtyRef.current = false;
         dispatch({ type: "SET_SAVING", saving: false, at: Date.now() });
       } catch {
-        dispatch({ type: "SET_SAVING", saving: false, at: state.lastSavedAt ?? 0 });
+        dispatch({
+          type: "SET_SAVING",
+          saving: false,
+          at: state.lastSavedAt ?? 0,
+        });
       }
     }, 700);
     return () => {
@@ -261,7 +315,8 @@ export function useGameSession(roomId: string, socket: Socket | null, enabled: b
   }, [roomId]);
 
   const act = useCallback(
-    (fn: (g: GameState, logs: string[]) => void) => dispatch({ type: "APPLY", fn }),
+    (fn: (g: GameState, logs: string[]) => void) =>
+      dispatch({ type: "APPLY", fn }),
     [],
   );
 

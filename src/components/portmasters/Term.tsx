@@ -1,6 +1,10 @@
 "use client";
 
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { GLOSSARY } from "@/lib/game/glossary";
 import { cn } from "@/lib/utils";
 
@@ -20,13 +24,21 @@ export function Term({
   content?: React.ReactNode;
   className?: string;
 }) {
-  const body = content ?? (term ? GLOSSARY[term] : undefined) ?? (typeof children === "string" ? GLOSSARY[children] : undefined);
+  const body =
+    content ??
+    (term ? GLOSSARY[term] : undefined) ??
+    (typeof children === "string" ? GLOSSARY[children] : undefined);
   if (!body) return <>{children}</>;
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className={cn("underline decoration-dotted decoration-muted-foreground/50 underline-offset-2 cursor-help", className)}>
+        <span
+          className={cn(
+            "underline decoration-dotted decoration-muted-foreground/50 underline-offset-2 cursor-help",
+            className,
+          )}
+        >
           {children}
         </span>
       </TooltipTrigger>

@@ -46,7 +46,13 @@ import {
   type Module,
 } from "./constants";
 import { createRng, pick, randInt, weightedPick, type Rng } from "./rng";
-import { createInitialGameState, type GameContext, type GameState, type OrderCard, type ResourceCard } from "./types";
+import {
+  createInitialGameState,
+  type GameContext,
+  type GameState,
+  type OrderCard,
+  type ResourceCard,
+} from "./types";
 
 // ---------- Helpers ----------
 export function hasModule(state: GameState, id: string): boolean {
@@ -67,13 +73,21 @@ function addOwnedAmount(state: GameState, item: string, delta: number) {
 }
 
 // ---------- Calculations (preserved verbatim) ----------
-export function calcTransportCost(state: GameState, totalItems: number, hasSilk = false): number {
+export function calcTransportCost(
+  state: GameState,
+  totalItems: number,
+  hasSilk = false,
+): number {
   let base = totalItems * 2;
   let discount = state.shipLevel * 5;
-  if (state.modifierFlags.transport_flat_discount) discount += state.modifierFlags.transport_flat_discount;
+  if (state.modifierFlags.transport_flat_discount)
+    discount += state.modifierFlags.transport_flat_discount;
   let cost = Math.max(5, base - discount);
   if (hasSilk && state.modifierFlags.transport_silk_discount)
-    cost = Math.max(5, Math.floor(cost * state.modifierFlags.transport_silk_discount));
+    cost = Math.max(
+      5,
+      Math.floor(cost * state.modifierFlags.transport_silk_discount),
+    );
   if (hasModule(state, "bulk_hauler")) cost = Math.max(0, cost - totalItems);
   if (hasModule(state, "overdrive_engine")) cost = Math.max(0, cost - 5);
   if (hasModule(state, "silk_monopoly") && hasSilk) cost = 0;
@@ -84,7 +98,11 @@ export function calcTransportCost(state: GameState, totalItems: number, hasSilk 
 // own function rather than having calcTransportCost delegate to it, so the
 // balance-critical "preserved verbatim" math above never has to change to
 // accommodate a tooltip.
-export function explainTransportCost(state: GameState, totalItems: number, hasSilk = false): PriceBreakdown {
+export function explainTransportCost(
+  state: GameState,
+  totalItems: number,
+  hasSilk = false,
+): PriceBreakdown {
   const steps: PriceStep[] = [];
   const base = totalItems * 2;
   let cost = base;
@@ -92,17 +110,32 @@ export function explainTransportCost(state: GameState, totalItems: number, hasSi
   const shipDiscount = state.shipLevel * 5;
   if (shipDiscount > 0) {
     const next = Math.max(5, cost - shipDiscount);
-    steps.push({ label: `Ship Level ${state.shipLevel} discount`, delta: next - cost });
+    steps.push({
+      label: `Ship Level ${state.shipLevel} discount`,
+      delta: next - cost,
+    });
     cost = next;
   }
   if (state.modifierFlags.transport_flat_discount) {
-    const next = Math.max(5, cost - state.modifierFlags.transport_flat_discount);
-    steps.push({ label: `${boonNameForModifierKey("transport_flat_discount")} (-${state.modifierFlags.transport_flat_discount}g)`, delta: next - cost });
+    const next = Math.max(
+      5,
+      cost - state.modifierFlags.transport_flat_discount,
+    );
+    steps.push({
+      label: `${boonNameForModifierKey("transport_flat_discount")} (-${state.modifierFlags.transport_flat_discount}g)`,
+      delta: next - cost,
+    });
     cost = next;
   }
   if (hasSilk && state.modifierFlags.transport_silk_discount) {
-    const next = Math.max(5, Math.floor(cost * state.modifierFlags.transport_silk_discount));
-    steps.push({ label: `${boonNameForModifierKey("transport_silk_discount")} on Silk goods`, delta: next - cost });
+    const next = Math.max(
+      5,
+      Math.floor(cost * state.modifierFlags.transport_silk_discount),
+    );
+    steps.push({
+      label: `${boonNameForModifierKey("transport_silk_discount")} on Silk goods`,
+      delta: next - cost,
+    });
     cost = next;
   }
   if (hasModule(state, "bulk_hauler")) {
@@ -116,17 +149,25 @@ export function explainTransportCost(state: GameState, totalItems: number, hasSi
     cost = next;
   }
   if (hasModule(state, "silk_monopoly") && hasSilk) {
-    steps.push({ label: "Silk Road Monopoly module (Silk freight waived)", delta: -cost });
+    steps.push({
+      label: "Silk Road Monopoly module (Silk freight waived)",
+      delta: -cost,
+    });
     cost = 0;
   }
   return { base, steps, final: Math.max(0, cost) };
 }
 
-export function calcVAT(state: GameState, product: string, sellingPrice: number): number {
+export function calcVAT(
+  state: GameState,
+  product: string,
+  sellingPrice: number,
+): number {
   const recipe = RECIPES[product];
   let matCost = 0;
   for (const [m, a] of Object.entries(recipe.materials)) {
-    matCost += ((COMMODITIES[m].basePrice[0] + COMMODITIES[m].basePrice[1]) / 2) * a;
+    matCost +=
+      ((COMMODITIES[m].basePrice[0] + COMMODITIES[m].basePrice[1]) / 2) * a;
   }
   const workerCost = WAGES[recipe.worker_type];
   const taxable = sellingPrice - matCost - workerCost;
@@ -141,24 +182,35 @@ export function calcVAT(state: GameState, product: string, sellingPrice: number)
 // Display-only mirror of calcVAT above, same reasoning as
 // explainTransportCost: the tooltip gets its own copy of the math instead
 // of touching the function the actual sale relies on.
-export function explainVAT(state: GameState, product: string, sellingPrice: number): PriceBreakdown {
+export function explainVAT(
+  state: GameState,
+  product: string,
+  sellingPrice: number,
+): PriceBreakdown {
   const recipe = RECIPES[product];
   let matCost = 0;
   for (const [m, a] of Object.entries(recipe.materials)) {
-    matCost += ((COMMODITIES[m].basePrice[0] + COMMODITIES[m].basePrice[1]) / 2) * a;
+    matCost +=
+      ((COMMODITIES[m].basePrice[0] + COMMODITIES[m].basePrice[1]) / 2) * a;
   }
   const workerCost = WAGES[recipe.worker_type];
   const taxable = sellingPrice - matCost - workerCost;
   const steps: PriceStep[] = [
     { label: "Average material cost", delta: -matCost },
-    { label: `${recipe.worker_type === "weaver" ? "Weaver" : recipe.worker_type === "master" ? "Master Weaver" : "Sachet Maker"} wage`, delta: -workerCost },
+    {
+      label: `${recipe.worker_type === "weaver" ? "Weaver" : recipe.worker_type === "master" ? "Master Weaver" : "Sachet Maker"} wage`,
+      delta: -workerCost,
+    },
   ];
   if (taxable <= 0) return { base: sellingPrice, steps, final: 0 };
   let vat = Math.floor(taxable * 0.05);
   steps.push({ label: "5% VAT on the margin", delta: -vat });
   if (hasModule(state, "tax_evasion")) {
     const next = Math.floor(vat * 0.5);
-    steps.push({ label: "Tax Evasion Ledger module (-50%)", delta: next - vat });
+    steps.push({
+      label: "Tax Evasion Ledger module (-50%)",
+      delta: next - vat,
+    });
     vat = next;
   }
   return { base: sellingPrice, steps, final: vat };
@@ -182,24 +234,43 @@ function boonNameForModifierKey(key: string): string {
 }
 
 export type PriceStep = { label: string; delta: number };
-export type PriceBreakdown = { base: number; steps: PriceStep[]; final: number };
+export type PriceBreakdown = {
+  base: number;
+  steps: PriceStep[];
+  final: number;
+};
 
 // The same math as getCardFinalCost, but reported as a step-by-step
 // breakdown so the buying-phase tooltip can show exactly where a price
 // came from: base cost, then whatever boon or module touched it.
-export function explainCardPrice(state: GameState, card: ResourceCard): PriceBreakdown {
+export function explainCardPrice(
+  state: GameState,
+  card: ResourceCard,
+): PriceBreakdown {
   const steps: PriceStep[] = [];
   let cost = card.totalCost;
 
   if (state.modifierFlags.purchase_discount) {
     const next = Math.floor(cost * (1 - state.modifierFlags.purchase_discount));
-    steps.push({ label: `${boonNameForModifierKey("purchase_discount")} (-${Math.round(state.modifierFlags.purchase_discount * 100)}%)`, delta: next - cost });
+    steps.push({
+      label: `${boonNameForModifierKey("purchase_discount")} (-${Math.round(state.modifierFlags.purchase_discount * 100)}%)`,
+      delta: next - cost,
+    });
     cost = next;
   }
   if (state.modifierFlags.hemp_price_reduction) {
-    const reduction = card.resources.reduce((sum, r) => (r.type === "Hemp" ? sum + r.quantity! * state.modifierFlags.hemp_price_reduction : sum), 0);
+    const reduction = card.resources.reduce(
+      (sum, r) =>
+        r.type === "Hemp"
+          ? sum + r.quantity! * state.modifierFlags.hemp_price_reduction
+          : sum,
+      0,
+    );
     if (reduction > 0) {
-      steps.push({ label: `${boonNameForModifierKey("hemp_price_reduction")} (-${state.modifierFlags.hemp_price_reduction}g/Hemp)`, delta: -reduction });
+      steps.push({
+        label: `${boonNameForModifierKey("hemp_price_reduction")} (-${state.modifierFlags.hemp_price_reduction}g/Hemp)`,
+        delta: -reduction,
+      });
       cost -= reduction;
     }
   }
@@ -210,7 +281,8 @@ export function explainCardPrice(state: GameState, card: ResourceCard): PriceBre
   }
 
   const final = Math.max(0, cost);
-  if (final !== cost) steps.push({ label: "Floor at 0 Gold", delta: final - cost });
+  if (final !== cost)
+    steps.push({ label: "Floor at 0 Gold", delta: final - cost });
   return { base: card.totalCost, steps, final };
 }
 
@@ -218,7 +290,12 @@ export function getCardFinalCost(state: GameState, card: ResourceCard): number {
   return explainCardPrice(state, card).final;
 }
 
-export type ExpectedPrice = { min: number; max: number; isProduct: boolean; modifiers: string[] };
+export type ExpectedPrice = {
+  min: number;
+  max: number;
+  isProduct: boolean;
+  modifiers: string[];
+};
 
 // A general "what does this typically cost" estimate for a raw material
 // or product, independent of any specific market card. Used for the
@@ -229,9 +306,14 @@ export type ExpectedPrice = { min: number; max: number; isProduct: boolean; modi
 // 1 Gold up or down depending on whether the port specializes in it
 // (see genResourceCard), which is why the range carries a margin note
 // instead of trying to fold that into the numbers themselves.
-export function explainExpectedPrice(state: GameState, itemType: string): ExpectedPrice {
+export function explainExpectedPrice(
+  state: GameState,
+  itemType: string,
+): ExpectedPrice {
   const isResource = (RESOURCES as readonly string[]).includes(itemType);
-  let [min, max] = isResource ? COMMODITIES[itemType].basePrice : PRODUCT_PRICES[itemType];
+  let [min, max] = isResource
+    ? COMMODITIES[itemType].basePrice
+    : PRODUCT_PRICES[itemType];
   const modifiers: string[] = [];
 
   if (isResource) {
@@ -239,12 +321,16 @@ export function explainExpectedPrice(state: GameState, itemType: string): Expect
       const factor = 1 - state.modifierFlags.purchase_discount;
       min = Math.floor(min * factor);
       max = Math.floor(max * factor);
-      modifiers.push(`${boonNameForModifierKey("purchase_discount")} (-${Math.round(state.modifierFlags.purchase_discount * 100)}%)`);
+      modifiers.push(
+        `${boonNameForModifierKey("purchase_discount")} (-${Math.round(state.modifierFlags.purchase_discount * 100)}%)`,
+      );
     }
     if (itemType === "Hemp" && state.modifierFlags.hemp_price_reduction) {
       min = Math.max(0, min - state.modifierFlags.hemp_price_reduction);
       max = Math.max(0, max - state.modifierFlags.hemp_price_reduction);
-      modifiers.push(`${boonNameForModifierKey("hemp_price_reduction")} (-${state.modifierFlags.hemp_price_reduction}g/unit)`);
+      modifiers.push(
+        `${boonNameForModifierKey("hemp_price_reduction")} (-${state.modifierFlags.hemp_price_reduction}g/unit)`,
+      );
     }
     if (hasModule(state, "smugglers_hold")) {
       min = Math.floor(min * 0.85);
@@ -269,7 +355,8 @@ export function explainExpectedPrice(state: GameState, itemType: string): Expect
 // payment even though the hiring screen's own price looked discounted.
 export function getHireCost(state: GameState, type: string): number {
   let wage = WAGES[type];
-  if (state.modifierFlags.hire_discount) wage = Math.floor(wage * (1 - state.modifierFlags.hire_discount));
+  if (state.modifierFlags.hire_discount)
+    wage = Math.floor(wage * (1 - state.modifierFlags.hire_discount));
   if (hasModule(state, "artisans_workshop")) wage = Math.floor(wage * 1.2);
   return wage;
 }
@@ -280,7 +367,11 @@ export function getHireCost(state: GameState, type: string): number {
 // quantityOverride is only ever set by callBrokersFavor, letting a captain
 // choose exactly how much of a filtered good the guaranteed order asks for
 // instead of leaving it to the usual randInt roll below.
-function genRawOrder(rng: Rng, filter: string | null = null, quantityOverride?: number): Omit<OrderCard, "id"> {
+function genRawOrder(
+  rng: Rng,
+  filter: string | null = null,
+  quantityOverride?: number,
+): Omit<OrderCard, "id"> {
   const num = randInt(rng, 1, 3);
   const resources: { type: string; required: number }[] = [];
   const available = [...RESOURCES];
@@ -301,15 +392,38 @@ function genRawOrder(rng: Rng, filter: string | null = null, quantityOverride?: 
     }
   }
   const base = resources.reduce((s, r) => s + r.required * 5, 0);
-  return { demandPort: port, resources, reward: base + randInt(rng, 10, 25), totalItems: total, isProductOrder: false };
+  return {
+    demandPort: port,
+    resources,
+    reward: base + randInt(rng, 10, 25),
+    totalItems: total,
+    isProductOrder: false,
+  };
 }
 
-function genProductOrder(rng: Rng, filter: string | null = null, quantityOverride?: number): Omit<OrderCard, "id"> {
-  const product = filter && (PRODUCTS as readonly string[]).includes(filter) ? filter : pick(rng, PRODUCTS as readonly string[]);
+function genProductOrder(
+  rng: Rng,
+  filter: string | null = null,
+  quantityOverride?: number,
+): Omit<OrderCard, "id"> {
+  const product =
+    filter && (PRODUCTS as readonly string[]).includes(filter)
+      ? filter
+      : pick(rng, PRODUCTS as readonly string[]);
   const req = quantityOverride ?? randInt(rng, 1, 3);
   const port = pick(rng, PORTS as readonly string[]);
-  const basePrice = randInt(rng, PRODUCT_PRICES[product][0], PRODUCT_PRICES[product][1]);
-  return { demandPort: port, resources: [{ type: product, required: req }], reward: basePrice * req, totalItems: req, isProductOrder: true };
+  const basePrice = randInt(
+    rng,
+    PRODUCT_PRICES[product][0],
+    PRODUCT_PRICES[product][1],
+  );
+  return {
+    demandPort: port,
+    resources: [{ type: product, required: req }],
+    reward: basePrice * req,
+    totalItems: req,
+    isProductOrder: true,
+  };
 }
 
 // Deliberately a pure function of rng only. It used to also take `state`
@@ -345,7 +459,15 @@ function genProductPurchaseCard(rng: Rng): Omit<ResourceCard, "id"> {
   unitPrice = Math.max(min, Math.min(unitPrice, max));
   return {
     port,
-    resources: [{ type: product, quantity: qty, price: unitPrice, materialCost: matCost, materialDetails: details.join(" + ") }],
+    resources: [
+      {
+        type: product,
+        quantity: qty,
+        price: unitPrice,
+        materialCost: matCost,
+        materialDetails: details.join(" + "),
+      },
+    ],
     totalCost: unitPrice * qty,
     isProductCard: true,
   };
@@ -376,7 +498,9 @@ function genResourceCard(rng: Rng): Omit<ResourceCard, "id"> {
     const qty = randInt(rng, 1, 3);
     const [min, max] = COMMODITIES[chosen].basePrice;
     const base = randInt(rng, min, max);
-    const price = COMMODITIES[chosen].ports.includes(port) ? base - 1 : base + 1;
+    const price = COMMODITIES[chosen].ports.includes(port)
+      ? base - 1
+      : base + 1;
     resources.push({ type: chosen, quantity: qty, price });
   }
   const total = resources.reduce((s, r) => s + r.quantity * r.price, 0);
@@ -393,23 +517,35 @@ export function draftBoons(state: GameState): Boon[] {
     sachet_makers: state.sachetMakers,
   };
   const weightFuncs: Record<string, () => number> = {
-    silk_wind: () => (gs.inventory["Silk"] || 0) > 2 || gs.master_weavers.length > 0 ? 2.5 : 0.8,
+    silk_wind: () =>
+      (gs.inventory["Silk"] || 0) > 2 || gs.master_weavers.length > 0
+        ? 2.5
+        : 0.8,
     favorable_tides: () => 1.5,
     merchant_charm: () => (gs.money > 40 ? 2.0 : 0.5),
-    artisan_inspiration: () => (gs.weavers.length + gs.master_weavers.length + gs.sachet_makers.length > 0 ? 3.0 : 0.0),
+    artisan_inspiration: () =>
+      gs.weavers.length + gs.master_weavers.length + gs.sachet_makers.length > 0
+        ? 3.0
+        : 0.0,
     emergency_loan: () => (gs.money < 30 ? 4.0 : 0.2),
     tax_shelter: () => 1.5,
-    hemp_monopoly: () => (gs.inventory["Hemp"] || 0) < 5 || gs.weavers.length > 0 ? 2.0 : 1.0,
+    hemp_monopoly: () =>
+      (gs.inventory["Hemp"] || 0) < 5 || gs.weavers.length > 0 ? 2.0 : 1.0,
     master_apprentice: () => 1.5,
   };
-  const available = BOONS.map((b) => [b, weightFuncs[b.id]()] as [Boon, number]).filter(([, w]) => w > 0);
+  const available = BOONS.map(
+    (b) => [b, weightFuncs[b.id]()] as [Boon, number],
+  ).filter(([, w]) => w > 0);
   const picks: Boon[] = [];
   const pool = [...available];
   for (let i = 0; i < 3; i++) {
     if (!pool.length) break;
     const chosen = weightedPick(Math.random, pool);
     picks.push(chosen);
-    pool.splice(pool.findIndex((x) => x[0].id === chosen.id), 1);
+    pool.splice(
+      pool.findIndex((x) => x[0].id === chosen.id),
+      1,
+    );
   }
   return picks;
 }
@@ -429,7 +565,9 @@ export function purchaseCard(state: GameState, cardId: number, logs: string[]) {
   if (state.purchasedCards.includes(card.id)) return;
   const cost = getCardFinalCost(state, card);
   if (state.money < cost) {
-    logs.push(`❌ Insufficient funds! Need ${cost} Gold, Have ${state.money} Gold`);
+    logs.push(
+      `❌ Insufficient funds! Need ${cost} Gold, Have ${state.money} Gold`,
+    );
     return;
   }
   state.money -= cost;
@@ -445,9 +583,16 @@ export function purchaseCard(state: GameState, cardId: number, logs: string[]) {
     );
     logs.push("   💡 Tip: VAT applies when selling finished products");
   } else {
-    const txt = card.resources.map((r) => `${ICONS[r.type]}${r.type}×${r.quantity}(${r.price} Gold/item)`).join(" + ");
+    const txt = card.resources
+      .map(
+        (r) => `${ICONS[r.type]}${r.type}×${r.quantity}(${r.price} Gold/item)`,
+      )
+      .join(" + ");
     logs.push(`🛒 Bought at ${card.port}: ${txt}, Total ${cost} Gold`);
-    if (cost < card.totalCost) logs.push(`   ✨ Boon Discount Applied! Saved ${card.totalCost - cost} Gold`);
+    if (cost < card.totalCost)
+      logs.push(
+        `   ✨ Boon Discount Applied! Saved ${card.totalCost - cost} Gold`,
+      );
   }
   logs.push(`📊 Purchased ${state.purchaseCount} cargo batches`);
 }
@@ -460,11 +605,17 @@ export function purchaseCard(state: GameState, cardId: number, logs: string[]) {
 // pay out regardless of how large a quantity a captain asks for, instead of
 // needing to cap the quantity itself.
 export function brokersFavorCommission(reward: number): number {
-  const net = BROKERS_FAVOR_PAYOUT_CAP * (1 - Math.exp(-reward / BROKERS_FAVOR_PAYOUT_CAP));
+  const net =
+    BROKERS_FAVOR_PAYOUT_CAP *
+    (1 - Math.exp(-reward / BROKERS_FAVOR_PAYOUT_CAP));
   return Math.max(0, reward - Math.floor(net));
 }
 
-export function completeOrder(state: GameState, orderId: number, logs: string[]) {
+export function completeOrder(
+  state: GameState,
+  orderId: number,
+  logs: string[],
+) {
   const order = state.customerCards.find((o) => o.id === orderId);
   if (!order) return;
   if (state.completedOrders.includes(order.id)) return;
@@ -474,14 +625,20 @@ export function completeOrder(state: GameState, orderId: number, logs: string[])
       return;
     }
   }
-  const hasSilk = order.resources.some((r) => ["Silk", "Brocade", "Sachet", "Cotton Clothes"].includes(r.type));
+  const hasSilk = order.resources.some((r) =>
+    ["Silk", "Brocade", "Sachet", "Cotton Clothes"].includes(r.type),
+  );
   let transport = calcTransportCost(state, order.totalItems, hasSilk);
   for (const r of order.resources) state.inventory[r.type] -= r.required!;
   let reward = order.reward;
   let totalVat = 0;
   if (order.isProductOrder) {
     const product = order.resources[0].type;
-    const unitVat = calcVAT(state, product, reward / order.resources[0].required!);
+    const unitVat = calcVAT(
+      state,
+      product,
+      reward / order.resources[0].required!,
+    );
     totalVat = unitVat * order.resources[0].required!;
     reward -= totalVat;
     state.vatPaid += totalVat;
@@ -516,7 +673,8 @@ export function completeOrder(state: GameState, orderId: number, logs: string[])
   if (order.isBrokerFavor) {
     const commission = brokersFavorCommission(order.reward);
     reward -= commission;
-    const pct = order.reward > 0 ? Math.round((commission / order.reward) * 100) : 0;
+    const pct =
+      order.reward > 0 ? Math.round((commission / order.reward) * 100) : 0;
     logs.push(`🤝 Broker's Commission (${pct}%): ${commission} Gold`);
   }
   state.money += reward;
@@ -525,9 +683,13 @@ export function completeOrder(state: GameState, orderId: number, logs: string[])
   state.score += Math.floor(reward - transport);
   state.completedOrders.push(order.id);
   state.orderCount++;
-  const txt = order.resources.map((r) => `${ICONS[r.type]}${r.type}×${r.required}`).join(" + ");
+  const txt = order.resources
+    .map((r) => `${ICONS[r.type]}${r.type}×${r.required}`)
+    .join(" + ");
   logs.push(`📦 Completed Order at ${order.demandPort}: ${txt}`);
-  logs.push(`   💰 Reward: ${reward} Gold · ⚓ Freight: ${transport} Gold = 📊 Net Profit: ${reward - transport} Gold`);
+  logs.push(
+    `   💰 Reward: ${reward} Gold · ⚓ Freight: ${transport} Gold = 📊 Net Profit: ${reward - transport} Gold`,
+  );
   logs.push(`📊 Completed ${state.orderCount} transactions`);
 }
 
@@ -542,10 +704,17 @@ export function completeOrder(state: GameState, orderId: number, logs: string[])
 // usual 1-3/2-5 order range, since brokersFavorCommission (see
 // completeOrder) is what keeps an oversized ask from paying out too much,
 // not a quantity limit.
-export function callBrokersFavor(state: GameState, item: string, quantity: number, logs: string[]) {
+export function callBrokersFavor(
+  state: GameState,
+  item: string,
+  quantity: number,
+  logs: string[],
+) {
   if (state.phase !== 2) return;
   if (state.renownLevel < BROKERS_FAVOR_UNLOCK_LEVEL) {
-    logs.push(`❌ Broker's Favor unlocks at Renown Level ${BROKERS_FAVOR_UNLOCK_LEVEL}`);
+    logs.push(
+      `❌ Broker's Favor unlocks at Renown Level ${BROKERS_FAVOR_UNLOCK_LEVEL}`,
+    );
     return;
   }
   if (state.brokersFavorUsed) {
@@ -569,11 +738,16 @@ export function callBrokersFavor(state: GameState, item: string, quantity: numbe
     return;
   }
   const localRng: Rng = Math.random;
-  const order = isRaw ? genRawOrder(localRng, item, qty) : genProductOrder(localRng, item, qty);
-  const nextId = state.customerCards.reduce((m, c) => Math.max(m, c.id), -1) + 1;
+  const order = isRaw
+    ? genRawOrder(localRng, item, qty)
+    : genProductOrder(localRng, item, qty);
+  const nextId =
+    state.customerCards.reduce((m, c) => Math.max(m, c.id), -1) + 1;
   state.customerCards.push({ id: nextId, ...order, isBrokerFavor: true });
   state.brokersFavorUsed = true;
-  const txt = order.resources.map((r) => `${ICONS[r.type]}${r.type}×${r.required}`).join(" + ");
+  const txt = order.resources
+    .map((r) => `${ICONS[r.type]}${r.type}×${r.required}`)
+    .join(" + ");
   logs.push(
     `🤝 Broker's Favor called in: a buyer at ${order.demandPort} now wants ${txt}. The bigger the ask, the bigger the Broker's cut.`,
   );
@@ -585,20 +759,51 @@ export function hireWorker(state: GameState, type: string, logs: string[]) {
     logs.push("❌ Insufficient funds to hire workers!");
     return;
   }
-  const names: Record<string, string> = { weaver: "Weaver", master: "Master Weaver", sachet_maker: "Sachet Maker" };
-  const icons: Record<string, string> = { weaver: "👩‍🔧", master: "👩‍🎨", sachet_maker: "🌸" };
-  const list = type === "weaver" ? state.weavers : type === "master" ? state.masterWeavers : state.sachetMakers;
+  const names: Record<string, string> = {
+    weaver: "Weaver",
+    master: "Master Weaver",
+    sachet_maker: "Sachet Maker",
+  };
+  const icons: Record<string, string> = {
+    weaver: "👩‍🔧",
+    master: "👩‍🎨",
+    sachet_maker: "🌸",
+  };
+  const list =
+    type === "weaver"
+      ? state.weavers
+      : type === "master"
+        ? state.masterWeavers
+        : state.sachetMakers;
   list.push({ task: null, progress: 0, producedCount: 0, isSkilled: false });
-  logs.push(`${icons[type]} Hired a ${names[type]}! Wage: ${wage} Gold / Round (paid at round end)`);
+  logs.push(
+    `${icons[type]} Hired a ${names[type]}! Wage: ${wage} Gold / Round (paid at round end)`,
+  );
 }
 
-export function fireWorker(state: GameState, type: string, idx: number, logs: string[]) {
-  const list = type === "weaver" ? state.weavers : type === "master" ? state.masterWeavers : state.sachetMakers;
+export function fireWorker(
+  state: GameState,
+  type: string,
+  idx: number,
+  logs: string[],
+) {
+  const list =
+    type === "weaver"
+      ? state.weavers
+      : type === "master"
+        ? state.masterWeavers
+        : state.sachetMakers;
   const wage = WAGES[type];
-  const names: Record<string, string> = { weaver: "Weaver", master: "Master Weaver", sachet_maker: "Sachet Maker" };
+  const names: Record<string, string> = {
+    weaver: "Weaver",
+    master: "Master Weaver",
+    sachet_maker: "Sachet Maker",
+  };
   if (idx < 0 || idx >= list.length) return;
   if (state.money < wage) {
-    logs.push(`❌ Insufficient funds for ${names[type]}'s severance: ${wage} Gold`);
+    logs.push(
+      `❌ Insufficient funds for ${names[type]}'s severance: ${wage} Gold`,
+    );
     return;
   }
   state.money -= wage;
@@ -607,8 +812,18 @@ export function fireWorker(state: GameState, type: string, idx: number, logs: st
   if (worker.task) logs.push(`  This worker was making: ${worker.task}`);
 }
 
-export function assignTask(state: GameState, type: string, task: string, logs: string[]) {
-  const list = type === "weaver" ? state.weavers : type === "master" ? state.masterWeavers : state.sachetMakers;
+export function assignTask(
+  state: GameState,
+  type: string,
+  task: string,
+  logs: string[],
+) {
+  const list =
+    type === "weaver"
+      ? state.weavers
+      : type === "master"
+        ? state.masterWeavers
+        : state.sachetMakers;
   const recipe = RECIPES[task];
   for (const worker of list) {
     if (worker.task === null) {
@@ -622,7 +837,8 @@ export function assignTask(state: GameState, type: string, task: string, logs: s
         logs.push(`❌ Material shortage to produce ${task}!`);
         return;
       }
-      for (const [m, a] of Object.entries(recipe.materials)) state.inventory[m] -= a;
+      for (const [m, a] of Object.entries(recipe.materials))
+        state.inventory[m] -= a;
       worker.task = task;
       worker.progress = 0;
       const matTxt = Object.entries(recipe.materials)
@@ -637,11 +853,12 @@ export function assignTask(state: GameState, type: string, task: string, logs: s
 
 export function processProduction(state: GameState, logs: string[]) {
   const bonus = state.modifierFlags.worker_bonus_production || 0;
-  const allLists: { list: GameState["weavers"]; name: string; type: string }[] = [
-    { list: state.weavers, name: "Weaver", type: "weaver" },
-    { list: state.masterWeavers, name: "Master", type: "master" },
-    { list: state.sachetMakers, name: "Maker", type: "sachet_maker" },
-  ];
+  const allLists: { list: GameState["weavers"]; name: string; type: string }[] =
+    [
+      { list: state.weavers, name: "Weaver", type: "weaver" },
+      { list: state.masterWeavers, name: "Master", type: "master" },
+      { list: state.sachetMakers, name: "Maker", type: "sachet_maker" },
+    ];
   for (const { list, name } of allLists) {
     for (const w of list) {
       if (w.task) {
@@ -650,8 +867,14 @@ export function processProduction(state: GameState, logs: string[]) {
         if (hasModule(state, "artisans_workshop")) amt += 1;
         state.inventory[w.task] = (state.inventory[w.task] || 0) + amt;
         w.producedCount = (w.producedCount || 0) + amt;
-        if (amt > base) logs.push(`✅ Skilled ${name} finished ${amt}× ${ICONS[w.task]}${w.task}! (Boon Bonus)`);
-        else if (w.isSkilled) logs.push(`✅ Skilled ${name} finished 2× ${ICONS[w.task]}${w.task}!`);
+        if (amt > base)
+          logs.push(
+            `✅ Skilled ${name} finished ${amt}× ${ICONS[w.task]}${w.task}! (Boon Bonus)`,
+          );
+        else if (w.isSkilled)
+          logs.push(
+            `✅ Skilled ${name} finished 2× ${ICONS[w.task]}${w.task}!`,
+          );
         else logs.push(`✅ ${name} finished ${ICONS[w.task]}${w.task}!`);
         if (w.producedCount >= 2 && !w.isSkilled) {
           w.isSkilled = true;
@@ -664,9 +887,13 @@ export function processProduction(state: GameState, logs: string[]) {
   }
 }
 
-export function payWages(state: GameState, logs: string[]): true | "bankruptcy" {
+export function payWages(
+  state: GameState,
+  logs: string[],
+): true | "bankruptcy" {
   let total = 0;
-  const countWorkers = (list: GameState["weavers"], type: string) => list.length * getHireCost(state, type);
+  const countWorkers = (list: GameState["weavers"], type: string) =>
+    list.length * getHireCost(state, type);
   const ww = countWorkers(state.weavers, "weaver");
   const mw = countWorkers(state.masterWeavers, "master");
   const sw = countWorkers(state.sachetMakers, "sachet_maker");
@@ -676,18 +903,32 @@ export function payWages(state: GameState, logs: string[]): true | "bankruptcy" 
     state.money -= total;
     state.workerWages += total;
     state.roundCosts += total;
-    if (ww > 0) logs.push(`💰 Paid wages for ${state.weavers.length} Weavers: ${ww} Gold`);
-    if (mw > 0) logs.push(`💰 Paid wages for ${state.masterWeavers.length} Masters: ${mw} Gold`);
-    if (sw > 0) logs.push(`💰 Paid wages for ${state.sachetMakers.length} Makers: ${sw} Gold`);
+    if (ww > 0)
+      logs.push(
+        `💰 Paid wages for ${state.weavers.length} Weavers: ${ww} Gold`,
+      );
+    if (mw > 0)
+      logs.push(
+        `💰 Paid wages for ${state.masterWeavers.length} Masters: ${mw} Gold`,
+      );
+    if (sw > 0)
+      logs.push(
+        `💰 Paid wages for ${state.sachetMakers.length} Makers: ${sw} Gold`,
+      );
     return true;
   }
-  logs.push(`⚠️ Insufficient funds! Needed: ${total} Gold, Have: ${state.money} Gold`);
+  logs.push(
+    `⚠️ Insufficient funds! Needed: ${total} Gold, Have: ${state.money} Gold`,
+  );
   logs.push("💥 Could not pay wages, workers strike...");
   logs.push("💥 Reputation collapsed, forced bankruptcy!");
   return "bankruptcy";
 }
 
-export function payMaintenance(state: GameState, logs: string[]): true | "bankruptcy" {
+export function payMaintenance(
+  state: GameState,
+  logs: string[],
+): true | "bankruptcy" {
   const cost = state.fixedCost + state.maintenancePenalty;
   if (state.money >= cost) {
     state.money -= cost;
@@ -713,7 +954,8 @@ export function payMaintenance(state: GameState, logs: string[]): true | "bankru
 export function endRound(state: GameState, logs: string[]) {
   logs.push(`\n📊=== Round ${state.currentRound} Settlement ===`);
   logs.push(`💰 Revenue this round: ${state.roundRevenue} Gold`);
-  const totalCost = state.roundCosts + state.maintenanceCosts + state.workerWages;
+  const totalCost =
+    state.roundCosts + state.maintenanceCosts + state.workerWages;
   logs.push(`💸 Total Cost this round: ${totalCost} Gold`);
   logs.push(`   🔧 Maintenance: ${state.maintenanceCosts} Gold`);
   logs.push(`   📦 Materials: ${state.materialCosts} Gold`);
@@ -727,7 +969,8 @@ export function endRound(state: GameState, logs: string[]) {
     const rate = (state.modifierFlags.income_tax_override || 0.1) * 100;
     logs.push(`🏛️ Income Tax Paid (${rate.toFixed(0)}%): ${tax} Gold`);
   } else logs.push("🏛️ No profit, no income tax due");
-  if (state.vatPaid > 0) logs.push(`🧾 VAT Paid this round: ${state.vatPaid} Gold`);
+  if (state.vatPaid > 0)
+    logs.push(`🧾 VAT Paid this round: ${state.vatPaid} Gold`);
 
   state.modifierFlags = {};
   state.phase2DemandTags = [];
@@ -766,28 +1009,41 @@ export function purchaseIntel(state: GameState, logs: string[]) {
   const count = hasModule(state, "brokers_network") ? 2 : 1;
   for (let i = 0; i < count; i++) {
     if (!state.phase2DemandTags.length) break;
-    const item = state.phase2DemandTags[Math.floor(Math.random() * state.phase2DemandTags.length)];
+    const item =
+      state.phase2DemandTags[
+        Math.floor(Math.random() * state.phase2DemandTags.length)
+      ];
     state.phase2DemandTags.splice(state.phase2DemandTags.indexOf(item), 1);
     const port = PORTS[Math.floor(Math.random() * PORTS.length)];
     state.revealedIntel.push({ item, port });
-    logs.push(`🗣️ Broker's Whisper: 'Word from ${port}: High demand for ${item}!'`);
+    logs.push(
+      `🗣️ Broker's Whisper: 'Word from ${port}: High demand for ${item}!'`,
+    );
     state.money -= state.intelCost;
   }
 }
 
 export function upgradeShip(state: GameState, logs: string[]) {
   if (state.shipLevel >= 3) return;
-  const cost = state.shipUpgradeCost[state.shipLevel] + state.shipUpgradePenalty;
+  const cost =
+    state.shipUpgradeCost[state.shipLevel] + state.shipUpgradePenalty;
   if (state.money < cost) {
     logs.push(`❌ Need ${cost} Gold to upgrade the ship`);
     return;
   }
   state.money -= cost;
   state.shipLevel++;
-  logs.push(`🎉 Ship Upgraded to Level ${state.shipLevel}! +1 Module Slot, +5 Discount`);
+  logs.push(
+    `🎉 Ship Upgraded to Level ${state.shipLevel}! +1 Module Slot, +5 Discount`,
+  );
 }
 
-export function equipModule(state: GameState, mod: Module, swapIdx: number | null, logs: string[]) {
+export function equipModule(
+  state: GameState,
+  mod: Module,
+  swapIdx: number | null,
+  logs: string[],
+) {
   if (swapIdx !== null) {
     const old = state.equippedModules[swapIdx];
     if (old.id === "bulk_hauler") state.shipUpgradePenalty -= 15;
@@ -850,7 +1106,12 @@ export function swapBoonChoices(state: GameState, logs: string[]) {
   logs.push("🔄 Swapped Boon Choices for 10 Gold");
 }
 
-export function selectBoon(state: GameState, ctx: GameContext, boonId: string, logs: string[]) {
+export function selectBoon(
+  state: GameState,
+  ctx: GameContext,
+  boonId: string,
+  logs: string[],
+) {
   const boon = BOONS.find((b) => b.id === boonId);
   if (!boon) return;
   logs.push(`🧭 Boon Locked In: ${boon.icon} ${boon.name}`);
@@ -859,13 +1120,19 @@ export function selectBoon(state: GameState, ctx: GameContext, boonId: string, l
   startPhase1(state, ctx, logs);
 }
 
-export function startPhase1(state: GameState, ctx: GameContext, logs: string[]) {
+export function startPhase1(
+  state: GameState,
+  ctx: GameContext,
+  logs: string[],
+) {
   state.phase = 1;
   state.purchaseCount = 0;
   state.purchasedCards = [];
   state.phase2DemandTags = [];
   // [ONLINE] Deterministic intel pool per (room, round).
-  const intelRng = createRng(`${ctx.seedBase}:V${state.voyageEpoch}:R${state.currentRound}:intel`);
+  const intelRng = createRng(
+    `${ctx.seedBase}:V${state.voyageEpoch}:R${state.currentRound}:intel`,
+  );
   const allItems = [...RESOURCES, ...PRODUCTS];
   for (let i = 0; i < 5; i++) {
     let t = pick(intelRng, allItems as readonly string[]);
@@ -875,7 +1142,9 @@ export function startPhase1(state: GameState, ctx: GameContext, logs: string[]) 
   logs.push(`\n⚓=== Round ${state.currentRound} · Phase 1: Port Purchase ===`);
   logs.push(`💰 Current Funds: ${state.money} Gold`);
   // [ONLINE] Deterministic port market per (room, round).
-  const marketRng = createRng(`${ctx.seedBase}:V${state.voyageEpoch}:R${state.currentRound}:market`);
+  const marketRng = createRng(
+    `${ctx.seedBase}:V${state.voyageEpoch}:R${state.currentRound}:market`,
+  );
   state.resourceCards = [];
   for (let i = 0; i < PURCHASE_CARD_COUNT; i++) {
     state.resourceCards.push({ id: i, ...genResourceCard(marketRng) });
@@ -906,7 +1175,12 @@ export function postBarterOffer(
     logs.push("❌ Can't barter an item for itself");
     return false;
   }
-  if (!Number.isInteger(offerAmount) || !Number.isInteger(requestAmount) || offerAmount < 1 || requestAmount < 1) {
+  if (
+    !Number.isInteger(offerAmount) ||
+    !Number.isInteger(requestAmount) ||
+    offerAmount < 1 ||
+    requestAmount < 1
+  ) {
     logs.push("❌ Barter amounts must be whole numbers of at least 1");
     return false;
   }
@@ -916,13 +1190,20 @@ export function postBarterOffer(
     return false;
   }
   addOwnedAmount(state, offerItem, -offerAmount);
-  logs.push(`🤝 Posted a barter offer: ${offerAmount} ${offerItem} for ${requestAmount} ${requestItem}`);
+  logs.push(
+    `🤝 Posted a barter offer: ${offerAmount} ${offerItem} for ${requestAmount} ${requestItem}`,
+  );
   return true;
 }
 
 // Returns an escrowed offer to its owner: a canceled offer, or one swept
 // up unaccepted when the bartering phase ends.
-export function refundBarterOffer(state: GameState, offerItem: string, offerAmount: number, logs: string[]) {
+export function refundBarterOffer(
+  state: GameState,
+  offerItem: string,
+  offerAmount: number,
+  logs: string[],
+) {
   addOwnedAmount(state, offerItem, offerAmount);
   logs.push(`↩️ Barter offer withdrawn, ${offerAmount} ${offerItem} returned`);
 }
@@ -941,38 +1222,65 @@ export function acceptBarterOffer(
 ): boolean {
   const owned = getOwnedAmount(state, requestItem);
   if (requestAmount > owned) {
-    logs.push(`❌ Can't pay ${requestAmount} ${requestItem}, only have ${owned}`);
+    logs.push(
+      `❌ Can't pay ${requestAmount} ${requestItem}, only have ${owned}`,
+    );
     return false;
   }
   addOwnedAmount(state, requestItem, -requestAmount);
   addOwnedAmount(state, offerItem, offerAmount);
-  logs.push(`🤝 Traded ${requestAmount} ${requestItem} for ${offerAmount} ${offerItem}`);
+  logs.push(
+    `🤝 Traded ${requestAmount} ${requestItem} for ${offerAmount} ${offerItem}`,
+  );
   return true;
 }
 
 // The posting side of a completed trade: the offered item was already
 // escrowed away in postBarterOffer, so all that's left is to receive
 // whatever was requested in return.
-export function settleBarterTrade(state: GameState, requestItem: string, requestAmount: number, logs: string[]) {
+export function settleBarterTrade(
+  state: GameState,
+  requestItem: string,
+  requestAmount: number,
+  logs: string[],
+) {
   addOwnedAmount(state, requestItem, requestAmount);
-  logs.push(`🤝 Barter offer accepted, received ${requestAmount} ${requestItem}`);
+  logs.push(
+    `🤝 Barter offer accepted, received ${requestAmount} ${requestItem}`,
+  );
 }
 
-export function completeBarterPhase(state: GameState, refunds: { item: string; amount: number }[], logs: string[]) {
+export function completeBarterPhase(
+  state: GameState,
+  refunds: { item: string; amount: number }[],
+  logs: string[],
+) {
   for (const r of refunds) refundBarterOffer(state, r.item, r.amount, logs);
-  logs.push(refunds.length ? "✅ Bartering ended, unmatched offers returned" : "⏭️ Bartering ended");
+  logs.push(
+    refunds.length
+      ? "✅ Bartering ended, unmatched offers returned"
+      : "⏭️ Bartering ended",
+  );
   state.phase = "worker_mgmt";
 }
 
-export function startPhase2(state: GameState, ctx: GameContext, logs: string[]) {
+export function startPhase2(
+  state: GameState,
+  ctx: GameContext,
+  logs: string[],
+) {
   state.phase = 2;
   state.orderCount = 0;
   state.completedOrders = [];
-  logs.push(`\n🤝=== Round ${state.currentRound} · Phase 2: Trade Transaction ===`);
+  logs.push(
+    `\n🤝=== Round ${state.currentRound} · Phase 2: Trade Transaction ===`,
+  );
   // [ONLINE] Deterministic trade orders per (room, round): every captain
   // in the room independently derives the identical base ORDER_CARD_COUNT
   // orders here, since this loop never reads anything captain specific.
-  const orderRng = createRng(`${ctx.seedBase}:V${state.voyageEpoch}:R${state.currentRound}:orders`);
+  const orderRng = createRng(
+    `${ctx.seedBase}:V${state.voyageEpoch}:R${state.currentRound}:orders`,
+  );
   state.customerCards = [];
   for (let i = 0; i < ORDER_CARD_COUNT; i++) {
     state.customerCards.push({ id: i, ...genMixedOrder(orderRng) });
@@ -986,7 +1294,10 @@ export function startPhase2(state: GameState, ctx: GameContext, logs: string[]) 
   // this at one guarantee per round no matter how many rumors a captain
   // had revealed (Broker's Network reveals two per purchase), so the
   // second rumor's "guaranteed" order silently never appeared.
-  const guaranteedCount = Math.min(state.revealedIntel.length, state.customerCards.length);
+  const guaranteedCount = Math.min(
+    state.revealedIntel.length,
+    state.customerCards.length,
+  );
   for (let i = 0; i < guaranteedCount; i++) {
     const intel = state.revealedIntel[i];
     const localRng: Rng = Math.random;
@@ -1039,7 +1350,9 @@ export function hireEscort(state: GameState, logs: string[]) {
   state.money -= cost;
   state.escortHired = true;
   state.pirateAttackResolved = true;
-  logs.push(`🛡️ Hired an escort for ${cost} Gold. Safe passage guaranteed this round.`);
+  logs.push(
+    `🛡️ Hired an escort for ${cost} Gold. Safe passage guaranteed this round.`,
+  );
 }
 
 // Pays wages then maintenance in one confirmed step (the financial aid
@@ -1056,7 +1369,9 @@ export function finishSettlement(state: GameState, logs: string[]) {
     state.phase = "bankruptcy";
     return;
   }
-  logs.push(`\n🔧=== Round ${state.currentRound} · Phase 3: Ship Maintenance ===`);
+  logs.push(
+    `\n🔧=== Round ${state.currentRound} · Phase 3: Ship Maintenance ===`,
+  );
   const maintResult = payMaintenance(state, logs);
   if (maintResult === "bankruptcy") {
     state.gameOver = true;
@@ -1079,20 +1394,44 @@ export function receiveLoan(
   logs: string[],
 ) {
   state.money += loan.amount;
-  state.debts.push({ id: loan.id, counterpartyId: loan.fromUserId, counterpartyName: loan.fromName, amount: loan.amount, roundBorrowed: state.currentRound });
-  logs.push(`🆘 ${loan.fromName} lent you ${loan.amount} Gold. Repay it before the voyage ends, or it's deducted automatically.`);
+  state.debts.push({
+    id: loan.id,
+    counterpartyId: loan.fromUserId,
+    counterpartyName: loan.fromName,
+    amount: loan.amount,
+    roundBorrowed: state.currentRound,
+  });
+  logs.push(
+    `🆘 ${loan.fromName} lent you ${loan.amount} Gold. Repay it before the voyage ends, or it's deducted automatically.`,
+  );
 }
 
 export function grantLoan(
   state: GameState,
-  loan: { id: string; borrowerId: string; borrowerName: string; amount: number },
+  loan: {
+    id: string;
+    borrowerId: string;
+    borrowerName: string;
+    amount: number;
+  },
   logs: string[],
 ) {
   state.money -= loan.amount;
-  state.loansGiven.push({ id: loan.id, counterpartyId: loan.borrowerId, counterpartyName: loan.borrowerName, amount: loan.amount, roundBorrowed: state.currentRound });
-  const repGain = Math.max(1, Math.floor(loan.amount * AID_REPUTATION_PER_GOLD));
+  state.loansGiven.push({
+    id: loan.id,
+    counterpartyId: loan.borrowerId,
+    counterpartyName: loan.borrowerName,
+    amount: loan.amount,
+    roundBorrowed: state.currentRound,
+  });
+  const repGain = Math.max(
+    1,
+    Math.floor(loan.amount * AID_REPUTATION_PER_GOLD),
+  );
   state.score += repGain;
-  logs.push(`🤝 Lent ${loan.borrowerName} ${loan.amount} Gold. Reputation +${repGain} for helping a fellow captain.`);
+  logs.push(
+    `🤝 Lent ${loan.borrowerName} ${loan.amount} Gold. Reputation +${repGain} for helping a fellow captain.`,
+  );
 }
 
 // Voluntary, captain-initiated repayment. The caller (GameRoom.tsx) reads
@@ -1103,7 +1442,9 @@ export function repayLoan(state: GameState, debtId: string, logs: string[]) {
   const debt = state.debts.find((d) => d.id === debtId);
   if (!debt) return;
   if (state.money < debt.amount) {
-    logs.push(`❌ Need ${debt.amount} Gold to repay ${debt.counterpartyName}, have ${state.money}`);
+    logs.push(
+      `❌ Need ${debt.amount} Gold to repay ${debt.counterpartyName}, have ${state.money}`,
+    );
     return;
   }
   state.money -= debt.amount;
@@ -1113,7 +1454,13 @@ export function repayLoan(state: GameState, debtId: string, logs: string[]) {
 
 // The lender's side of either a voluntary repayment or a forced one (see
 // settleOutstandingDebts below); both arrive the same way, over aid:repay.
-export function receiveRepayment(state: GameState, debtId: string, amount: number, fromName: string, logs: string[]) {
+export function receiveRepayment(
+  state: GameState,
+  debtId: string,
+  amount: number,
+  fromName: string,
+  logs: string[],
+) {
   state.loansGiven = state.loansGiven.filter((l) => l.id !== debtId);
   state.money += amount;
   logs.push(`💰 ${fromName} repaid you ${amount} Gold`);
@@ -1128,25 +1475,45 @@ export function receiveRepayment(state: GameState, debtId: string, amount: numbe
 export function settleOutstandingDebts(state: GameState, logs: string[]) {
   if (!state.debts.length) return;
   logs.push("\n📋=== Settling Outstanding Loans ===");
-  const settlements: { lenderId: string; lenderName: string; amount: number; debtId: string }[] = [];
+  const settlements: {
+    lenderId: string;
+    lenderName: string;
+    amount: number;
+    debtId: string;
+  }[] = [];
   for (const debt of state.debts) {
     const paid = Math.min(state.money, debt.amount);
     state.money -= paid;
-    if (paid > 0) settlements.push({ lenderId: debt.counterpartyId, lenderName: debt.counterpartyName, amount: paid, debtId: debt.id });
+    if (paid > 0)
+      settlements.push({
+        lenderId: debt.counterpartyId,
+        lenderName: debt.counterpartyName,
+        amount: paid,
+        debtId: debt.id,
+      });
     if (paid < debt.amount) {
       state.defaultedDebt = true;
-      logs.push(`⚠️ Could not fully repay ${debt.counterpartyName}: paid ${paid} of ${debt.amount} Gold owed`);
+      logs.push(
+        `⚠️ Could not fully repay ${debt.counterpartyName}: paid ${paid} of ${debt.amount} Gold owed`,
+      );
     } else {
-      logs.push(`💰 Settled outstanding loan to ${debt.counterpartyName}: ${paid} Gold`);
+      logs.push(
+        `💰 Settled outstanding loan to ${debt.counterpartyName}: ${paid} Gold`,
+      );
     }
   }
   state.debts = [];
-  state._pendingDebtSettlements = [...(state._pendingDebtSettlements ?? []), ...settlements];
+  state._pendingDebtSettlements = [
+    ...(state._pendingDebtSettlements ?? []),
+    ...settlements,
+  ];
 }
 
 export function startPhase4(state: GameState, logs: string[]) {
   state.phase = 4;
-  logs.push(`\n🚢=== Round ${state.currentRound} · Phase 4: Shipyard & Modules ===`);
+  logs.push(
+    `\n🚢=== Round ${state.currentRound} · Phase 4: Shipyard & Modules ===`,
+  );
 }
 
 export function skipUpgrade(state: GameState, logs: string[]) {
@@ -1162,7 +1529,10 @@ export function skipUpgrade(state: GameState, logs: string[]) {
 // MERCHANT_RATINGS is ordered highest threshold first, so the first
 // match scanning down the list is always the correct tier.
 export function merchantRatingForScore(score: number): MerchantRating {
-  return MERCHANT_RATINGS.find((r) => score >= r.minScore) ?? MERCHANT_RATINGS[MERCHANT_RATINGS.length - 1];
+  return (
+    MERCHANT_RATINGS.find((r) => score >= r.minScore) ??
+    MERCHANT_RATINGS[MERCHANT_RATINGS.length - 1]
+  );
 }
 
 export function endGame(state: GameState, logs: string[]) {
@@ -1184,8 +1554,18 @@ export function endGame(state: GameState, logs: string[]) {
   logs.push("=".repeat(50));
 }
 
-export function restartGame(state: GameState, logs: string[], startingGoldBonus: number = 0, renownLevel: number = 1, voyageEpoch: number = 0) {
-  const fresh = createInitialGameState(startingGoldBonus, renownLevel, voyageEpoch);
+export function restartGame(
+  state: GameState,
+  logs: string[],
+  startingGoldBonus: number = 0,
+  renownLevel: number = 1,
+  voyageEpoch: number = 0,
+) {
+  const fresh = createInitialGameState(
+    startingGoldBonus,
+    renownLevel,
+    voyageEpoch,
+  );
   Object.assign(state, fresh);
   logs.length = 0;
   showWelcome(state, logs);
@@ -1218,7 +1598,9 @@ export function nextPhase(state: GameState, ctx: GameContext, logs: string[]) {
 
 // ---------- Module drafting ----------
 function rollModuleChoices(state: GameState): Module[] {
-  const available = MODULES.filter((m) => !state.equippedModules.some((eq) => eq.id === m.id));
+  const available = MODULES.filter(
+    (m) => !state.equippedModules.some((eq) => eq.id === m.id),
+  );
   const pool = available.length >= 3 ? available : MODULES;
   const picks: Module[] = [];
   const copy = [...pool];
@@ -1259,7 +1641,11 @@ export function swapModuleChoices(state: GameState, logs: string[]) {
   logs.push("🔄 Swapped Module Choices for a fresh batch");
 }
 
-export function handleModuleSelect(state: GameState, idx: number, logs: string[]) {
+export function handleModuleSelect(
+  state: GameState,
+  idx: number,
+  logs: string[],
+) {
   const mod = state._draftChoices?.[idx];
   if (!mod) return;
   if (state.equippedModules.length < state.shipLevel) {
@@ -1282,11 +1668,17 @@ export function handleModuleSelect(state: GameState, idx: number, logs: string[]
 // to give up for it. Only here, not at the initial pick above, does the
 // chosen draft option actually leave the pool, since backing out with
 // "Back to Draft" up to this point should still offer it.
-export function finalizeModuleSwap(state: GameState, slotIdx: number, logs: string[]) {
+export function finalizeModuleSwap(
+  state: GameState,
+  slotIdx: number,
+  logs: string[],
+) {
   const mod = state._newModule;
   if (!mod) return;
   equipModule(state, mod, slotIdx, logs);
-  state._draftChoices = (state._draftChoices ?? []).filter((m) => m.id !== mod.id);
+  state._draftChoices = (state._draftChoices ?? []).filter(
+    (m) => m.id !== mod.id,
+  );
   state._newModule = undefined;
   state.phase = 4;
 }
@@ -1298,7 +1690,13 @@ export function finalizeModuleSwap(state: GameState, slotIdx: number, logs: stri
 // the same setup calls a normal transition would, just once, up front, so
 // a fresh captain lands on a fully-formed phase (cards generated, etc.)
 // instead of an empty one.
-export function snapToCheckpoint(state: GameState, ctx: GameContext, round: number, phaseStr: string, logs: string[]): void {
+export function snapToCheckpoint(
+  state: GameState,
+  ctx: GameContext,
+  round: number,
+  phaseStr: string,
+  logs: string[],
+): void {
   state.currentRound = round;
   switch (phaseStr) {
     case "5":
@@ -1331,7 +1729,10 @@ export function snapToCheckpoint(state: GameState, ctx: GameContext, round: numb
 // panel and the player detail popup). Takes just the two fields it needs
 // rather than a full GameState so it can also describe the lighter-weight
 // snapshot used for someone else's detail popup.
-export function phaseLabel(state: { phase: GameState["phase"]; currentRound: GameState["currentRound"] }): string {
+export function phaseLabel(state: {
+  phase: GameState["phase"];
+  currentRound: GameState["currentRound"];
+}): string {
   switch (state.phase) {
     case 0:
       return "In Harbor";

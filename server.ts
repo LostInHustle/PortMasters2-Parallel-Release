@@ -23,6 +23,8 @@ app.prepare().then(() => {
   attachRealtime(httpServer);
 
   httpServer.listen(port, () => {
-    console.log(`> PortMasters 2 Parallel Release ready on http://localhost:${port}`);
+    console.log(
+      `> PortMasters 2 Parallel Release ready on http://localhost:${port}`,
+    );
   });
 });

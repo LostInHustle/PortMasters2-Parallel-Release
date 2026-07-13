@@ -30,8 +30,14 @@ export type PlayerDetailData = {
  * when someone actually does. Handles both directions: requesting
  * someone else's detail, and answering when someone asks for "my own."
  */
-export function usePlayerDetail(socket: Socket | null, roomId: string, myDetail: () => PlayerDetailData) {
-  const [detail, setDetail] = useState<Record<string, PlayerDetailData | null>>({});
+export function usePlayerDetail(
+  socket: Socket | null,
+  roomId: string,
+  myDetail: () => PlayerDetailData,
+) {
+  const [detail, setDetail] = useState<Record<string, PlayerDetailData | null>>(
+    {},
+  );
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const myDetailRef = useRef(myDetail);
   useEffect(() => {
@@ -43,7 +49,11 @@ export function usePlayerDetail(socket: Socket | null, roomId: string, myDetail:
 
     // The server only relays this to the sockets it's actually about, so
     // receiving it at all means someone is asking for our own snapshot.
-    const onRequest = (data: { roomId: string; targetUserId: string; requesterId: string }) => {
+    const onRequest = (data: {
+      roomId: string;
+      targetUserId: string;
+      requesterId: string;
+    }) => {
       if (data.roomId !== roomId) return;
       socket.emit("player:detail:response", {
         roomId,
@@ -52,7 +62,11 @@ export function usePlayerDetail(socket: Socket | null, roomId: string, myDetail:
         data: myDetailRef.current(),
       });
     };
-    const onResponse = (data: { roomId: string; targetUserId: string; data: PlayerDetailData | null }) => {
+    const onResponse = (data: {
+      roomId: string;
+      targetUserId: string;
+      data: PlayerDetailData | null;
+    }) => {
       if (data.roomId !== roomId) return;
       setDetail((prev) => ({ ...prev, [data.targetUserId]: data.data }));
       setLoading((prev) => ({ ...prev, [data.targetUserId]: false }));

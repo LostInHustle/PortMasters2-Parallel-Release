@@ -36,12 +36,19 @@ export function useNotificationCenter() {
   }, []);
 
   const push = useCallback((item: Omit<NotificationItem, "id" | "at">) => {
-    const full: NotificationItem = { ...item, id: `${Date.now()}:${Math.random().toString(36).slice(2, 8)}`, at: Date.now() };
+    const full: NotificationItem = {
+      ...item,
+      id: `${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
+      at: Date.now(),
+    };
     setItems((prev) => [full, ...prev].slice(0, HISTORY_LIMIT));
     setUnreadCount((n) => n + 1);
     setCurrent(full);
     if (dismissTimer.current) clearTimeout(dismissTimer.current);
-    dismissTimer.current = setTimeout(() => setCurrent(null), BUBBLE_DURATION_MS);
+    dismissTimer.current = setTimeout(
+      () => setCurrent(null),
+      BUBBLE_DURATION_MS,
+    );
   }, []);
 
   const markAllRead = useCallback(() => setUnreadCount(0), []);

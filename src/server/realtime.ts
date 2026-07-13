@@ -60,13 +60,19 @@ export function attachRealtime(httpServer: HttpServer): Server {
     displayName: string;
     avatarHue: number;
   }): PublicUser {
-    return { id: u.id, username: u.username, displayName: u.displayName, avatarHue: u.avatarHue };
+    return {
+      id: u.id,
+      username: u.username,
+      displayName: u.displayName,
+      avatarHue: u.avatarHue,
+    };
   }
 
   function onlineUsers(): Array<PublicUser & { roomId: string | null }> {
     const seen = new Map<string, PublicUser & { roomId: string | null }>();
     for (const s of sockets.values()) {
-      if (!seen.has(s.userId)) seen.set(s.userId, { ...s.user, roomId: s.roomId });
+      if (!seen.has(s.userId))
+        seen.set(s.userId, { ...s.user, roomId: s.roomId });
     }
     return Array.from(seen.values());
   }
@@ -108,8 +114,15 @@ export function attachRealtime(httpServer: HttpServer): Server {
   // join/leave/disconnect, never on the hot game-action path.
   async function emitRoomMembers(roomId: string) {
     const members = roomMembers(roomId).map(({ socketId: _sid, ...u }) => u);
-    const room = await db.room.findUnique({ where: { id: roomId }, select: { hostId: true } });
-    io.to(`room:${roomId}`).emit("room:members", { roomId, members, hostId: room?.hostId ?? null });
+    const room = await db.room.findUnique({
+      where: { id: roomId },
+      select: { hostId: true },
+    });
+    io.to(`room:${roomId}`).emit("room:members", {
+      roomId,
+      members,
+      hostId: room?.hostId ?? null,
+    });
   }
 
   // Last-known game status per (room, user) so late joiners can hydrate the
@@ -179,7 +192,11 @@ export function attachRealtime(httpServer: HttpServer): Server {
     return false;
   }
 
-  function scheduleDeparture(roomId: string, userId: string, displayName: string) {
+  function scheduleDeparture(
+    roomId: string,
+    userId: string,
+    displayName: string,
+  ) {
     const key = `${roomId}:${userId}`;
     cancelDeparture(roomId, userId);
     const t = setTimeout(async () => {
@@ -226,7 +243,12 @@ export function attachRealtime(httpServer: HttpServer): Server {
   // its own (identical, deterministic) transition in src/lib/game/engine.ts
   // when it gets the "go", which is how they all land on the same next
   // phase without this server needing to know what that phase is.
-  type Checkpoint = { round: number; phase: string; readyUserIds: Set<string>; advancing: boolean };
+  type Checkpoint = {
+    round: number;
+    phase: string;
+    readyUserIds: Set<string>;
+    advancing: boolean;
+  };
   const roomCheckpoints = new Map<string, Checkpoint>();
 
   // Guards "room:start" against firing twice for the same room if the
@@ -243,7 +265,16 @@ export function attachRealtime(httpServer: HttpServer): Server {
   // these eight are gated; sub-states like module drafting/swapping, and
   // terminal ones like bankruptcy/endgame, are personal and never become a
   // room checkpoint.
-  const CHECKPOINT_PHASE_ORDER = ["0", "5", "1", "barter", "worker_mgmt", "2", "3", "4"];
+  const CHECKPOINT_PHASE_ORDER = [
+    "0",
+    "5",
+    "1",
+    "barter",
+    "worker_mgmt",
+    "2",
+    "3",
+    "4",
+  ];
   function checkpointRank(round: number, phase: string): number | null {
     const idx = CHECKPOINT_PHASE_ORDER.indexOf(phase);
     if (idx === -1) return null;
@@ -253,8 +284,16 @@ export function attachRealtime(httpServer: HttpServer): Server {
   async function getCheckpoint(roomId: string): Promise<Checkpoint> {
     let cp = roomCheckpoints.get(roomId);
     if (cp) return cp;
-    const room = await db.room.findUnique({ where: { id: roomId }, select: { currentRound: true, currentPhase: true } });
-    cp = { round: room?.currentRound ?? 1, phase: room?.currentPhase ?? "0", readyUserIds: new Set(), advancing: false };
+    const room = await db.room.findUnique({
+      where: { id: roomId },
+      select: { currentRound: true, currentPhase: true },
+    });
+    cp = {
+      round: room?.currentRound ?? 1,
+      phase: room?.currentPhase ?? "0",
+      readyUserIds: new Set(),
+      advancing: false,
+    };
     roomCheckpoints.set(roomId, cp);
     return cp;
   }
@@ -291,13 +330,18 @@ export function attachRealtime(httpServer: HttpServer): Server {
       roomId,
       round: cp.round,
       phase: cp.phase,
-      readyUserIds: Array.from(cp.readyUserIds).filter((id) => roster.includes(id)),
+      readyUserIds: Array.from(cp.readyUserIds).filter((id) =>
+        roster.includes(id),
+      ),
       requiredUserIds: roster,
     };
   }
 
   async function broadcastReadyState(roomId: string, cp: Checkpoint) {
-    io.to(`room:${roomId}`).emit("phase:ready_update", await readyStatePayload(roomId, cp));
+    io.to(`room:${roomId}`).emit(
+      "phase:ready_update",
+      await readyStatePayload(roomId, cp),
+    );
   }
 
   // Once every active member has signaled ready for the checkpoint they're
@@ -311,7 +355,11 @@ export function attachRealtime(httpServer: HttpServer): Server {
       if (!cp.readyUserIds.has(id)) return;
     }
     cp.advancing = true;
-    io.to(`room:${roomId}`).emit("phase:advance", { roomId, round: cp.round, phase: cp.phase });
+    io.to(`room:${roomId}`).emit("phase:advance", {
+      roomId,
+      round: cp.round,
+      phase: cp.phase,
+    });
   }
 
   // ---------- Voyage conclusion & Captain's Legacy ----------
@@ -338,12 +386,24 @@ export function attachRealtime(httpServer: HttpServer): Server {
     const statuses = roomStatuses.get(roomId);
     if (!statuses) return;
 
-    const finished: { userId: string; user: PublicUser; reputation: number; gold: number; phase: string }[] = [];
+    const finished: {
+      userId: string;
+      user: PublicUser;
+      reputation: number;
+      gold: number;
+      phase: string;
+    }[] = [];
     for (const id of memberIds) {
       const st = statuses.get(id);
       const phase = st ? String(st.phase) : "";
       if (phase !== "endgame" && phase !== "bankruptcy") return; // someone is still out at sea
-      finished.push({ userId: id, user: st.user, reputation: st.reputation ?? 0, gold: st.gold ?? 0, phase });
+      finished.push({
+        userId: id,
+        user: st.user,
+        reputation: st.reputation ?? 0,
+        gold: st.gold ?? 0,
+        phase,
+      });
     }
 
     // Guard set right after the roster check passes, before any `await`
@@ -354,7 +414,9 @@ export function attachRealtime(httpServer: HttpServer): Server {
 
     const crownable = finished.filter((f) => f.phase === "endgame");
     const winnerId = crownable.length
-      ? crownable.reduce((best, f) => (f.reputation > best.reputation ? f : best)).userId
+      ? crownable.reduce((best, f) =>
+          f.reputation > best.reputation ? f : best,
+        ).userId
       : null;
 
     const standings: {
@@ -377,7 +439,9 @@ export function attachRealtime(httpServer: HttpServer): Server {
       const xpGained = Math.max(0, f.reputation);
       const crowned = f.userId === winnerId;
       const bankrupt = f.phase === "bankruptcy";
-      const prior = await db.captainLegacy.findUnique({ where: { userId: f.userId } });
+      const prior = await db.captainLegacy.findUnique({
+        where: { userId: f.userId },
+      });
       const priorLevel = prior?.renownLevel ?? 1;
       const newXP = (prior?.renownXP ?? 0) + xpGained;
       const newLevel = levelForRenownXP(newXP);
@@ -385,14 +449,18 @@ export function attachRealtime(httpServer: HttpServer): Server {
       // A big Reputation haul can jump several levels in one voyage, so this
       // checks the whole span crossed rather than newLevel === the unlock
       // level, which would miss a captain who skipped past it entirely.
-      const brokersFavorUnlocked = priorLevel < BROKERS_FAVOR_UNLOCK_LEVEL && newLevel >= BROKERS_FAVOR_UNLOCK_LEVEL;
+      const brokersFavorUnlocked =
+        priorLevel < BROKERS_FAVOR_UNLOCK_LEVEL &&
+        newLevel >= BROKERS_FAVOR_UNLOCK_LEVEL;
       const newBestScore = Math.max(prior?.bestScore ?? 0, f.reputation);
       const newVoyagesCompleted = (prior?.voyagesCompleted ?? 0) + 1;
       // Resets on any bankruptcy rather than only incrementing on a clean
       // finish, so a single defaulted voyage costs the whole streak, the
       // same "start over" feel as the streak-shaped systems this project
       // already has (a missed pirate roll undoing an escort-free run).
-      const newConsecutiveSolventVoyages = bankrupt ? 0 : (prior?.consecutiveSolventVoyages ?? 0) + 1;
+      const newConsecutiveSolventVoyages = bankrupt
+        ? 0
+        : (prior?.consecutiveSolventVoyages ?? 0) + 1;
       await db.captainLegacy.upsert({
         where: { userId: f.userId },
         create: {
@@ -419,7 +487,10 @@ export function attachRealtime(httpServer: HttpServer): Server {
       // what's new, so the existing rows on file are what turn that into
       // a delta. skipDuplicates is a second line of defense alongside the
       // @@unique constraint, not load bearing on its own.
-      const existingMerits = await db.captainMerit.findMany({ where: { userId: f.userId }, select: { meritId: true } });
+      const existingMerits = await db.captainMerit.findMany({
+        where: { userId: f.userId },
+        select: { meritId: true },
+      });
       const existingMeritIds = new Set(existingMerits.map((m) => m.meritId));
       const qualifying = qualifyingMerits({
         newVoyagesCompleted,
@@ -476,7 +547,11 @@ export function attachRealtime(httpServer: HttpServer): Server {
     }
     standings.sort((a, b) => b.reputation - a.reputation);
 
-    io.to(`room:${roomId}`).emit("room:voyage_complete", { roomId, winnerId, standings });
+    io.to(`room:${roomId}`).emit("room:voyage_complete", {
+      roomId,
+      winnerId,
+      standings,
+    });
   }
 
   // ---------- Bartering ----------
@@ -507,7 +582,10 @@ export function attachRealtime(httpServer: HttpServer): Server {
   }
 
   function broadcastBarter(roomId: string) {
-    io.to(`room:${roomId}`).emit("barter:update", { roomId, offers: barterList(roomId) });
+    io.to(`room:${roomId}`).emit("barter:update", {
+      roomId,
+      offers: barterList(roomId),
+    });
   }
 
   // Drops every open offer for a room (phase moved on, or the room
@@ -540,7 +618,13 @@ export function attachRealtime(httpServer: HttpServer): Server {
   // Gold total. Whether the helper can really afford to lend is decided
   // on their own client against their own GameState, same as a barter
   // offer's affordability (see grantLoan in src/lib/game/engine.ts).
-  type AidRequest = { id: string; fromUserId: string; fromName: string; amount: number; round: number };
+  type AidRequest = {
+    id: string;
+    fromUserId: string;
+    fromName: string;
+    amount: number;
+    round: number;
+  };
   const roomAidRequests = new Map<string, AidRequest[]>();
 
   function aidList(roomId: string): AidRequest[] {
@@ -548,7 +632,10 @@ export function attachRealtime(httpServer: HttpServer): Server {
   }
 
   function broadcastAid(roomId: string) {
-    io.to(`room:${roomId}`).emit("aid:update", { roomId, requests: aidList(roomId) });
+    io.to(`room:${roomId}`).emit("aid:update", {
+      roomId,
+      requests: aidList(roomId),
+    });
   }
 
   function clearAid(roomId: string) {
@@ -595,7 +682,8 @@ export function attachRealtime(httpServer: HttpServer): Server {
 
   // Authenticate a socket from its handshake cookie (auto) or an explicit token.
   async function authenticate(socket: any, explicitToken?: string) {
-    const token = explicitToken ?? readSessionCookie(socket.handshake?.headers?.cookie);
+    const token =
+      explicitToken ?? readSessionCookie(socket.handshake?.headers?.cookie);
     if (!token) {
       socket.emit("auth:fail", { error: "Missing session" });
       return null;
@@ -637,7 +725,12 @@ export function attachRealtime(httpServer: HttpServer): Server {
 
   // ---------- Connection handling ----------
   io.on("connection", (socket) => {
-    sockets.set(socket.id, { userId: "", user: { id: "", username: "", displayName: "", avatarHue: 0 }, roomId: null, authed: false });
+    sockets.set(socket.id, {
+      userId: "",
+      user: { id: "", username: "", displayName: "", avatarHue: 0 },
+      roomId: null,
+      authed: false,
+    });
 
     // Auto-authenticate from the handshake cookie (sent with credentials).
     authenticate(socket);
@@ -666,7 +759,10 @@ export function attachRealtime(httpServer: HttpServer): Server {
         where: { userId_roomId: { userId: s.userId, roomId } },
       });
       if (!member) {
-        socket.emit("room:error", { roomId, error: "Not a member of that room" });
+        socket.emit("room:error", {
+          roomId,
+          error: "Not a member of that room",
+        });
         return;
       }
 
@@ -713,9 +809,18 @@ export function attachRealtime(httpServer: HttpServer): Server {
       // error and no way to recover short of a full page reload.
       sendStatusBatchTo(roomId, socket.id);
       const cp = await getCheckpoint(roomId);
-      io.to(socket.id).emit("phase:ready_update", await readyStatePayload(roomId, cp));
-      io.to(socket.id).emit("barter:update", { roomId, offers: barterList(roomId) });
-      io.to(socket.id).emit("aid:update", { roomId, requests: aidList(roomId) });
+      io.to(socket.id).emit(
+        "phase:ready_update",
+        await readyStatePayload(roomId, cp),
+      );
+      io.to(socket.id).emit("barter:update", {
+        roomId,
+        offers: barterList(roomId),
+      });
+      io.to(socket.id).emit("aid:update", {
+        roomId,
+        requests: aidList(roomId),
+      });
       broadcastPresence();
     });
 
@@ -737,117 +842,157 @@ export function attachRealtime(httpServer: HttpServer): Server {
       broadcastPresence();
     });
 
-    socket.on("game:status", async (payload: { roomId?: string; round?: number; phase?: number | string; phaseLabel?: string; gold?: number; reputation?: number; shipLevel?: number; gameOver?: boolean }) => {
-      const s = requireAuth();
-      if (!s) return;
-      if (!s.roomId) return;
-      const roomId = payload?.roomId ?? s.roomId;
-      if (roomId !== s.roomId) return;
+    socket.on(
+      "game:status",
+      async (payload: {
+        roomId?: string;
+        round?: number;
+        phase?: number | string;
+        phaseLabel?: string;
+        gold?: number;
+        reputation?: number;
+        shipLevel?: number;
+        gameOver?: boolean;
+      }) => {
+        const s = requireAuth();
+        if (!s) return;
+        if (!s.roomId) return;
+        const roomId = payload?.roomId ?? s.roomId;
+        if (roomId !== s.roomId) return;
 
-      // Only the newest socket for a user is allowed to update the room's
-      // status cache and broadcast.  A stale socket that hasn't been cleaned
-      // up yet (Railway edge proxy recycling, pingTimeout not yet fired)
-      // would otherwise keep spraying frozen phase/gold/reputation data
-      // across the room, making the same captain flicker between two
-      // different statuses on everyone else's roster, the exact "duplicate
-      // me with different statuses" symptom.
-      {
-        let newest = false;
-        for (const [sid, st] of Array.from(sockets.entries()).reverse()) {
-          if (st.userId === s.userId) { newest = sid === socket.id; break; }
+        // Only the newest socket for a user is allowed to update the room's
+        // status cache and broadcast.  A stale socket that hasn't been cleaned
+        // up yet (Railway edge proxy recycling, pingTimeout not yet fired)
+        // would otherwise keep spraying frozen phase/gold/reputation data
+        // across the room, making the same captain flicker between two
+        // different statuses on everyone else's roster, the exact "duplicate
+        // me with different statuses" symptom.
+        {
+          let newest = false;
+          for (const [sid, st] of Array.from(sockets.entries()).reverse()) {
+            if (st.userId === s.userId) {
+              newest = sid === socket.id;
+              break;
+            }
+          }
+          if (!newest) return;
         }
-        if (!newest) return;
-      }
 
-      const broadcast = {
-        roomId,
-        user: s.user,
-        round: payload?.round ?? 0,
-        phase: payload?.phase ?? 0,
-        phaseLabel: payload?.phaseLabel ?? "",
-        gold: payload?.gold ?? 0,
-        reputation: payload?.reputation ?? 0,
-        shipLevel: payload?.shipLevel ?? 0,
-        gameOver: Boolean(payload?.gameOver),
-        at: Date.now(),
-      };
-      rememberStatus(roomId, broadcast);
-      io.to(`room:${roomId}`).emit("game:status", broadcast);
+        const broadcast = {
+          roomId,
+          user: s.user,
+          round: payload?.round ?? 0,
+          phase: payload?.phase ?? 0,
+          phaseLabel: payload?.phaseLabel ?? "",
+          gold: payload?.gold ?? 0,
+          reputation: payload?.reputation ?? 0,
+          shipLevel: payload?.shipLevel ?? 0,
+          gameOver: Boolean(payload?.gameOver),
+          at: Date.now(),
+        };
+        rememberStatus(roomId, broadcast);
+        io.to(`room:${roomId}`).emit("game:status", broadcast);
 
-      // Move the room's synchronized checkpoint forward if this report puts
-      // someone further along than where the room currently is, and recheck
-      // readiness. A status change can shrink the active roster (e.g.
-      // someone just went bankrupt), which can be the only thing blocking
-      // the rest of the room from advancing.
-      //
-      // Gated on the room's own "started" column, read fresh rather than
-      // off any in-memory copy, because a stale report can otherwise
-      // resurrect a checkpoint a host just reset. A captain's client keeps
-      // a status broadcast in flight on a 120ms debounce and an 8s
-      // heartbeat (see use-game-session.ts); if either is already on the
-      // wire the instant a host hits "Restart Voyage", it lands at the
-      // server moments after "started" flips back to false and, without
-      // this check, immediately advances the checkpoint right back to
-      // whatever phase that stale report claims, persisting "started:
-      // false, currentPhase: <mid-game>" forever. The very next captain to
-      // join that room then gets snapped straight into that orphaned phase
-      // with a blank, never-initialized game state (see snapToCheckpoint
-      // in engine.ts), instead of the fresh lobby it should be.
-      const room = await db.room.findUnique({ where: { id: roomId }, select: { started: true } });
-      const cp = await getCheckpoint(roomId);
-      const phaseStr = String(broadcast.phase);
-      const newRank = checkpointRank(broadcast.round, phaseStr);
-      const curRank = checkpointRank(cp.round, cp.phase);
-      if (room?.started && newRank !== null && (curRank === null || newRank > curRank)) {
-        cp.round = broadcast.round;
-        cp.phase = phaseStr;
-        cp.readyUserIds.clear();
-        cp.advancing = false;
-        await db.room.update({ where: { id: roomId }, data: { currentRound: cp.round, currentPhase: cp.phase } }).catch(() => {});
-        // The room has moved off the Bartering checkpoint (or, on a fresh
-        // join, was never on it to begin with), either way any offers
-        // left over from it are now stale and should disappear for
-        // whoever's left looking at that board.
-        if (cp.phase !== "barter") clearBarter(roomId);
-        // Same reasoning for any open aid request: Phase 3 is the only
-        // checkpoint it's ever relevant at.
-        if (cp.phase !== "3") clearAid(roomId);
-      }
-      await broadcastReadyState(roomId, cp);
-      await maybeAdvance(roomId, cp);
-      // gameOver only ever becomes true at "bankruptcy" or "endgame" (see
-      // GameState.gameOver in src/lib/game/types.ts), the two phases this
-      // report could have just moved someone into, so this is the one
-      // handler that can ever be the report that completes a room.
-      if (broadcast.gameOver) await maybeConcludeVoyage(roomId);
-    });
+        // Move the room's synchronized checkpoint forward if this report puts
+        // someone further along than where the room currently is, and recheck
+        // readiness. A status change can shrink the active roster (e.g.
+        // someone just went bankrupt), which can be the only thing blocking
+        // the rest of the room from advancing.
+        //
+        // Gated on the room's own "started" column, read fresh rather than
+        // off any in-memory copy, because a stale report can otherwise
+        // resurrect a checkpoint a host just reset. A captain's client keeps
+        // a status broadcast in flight on a 120ms debounce and an 8s
+        // heartbeat (see use-game-session.ts); if either is already on the
+        // wire the instant a host hits "Restart Voyage", it lands at the
+        // server moments after "started" flips back to false and, without
+        // this check, immediately advances the checkpoint right back to
+        // whatever phase that stale report claims, persisting "started:
+        // false, currentPhase: <mid-game>" forever. The very next captain to
+        // join that room then gets snapped straight into that orphaned phase
+        // with a blank, never-initialized game state (see snapToCheckpoint
+        // in engine.ts), instead of the fresh lobby it should be.
+        const room = await db.room.findUnique({
+          where: { id: roomId },
+          select: { started: true },
+        });
+        const cp = await getCheckpoint(roomId);
+        const phaseStr = String(broadcast.phase);
+        const newRank = checkpointRank(broadcast.round, phaseStr);
+        const curRank = checkpointRank(cp.round, cp.phase);
+        if (
+          room?.started &&
+          newRank !== null &&
+          (curRank === null || newRank > curRank)
+        ) {
+          cp.round = broadcast.round;
+          cp.phase = phaseStr;
+          cp.readyUserIds.clear();
+          cp.advancing = false;
+          await db.room
+            .update({
+              where: { id: roomId },
+              data: { currentRound: cp.round, currentPhase: cp.phase },
+            })
+            .catch(() => {});
+          // The room has moved off the Bartering checkpoint (or, on a fresh
+          // join, was never on it to begin with), either way any offers
+          // left over from it are now stale and should disappear for
+          // whoever's left looking at that board.
+          if (cp.phase !== "barter") clearBarter(roomId);
+          // Same reasoning for any open aid request: Phase 3 is the only
+          // checkpoint it's ever relevant at.
+          if (cp.phase !== "3") clearAid(roomId);
+        }
+        await broadcastReadyState(roomId, cp);
+        await maybeAdvance(roomId, cp);
+        // gameOver only ever becomes true at "bankruptcy" or "endgame" (see
+        // GameState.gameOver in src/lib/game/types.ts), the two phases this
+        // report could have just moved someone into, so this is the one
+        // handler that can ever be the report that completes a room.
+        if (broadcast.gameOver) await maybeConcludeVoyage(roomId);
+      },
+    );
 
-    socket.on("phase:ready", async (payload: { roomId?: string; round?: number; phase?: string | number }) => {
-      const s = requireAuth();
-      if (!s) return;
-      const roomId = payload?.roomId ?? s.roomId;
-      if (!roomId || roomId !== s.roomId) return;
-      const cp = await getCheckpoint(roomId);
-      // Phase 0 is the pre-game lobby. It only ever moves forward through
-      // the host's "room:start" (see below), never through a per-player
-      // ready vote, so a solitary host (or whoever happens to be the only
-      // one connected at that instant) can't accidentally start the
-      // voyage alone.
-      if (cp.phase === "0") return;
-      if (payload?.round !== cp.round || String(payload?.phase) !== cp.phase) {
-        // The client is voting on a stale checkpoint.  Instead of
-        // silently dropping the vote (which leaves them stuck at
-        // "Waiting…" forever on a tunnelled connection where the
-        // earlier phase:advance was eaten by a proxy), send them the
-        // authoritative ready state right now so their self-healing /
-        // desync-catch-up in usePhaseSync can get them back in sync.
-        io.to(socket.id).emit("phase:ready_update", await readyStatePayload(roomId, cp));
-        return;
-      }
-      cp.readyUserIds.add(s.userId);
-      await broadcastReadyState(roomId, cp);
-      await maybeAdvance(roomId, cp);
-    });
+    socket.on(
+      "phase:ready",
+      async (payload: {
+        roomId?: string;
+        round?: number;
+        phase?: string | number;
+      }) => {
+        const s = requireAuth();
+        if (!s) return;
+        const roomId = payload?.roomId ?? s.roomId;
+        if (!roomId || roomId !== s.roomId) return;
+        const cp = await getCheckpoint(roomId);
+        // Phase 0 is the pre-game lobby. It only ever moves forward through
+        // the host's "room:start" (see below), never through a per-player
+        // ready vote, so a solitary host (or whoever happens to be the only
+        // one connected at that instant) can't accidentally start the
+        // voyage alone.
+        if (cp.phase === "0") return;
+        if (
+          payload?.round !== cp.round ||
+          String(payload?.phase) !== cp.phase
+        ) {
+          // The client is voting on a stale checkpoint.  Instead of
+          // silently dropping the vote (which leaves them stuck at
+          // "Waiting…" forever on a tunnelled connection where the
+          // earlier phase:advance was eaten by a proxy), send them the
+          // authoritative ready state right now so their self-healing /
+          // desync-catch-up in usePhaseSync can get them back in sync.
+          io.to(socket.id).emit(
+            "phase:ready_update",
+            await readyStatePayload(roomId, cp),
+          );
+          return;
+        }
+        cp.readyUserIds.add(s.userId);
+        await broadcastReadyState(roomId, cp);
+        await maybeAdvance(roomId, cp);
+      },
+    );
 
     socket.on("phase:unready", async (payload: { roomId?: string }) => {
       const s = requireAuth();
@@ -876,87 +1021,125 @@ export function attachRealtime(httpServer: HttpServer): Server {
     // on their own client against their own GameState before this ever
     // fires, see postBarterOffer in src/lib/game/engine.ts, since this
     // server has no visibility into anyone's inventory or gold.
-    socket.on("barter:post", (payload: {
-      roomId?: string;
-      tempId?: string;
-      offerItem?: string;
-      offerAmount?: number;
-      requestItem?: string;
-      requestAmount?: number;
-    }) => {
-      const s = requireAuth();
-      if (!s) return;
-      const roomId = payload?.roomId ?? s.roomId;
-      if (!roomId || roomId !== s.roomId) return;
-      const { offerItem, offerAmount, requestItem, requestAmount } = payload ?? {};
-      if (
-        typeof offerItem !== "string" || !offerItem ||
-        typeof requestItem !== "string" || !requestItem ||
-        offerItem === requestItem ||
-        !Number.isInteger(offerAmount) || (offerAmount as number) < 1 ||
-        !Number.isInteger(requestAmount) || (requestAmount as number) < 1
-      ) {
-        socket.emit("barter:error", { roomId, tempId: payload?.tempId, error: "Invalid barter offer" });
-        return;
-      }
-      const offer: BarterOffer = {
-        id: `${roomId}:${s.userId}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
-        fromUserId: s.userId,
-        fromName: s.user.displayName,
-        offerItem,
-        offerAmount: offerAmount as number,
-        requestItem,
-        requestAmount: requestAmount as number,
-      };
-      roomBarterOffers.set(roomId, [...barterList(roomId), offer]);
-      socket.emit("barter:posted", { roomId, tempId: payload?.tempId, offer });
-      broadcastBarter(roomId);
-    });
+    socket.on(
+      "barter:post",
+      (payload: {
+        roomId?: string;
+        tempId?: string;
+        offerItem?: string;
+        offerAmount?: number;
+        requestItem?: string;
+        requestAmount?: number;
+      }) => {
+        const s = requireAuth();
+        if (!s) return;
+        const roomId = payload?.roomId ?? s.roomId;
+        if (!roomId || roomId !== s.roomId) return;
+        const { offerItem, offerAmount, requestItem, requestAmount } =
+          payload ?? {};
+        if (
+          typeof offerItem !== "string" ||
+          !offerItem ||
+          typeof requestItem !== "string" ||
+          !requestItem ||
+          offerItem === requestItem ||
+          !Number.isInteger(offerAmount) ||
+          (offerAmount as number) < 1 ||
+          !Number.isInteger(requestAmount) ||
+          (requestAmount as number) < 1
+        ) {
+          socket.emit("barter:error", {
+            roomId,
+            tempId: payload?.tempId,
+            error: "Invalid barter offer",
+          });
+          return;
+        }
+        const offer: BarterOffer = {
+          id: `${roomId}:${s.userId}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
+          fromUserId: s.userId,
+          fromName: s.user.displayName,
+          offerItem,
+          offerAmount: offerAmount as number,
+          requestItem,
+          requestAmount: requestAmount as number,
+        };
+        roomBarterOffers.set(roomId, [...barterList(roomId), offer]);
+        socket.emit("barter:posted", {
+          roomId,
+          tempId: payload?.tempId,
+          offer,
+        });
+        broadcastBarter(roomId);
+      },
+    );
 
-    socket.on("barter:cancel", (payload: { roomId?: string; offerId?: string }) => {
-      const s = requireAuth();
-      if (!s) return;
-      const roomId = payload?.roomId ?? s.roomId;
-      if (!roomId || roomId !== s.roomId || !payload?.offerId) return;
-      const list = barterList(roomId);
-      const next = list.filter((o) => !(o.id === payload.offerId && o.fromUserId === s.userId));
-      if (next.length === list.length) return; // not found, or not theirs to cancel
-      if (next.length) roomBarterOffers.set(roomId, next);
-      else roomBarterOffers.delete(roomId);
-      broadcastBarter(roomId);
-    });
+    socket.on(
+      "barter:cancel",
+      (payload: { roomId?: string; offerId?: string }) => {
+        const s = requireAuth();
+        if (!s) return;
+        const roomId = payload?.roomId ?? s.roomId;
+        if (!roomId || roomId !== s.roomId || !payload?.offerId) return;
+        const list = barterList(roomId);
+        const next = list.filter(
+          (o) => !(o.id === payload.offerId && o.fromUserId === s.userId),
+        );
+        if (next.length === list.length) return; // not found, or not theirs to cancel
+        if (next.length) roomBarterOffers.set(roomId, next);
+        else roomBarterOffers.delete(roomId);
+        broadcastBarter(roomId);
+      },
+    );
 
     // First accept to reach the server wins: the offer is deleted from the
     // room's list immediately (this handler runs to completion before the
     // next one does, so there's no real concurrency to race), so a second,
     // near-simultaneous accept for the same offer simply finds it already
     // gone.
-    socket.on("barter:accept", (payload: { roomId?: string; offerId?: string }) => {
-      const s = requireAuth();
-      if (!s) return;
-      const roomId = payload?.roomId ?? s.roomId;
-      if (!roomId || roomId !== s.roomId || !payload?.offerId) return;
-      const list = barterList(roomId);
-      const offer = list.find((o) => o.id === payload.offerId);
-      if (!offer) {
-        socket.emit("barter:accept:fail", { roomId, offerId: payload.offerId, reason: "That offer is no longer available." });
-        return;
-      }
-      if (offer.fromUserId === s.userId) {
-        socket.emit("barter:accept:fail", { roomId, offerId: payload.offerId, reason: "You can't accept your own offer." });
-        return;
-      }
-      const next = list.filter((o) => o.id !== offer.id);
-      if (next.length) roomBarterOffers.set(roomId, next);
-      else roomBarterOffers.delete(roomId);
-      broadcastBarter(roomId);
-      const fulfilled = { roomId, offer, accepterId: s.userId, accepterName: s.user.displayName };
-      socket.emit("barter:fulfilled", fulfilled);
-      const posterSockets = userSockets.get(offer.fromUserId);
-      if (posterSockets) {
-        for (const sid of posterSockets) io.to(sid).emit("barter:fulfilled", fulfilled);
-      }
-    });
+    socket.on(
+      "barter:accept",
+      (payload: { roomId?: string; offerId?: string }) => {
+        const s = requireAuth();
+        if (!s) return;
+        const roomId = payload?.roomId ?? s.roomId;
+        if (!roomId || roomId !== s.roomId || !payload?.offerId) return;
+        const list = barterList(roomId);
+        const offer = list.find((o) => o.id === payload.offerId);
+        if (!offer) {
+          socket.emit("barter:accept:fail", {
+            roomId,
+            offerId: payload.offerId,
+            reason: "That offer is no longer available.",
+          });
+          return;
+        }
+        if (offer.fromUserId === s.userId) {
+          socket.emit("barter:accept:fail", {
+            roomId,
+            offerId: payload.offerId,
+            reason: "You can't accept your own offer.",
+          });
+          return;
+        }
+        const next = list.filter((o) => o.id !== offer.id);
+        if (next.length) roomBarterOffers.set(roomId, next);
+        else roomBarterOffers.delete(roomId);
+        broadcastBarter(roomId);
+        const fulfilled = {
+          roomId,
+          offer,
+          accepterId: s.userId,
+          accepterName: s.user.displayName,
+        };
+        socket.emit("barter:fulfilled", fulfilled);
+        const posterSockets = userSockets.get(offer.fromUserId);
+        if (posterSockets) {
+          for (const sid of posterSockets)
+            io.to(sid).emit("barter:fulfilled", fulfilled);
+        }
+      },
+    );
 
     // ---------- Financial aid ----------
     socket.on("aid:state:request", (payload: { roomId?: string }) => {
@@ -1007,41 +1190,53 @@ export function attachRealtime(httpServer: HttpServer): Server {
     // the room's list immediately, so a second, near-simultaneous offer
     // to fund the same request simply finds it already gone, the same
     // race-safety as barter:accept above.
-    socket.on("aid:help", (payload: { roomId?: string; requestId?: string }) => {
-      const s = requireAuth();
-      if (!s) return;
-      const roomId = payload?.roomId ?? s.roomId;
-      if (!roomId || roomId !== s.roomId || !payload?.requestId) return;
-      const list = aidList(roomId);
-      const request = list.find((r) => r.id === payload.requestId);
-      if (!request) {
-        socket.emit("aid:help:fail", { roomId, requestId: payload.requestId, reason: "That request is no longer open." });
-        return;
-      }
-      if (request.fromUserId === s.userId) {
-        socket.emit("aid:help:fail", { roomId, requestId: payload.requestId, reason: "You can't fund your own request." });
-        return;
-      }
-      const next = list.filter((r) => r.id !== request.id);
-      if (next.length) roomAidRequests.set(roomId, next);
-      else roomAidRequests.delete(roomId);
-      broadcastAid(roomId);
-      const granted = {
-        roomId,
-        requestId: request.id,
-        borrowerId: request.fromUserId,
-        borrowerName: request.fromName,
-        helperId: s.userId,
-        helperName: s.user.displayName,
-        amount: request.amount,
-        round: request.round,
-      };
-      socket.emit("aid:granted", granted);
-      const borrowerSockets = userSockets.get(request.fromUserId);
-      if (borrowerSockets) {
-        for (const sid of borrowerSockets) io.to(sid).emit("aid:granted", granted);
-      }
-    });
+    socket.on(
+      "aid:help",
+      (payload: { roomId?: string; requestId?: string }) => {
+        const s = requireAuth();
+        if (!s) return;
+        const roomId = payload?.roomId ?? s.roomId;
+        if (!roomId || roomId !== s.roomId || !payload?.requestId) return;
+        const list = aidList(roomId);
+        const request = list.find((r) => r.id === payload.requestId);
+        if (!request) {
+          socket.emit("aid:help:fail", {
+            roomId,
+            requestId: payload.requestId,
+            reason: "That request is no longer open.",
+          });
+          return;
+        }
+        if (request.fromUserId === s.userId) {
+          socket.emit("aid:help:fail", {
+            roomId,
+            requestId: payload.requestId,
+            reason: "You can't fund your own request.",
+          });
+          return;
+        }
+        const next = list.filter((r) => r.id !== request.id);
+        if (next.length) roomAidRequests.set(roomId, next);
+        else roomAidRequests.delete(roomId);
+        broadcastAid(roomId);
+        const granted = {
+          roomId,
+          requestId: request.id,
+          borrowerId: request.fromUserId,
+          borrowerName: request.fromName,
+          helperId: s.userId,
+          helperName: s.user.displayName,
+          amount: request.amount,
+          round: request.round,
+        };
+        socket.emit("aid:granted", granted);
+        const borrowerSockets = userSockets.get(request.fromUserId);
+        if (borrowerSockets) {
+          for (const sid of borrowerSockets)
+            io.to(sid).emit("aid:granted", granted);
+        }
+      },
+    );
 
     // A direct relay between two known captains settling one specific
     // loan, the same shape as a direct message: no room-wide state to
@@ -1050,114 +1245,189 @@ export function attachRealtime(httpServer: HttpServer): Server {
     // voluntary repayment and the forced one at Round 8's end (see
     // settleOutstandingDebts in src/lib/game/engine.ts) since, from the
     // lender's side, receiving the Gold back looks identical either way.
-    socket.on("aid:repay", (payload: { roomId?: string; lenderId?: string; amount?: number; debtId?: string }) => {
-      const s = requireAuth();
-      if (!s) return;
-      const roomId = payload?.roomId ?? s.roomId;
-      const lenderId = payload?.lenderId;
-      const amount = payload?.amount;
-      const debtId = payload?.debtId;
-      if (!roomId || roomId !== s.roomId || !lenderId || !debtId || !Number.isInteger(amount) || (amount as number) < 1) return;
-      const lenderSockets = userSockets.get(lenderId);
-      if (!lenderSockets) return;
-      const repaid = { roomId, debtId, amount, fromUserId: s.userId, fromName: s.user.displayName };
-      for (const sid of lenderSockets) io.to(sid).emit("aid:repaid", repaid);
-    });
+    socket.on(
+      "aid:repay",
+      (payload: {
+        roomId?: string;
+        lenderId?: string;
+        amount?: number;
+        debtId?: string;
+      }) => {
+        const s = requireAuth();
+        if (!s) return;
+        const roomId = payload?.roomId ?? s.roomId;
+        const lenderId = payload?.lenderId;
+        const amount = payload?.amount;
+        const debtId = payload?.debtId;
+        if (
+          !roomId ||
+          roomId !== s.roomId ||
+          !lenderId ||
+          !debtId ||
+          !Number.isInteger(amount) ||
+          (amount as number) < 1
+        )
+          return;
+        const lenderSockets = userSockets.get(lenderId);
+        if (!lenderSockets) return;
+        const repaid = {
+          roomId,
+          debtId,
+          amount,
+          fromUserId: s.userId,
+          fromName: s.user.displayName,
+        };
+        for (const sid of lenderSockets) io.to(sid).emit("aid:repaid", repaid);
+      },
+    );
 
     // ---------- On-demand player detail (cargo, workers, logs) ----------
     // Kept out of the constant game:status heartbeat on purpose. Most of
     // the room never needs this, only whoever just opened that one
     // captain's detail popup, so it's a direct request/response relay
     // instead of something broadcast to everyone all the time.
-    socket.on("player:detail:request", (payload: { roomId?: string; targetUserId?: string }) => {
-      const s = requireAuth();
-      if (!s) return;
-      const roomId = payload?.roomId ?? s.roomId;
-      const targetUserId = payload?.targetUserId;
-      if (!roomId || !targetUserId || roomId !== s.roomId) return;
-      const targetSockets = userSockets.get(targetUserId);
-      if (!targetSockets || targetSockets.size === 0) {
-        socket.emit("player:detail:response", { roomId, targetUserId, data: null });
-        return;
-      }
-      for (const sid of targetSockets) {
-        io.to(sid).emit("player:detail:request", { roomId, targetUserId, requesterId: s.userId });
-      }
-    });
+    socket.on(
+      "player:detail:request",
+      (payload: { roomId?: string; targetUserId?: string }) => {
+        const s = requireAuth();
+        if (!s) return;
+        const roomId = payload?.roomId ?? s.roomId;
+        const targetUserId = payload?.targetUserId;
+        if (!roomId || !targetUserId || roomId !== s.roomId) return;
+        const targetSockets = userSockets.get(targetUserId);
+        if (!targetSockets || targetSockets.size === 0) {
+          socket.emit("player:detail:response", {
+            roomId,
+            targetUserId,
+            data: null,
+          });
+          return;
+        }
+        for (const sid of targetSockets) {
+          io.to(sid).emit("player:detail:request", {
+            roomId,
+            targetUserId,
+            requesterId: s.userId,
+          });
+        }
+      },
+    );
 
-    socket.on("player:detail:response", (payload: { roomId?: string; targetUserId?: string; requesterId?: string; data?: unknown }) => {
-      const s = requireAuth();
-      if (!s) return;
-      const roomId = payload?.roomId;
-      const requesterId = payload?.requesterId;
-      // Only the player being asked about may answer for themselves.
-      if (!roomId || !requesterId || payload?.targetUserId !== s.userId) return;
-      const reqSockets = userSockets.get(requesterId);
-      if (!reqSockets) return;
-      for (const sid of reqSockets) {
-        io.to(sid).emit("player:detail:response", { roomId, targetUserId: s.userId, data: payload?.data ?? null });
-      }
-    });
+    socket.on(
+      "player:detail:response",
+      (payload: {
+        roomId?: string;
+        targetUserId?: string;
+        requesterId?: string;
+        data?: unknown;
+      }) => {
+        const s = requireAuth();
+        if (!s) return;
+        const roomId = payload?.roomId;
+        const requesterId = payload?.requesterId;
+        // Only the player being asked about may answer for themselves.
+        if (!roomId || !requesterId || payload?.targetUserId !== s.userId)
+          return;
+        const reqSockets = userSockets.get(requesterId);
+        if (!reqSockets) return;
+        for (const sid of reqSockets) {
+          io.to(sid).emit("player:detail:response", {
+            roomId,
+            targetUserId: s.userId,
+            data: payload?.data ?? null,
+          });
+        }
+      },
+    );
 
-    socket.on("chat:room", async (payload: { roomId?: string; content?: string }) => {
-      const s = requireAuth();
-      if (!s) return;
-      const roomId = payload?.roomId ?? s.roomId;
-      const content = (payload?.content ?? "").trim();
-      if (!roomId || !content) return;
-      if (content.length > 1000) return;
+    socket.on(
+      "chat:room",
+      async (payload: { roomId?: string; content?: string }) => {
+        const s = requireAuth();
+        if (!s) return;
+        const roomId = payload?.roomId ?? s.roomId;
+        const content = (payload?.content ?? "").trim();
+        if (!roomId || !content) return;
+        if (content.length > 1000) return;
 
-      const msg = await db.message.create({
-        data: { roomId, senderId: s.userId, recipientId: null, content },
-        include: { sender: { select: { id: true, username: true, displayName: true, avatarHue: true } } },
-      });
-      io.to(`room:${roomId}`).emit("chat:room", {
-        roomId,
-        message: {
+        const msg = await db.message.create({
+          data: { roomId, senderId: s.userId, recipientId: null, content },
+          include: {
+            sender: {
+              select: {
+                id: true,
+                username: true,
+                displayName: true,
+                avatarHue: true,
+              },
+            },
+          },
+        });
+        io.to(`room:${roomId}`).emit("chat:room", {
+          roomId,
+          message: {
+            id: msg.id,
+            content: msg.content,
+            createdAt: msg.createdAt,
+            sender: publicUser(msg.sender),
+          },
+        });
+      },
+    );
+
+    socket.on(
+      "chat:dm",
+      async (payload: { recipientId?: string; content?: string }) => {
+        const s = requireAuth();
+        if (!s) return;
+        const recipientId = payload?.recipientId;
+        const content = (payload?.content ?? "").trim();
+        if (!recipientId || !content || recipientId === s.userId) return;
+        if (content.length > 1000) return;
+
+        const msg = await db.message.create({
+          data: { roomId: null, senderId: s.userId, recipientId, content },
+          include: {
+            sender: {
+              select: {
+                id: true,
+                username: true,
+                displayName: true,
+                avatarHue: true,
+              },
+            },
+            recipient: {
+              select: {
+                id: true,
+                username: true,
+                displayName: true,
+                avatarHue: true,
+              },
+            },
+          },
+        });
+
+        const messagePayload = {
           id: msg.id,
           content: msg.content,
           createdAt: msg.createdAt,
           sender: publicUser(msg.sender),
-        },
-      });
-    });
+          recipient: publicUser(msg.recipient!),
+          mine: false,
+        };
 
-    socket.on("chat:dm", async (payload: { recipientId?: string; content?: string }) => {
-      const s = requireAuth();
-      if (!s) return;
-      const recipientId = payload?.recipientId;
-      const content = (payload?.content ?? "").trim();
-      if (!recipientId || !content || recipientId === s.userId) return;
-      if (content.length > 1000) return;
+        // Echo back to sender (as "mine: true").
+        socket.emit("chat:dm", { ...messagePayload, mine: true });
 
-      const msg = await db.message.create({
-        data: { roomId: null, senderId: s.userId, recipientId, content },
-        include: {
-          sender: { select: { id: true, username: true, displayName: true, avatarHue: true } },
-          recipient: { select: { id: true, username: true, displayName: true, avatarHue: true } },
-        },
-      });
-
-      const messagePayload = {
-        id: msg.id,
-        content: msg.content,
-        createdAt: msg.createdAt,
-        sender: publicUser(msg.sender),
-        recipient: publicUser(msg.recipient!),
-        mine: false,
-      };
-
-      // Echo back to sender (as "mine: true").
-      socket.emit("chat:dm", { ...messagePayload, mine: true });
-
-      // Deliver to all of the recipient's sockets.
-      const recSet = userSockets.get(recipientId);
-      if (recSet) {
-        for (const sid of recSet) {
-          io.to(sid).emit("chat:dm", messagePayload);
+        // Deliver to all of the recipient's sockets.
+        const recSet = userSockets.get(recipientId);
+        if (recSet) {
+          for (const sid of recSet) {
+            io.to(sid).emit("chat:dm", messagePayload);
+          }
         }
-      }
-    });
+      },
+    );
 
     socket.on("presence:request", () => {
       const s = requireAuth();
@@ -1192,25 +1462,40 @@ export function attachRealtime(httpServer: HttpServer): Server {
       if (!roomId || roomId !== s.roomId) return;
       if (startingRooms.has(roomId)) return;
 
-      const room = await db.room.findUnique({ where: { id: roomId }, select: { hostId: true, started: true } });
+      const room = await db.room.findUnique({
+        where: { id: roomId },
+        select: { hostId: true, started: true },
+      });
       if (!room) return;
       if (room.started) {
-        socket.emit("room:error", { roomId, error: "This voyage has already set sail." });
+        socket.emit("room:error", {
+          roomId,
+          error: "This voyage has already set sail.",
+        });
         return;
       }
       if (room.hostId !== s.userId) {
-        socket.emit("room:error", { roomId, error: "Only the host can start the voyage." });
+        socket.emit("room:error", {
+          roomId,
+          error: "Only the host can start the voyage.",
+        });
         return;
       }
       const roster = await roomMemberIds(roomId);
       if (roster.length < 2) {
-        socket.emit("room:error", { roomId, error: "Need at least 2 captains in the harbor to set sail." });
+        socket.emit("room:error", {
+          roomId,
+          error: "Need at least 2 captains in the harbor to set sail.",
+        });
         return;
       }
 
       startingRooms.add(roomId);
       try {
-        await db.room.update({ where: { id: roomId }, data: { started: true, currentRound: 1, currentPhase: "5" } });
+        await db.room.update({
+          where: { id: roomId },
+          data: { started: true, currentRound: 1, currentPhase: "5" },
+        });
         const cp = await getCheckpoint(roomId);
         cp.round = 1;
         cp.phase = "5";
@@ -1247,10 +1532,16 @@ export function attachRealtime(httpServer: HttpServer): Server {
       if (!roomId || roomId !== s.roomId) return;
       if (restartingRooms.has(roomId)) return;
 
-      const room = await db.room.findUnique({ where: { id: roomId }, select: { hostId: true } });
+      const room = await db.room.findUnique({
+        where: { id: roomId },
+        select: { hostId: true },
+      });
       if (!room) return;
       if (room.hostId !== s.userId) {
-        socket.emit("room:error", { roomId, error: "Only the host can restart the voyage." });
+        socket.emit("room:error", {
+          roomId,
+          error: "Only the host can restart the voyage.",
+        });
         return;
       }
 
@@ -1262,7 +1553,12 @@ export function attachRealtime(httpServer: HttpServer): Server {
         // whole harbor rerolls fresh market, orders, and Broker intel.
         const restarted = await db.room.update({
           where: { id: roomId },
-          data: { started: false, currentRound: 1, currentPhase: "0", voyageEpoch: { increment: 1 } },
+          data: {
+            started: false,
+            currentRound: 1,
+            currentPhase: "0",
+            voyageEpoch: { increment: 1 },
+          },
         });
         await db.gameState.deleteMany({ where: { roomId } });
 
@@ -1273,7 +1569,10 @@ export function attachRealtime(httpServer: HttpServer): Server {
         // A restarted room can sail, and conclude, all over again.
         concludedRooms.delete(roomId);
 
-        io.to(`room:${roomId}`).emit("room:restarted", { roomId, voyageEpoch: restarted.voyageEpoch });
+        io.to(`room:${roomId}`).emit("room:restarted", {
+          roomId,
+          voyageEpoch: restarted.voyageEpoch,
+        });
         const cp = await getCheckpoint(roomId);
         await broadcastReadyState(roomId, cp);
       } finally {
@@ -1303,7 +1602,8 @@ export function attachRealtime(httpServer: HttpServer): Server {
           emitRoomMembers(s.roomId);
           // Only once their last socket is gone. A refresh or a second tab
           // closing shouldn't start the clock on losing their seat.
-          if (!set || set.size === 0) scheduleDeparture(s.roomId, s.userId, s.user.displayName);
+          if (!set || set.size === 0)
+            scheduleDeparture(s.roomId, s.userId, s.user.displayName);
         }
         broadcastPresence();
       }
@@ -1340,7 +1640,11 @@ export function attachRealtime(httpServer: HttpServer): Server {
   // make them, and is reaped the same way.
   async function reconcileMembershipAfterBoot() {
     const members = await db.roomMember.findMany({
-      select: { roomId: true, userId: true, user: { select: { displayName: true } } },
+      select: {
+        roomId: true,
+        userId: true,
+        user: { select: { displayName: true } },
+      },
     });
     for (const m of members) {
       scheduleDeparture(m.roomId, m.userId, m.user.displayName);

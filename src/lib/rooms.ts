@@ -9,10 +9,12 @@
 import { db } from "./db";
 
 export type LeaveRoomResult =
-  | { roomDeleted: true }
-  | { roomDeleted: false; newHostId: string | null };
+  { roomDeleted: true } | { roomDeleted: false; newHostId: string | null };
 
-export async function leaveRoomForUser(userId: string, roomId: string): Promise<LeaveRoomResult> {
+export async function leaveRoomForUser(
+  userId: string,
+  roomId: string,
+): Promise<LeaveRoomResult> {
   await db.roomMember.deleteMany({ where: { userId, roomId } }).catch(() => {});
 
   const room = await db.room.findUnique({
@@ -28,7 +30,10 @@ export async function leaveRoomForUser(userId: string, roomId: string): Promise<
 
   if (room.hostId === userId) {
     const newHostId = room.members[0].userId;
-    await db.room.update({ where: { id: roomId }, data: { hostId: newHostId } });
+    await db.room.update({
+      where: { id: roomId },
+      data: { hostId: newHostId },
+    });
     return { roomDeleted: false, newHostId };
   }
 
@@ -37,7 +42,10 @@ export async function leaveRoomForUser(userId: string, roomId: string): Promise<
 
 // Every room a user currently sits in, for cleaning up on logout.
 export async function roomIdsForUser(userId: string): Promise<string[]> {
-  const memberships = await db.roomMember.findMany({ where: { userId }, select: { roomId: true } });
+  const memberships = await db.roomMember.findMany({
+    where: { userId },
+    select: { roomId: true },
+  });
   return memberships.map((m) => m.roomId);
 }
 
@@ -50,6 +58,9 @@ export async function roomIdsForUser(userId: string): Promise<string[]> {
 // drop, still counts; only an actual departure (explicit leave, logout,
 // or the disconnect grace timer expiring) removes them from this list.
 export async function roomMemberIds(roomId: string): Promise<string[]> {
-  const members = await db.roomMember.findMany({ where: { roomId }, select: { userId: true } });
+  const members = await db.roomMember.findMany({
+    where: { roomId },
+    select: { userId: true },
+  });
   return members.map((m) => m.userId);
 }

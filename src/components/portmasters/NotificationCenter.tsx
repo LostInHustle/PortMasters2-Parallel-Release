@@ -12,7 +12,13 @@ import type { NotificationItem } from "@/lib/use-notifications";
  * did. A new push replaces this outright; nothing is lost since it's
  * also in the notification button's full history.
  */
-export function NotificationCenter({ current, dismiss }: { current: NotificationItem | null; dismiss: () => void }) {
+export function NotificationCenter({
+  current,
+  dismiss,
+}: {
+  current: NotificationItem | null;
+  dismiss: () => void;
+}) {
   return (
     <div className="fixed bottom-5 left-5 z-40 w-[min(360px,calc(100vw-2.5rem))]">
       <AnimatePresence mode="wait">

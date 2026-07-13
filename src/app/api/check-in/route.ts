@@ -11,7 +11,12 @@ import {
   levelForRenownXP,
   type CaptainLegacySummary,
 } from "@/lib/game/legacy";
-import { applyCheckIn, checkInStatus, utcDayKey, type CheckInState } from "@/lib/game/checkin";
+import {
+  applyCheckIn,
+  checkInStatus,
+  utcDayKey,
+  type CheckInState,
+} from "@/lib/game/checkin";
 
 type LegacyRow = {
   renownLevel: number;
@@ -26,7 +31,10 @@ type LegacyRow = {
 // meritIds is threaded in rather than queried here, since every call in
 // this file is for the one signed in user and a check-in claim never
 // changes their merits, so one query up front in POST covers all of them.
-function toSummary(row: LegacyRow | null, meritIds: string[]): CaptainLegacySummary {
+function toSummary(
+  row: LegacyRow | null,
+  meritIds: string[],
+): CaptainLegacySummary {
   if (!row) return DEFAULT_LEGACY_SUMMARY;
   return {
     renownLevel: row.renownLevel,
@@ -39,16 +47,25 @@ function toSummary(row: LegacyRow | null, meritIds: string[]): CaptainLegacySumm
 }
 
 function stateOf(row: LegacyRow | null): CheckInState {
-  return { checkInCount: row?.checkInCount ?? 0, lastCheckInDate: row?.lastCheckInDate ?? null };
+  return {
+    checkInCount: row?.checkInCount ?? 0,
+    lastCheckInDate: row?.lastCheckInDate ?? null,
+  };
 }
 
 export async function POST() {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const today = utcDayKey();
-  const prior = (await db.captainLegacy.findUnique({ where: { userId: user.id } })) as LegacyRow | null;
-  const meritRows = await db.captainMerit.findMany({ where: { userId: user.id }, select: { meritId: true } });
+  const prior = (await db.captainLegacy.findUnique({
+    where: { userId: user.id },
+  })) as LegacyRow | null;
+  const meritRows = await db.captainMerit.findMany({
+    where: { userId: user.id },
+    select: { meritId: true },
+  });
   const meritIds = meritRows.map((m) => m.meritId);
 
   const result = applyCheckIn(stateOf(prior), today);
@@ -72,7 +89,10 @@ export async function POST() {
   // in) has to be matched explicitly, since SQL `date != today` is not true
   // for NULL.
   const guarded = await db.captainLegacy.updateMany({
-    where: { userId: user.id, OR: [{ lastCheckInDate: null }, { NOT: { lastCheckInDate: today } }] },
+    where: {
+      userId: user.id,
+      OR: [{ lastCheckInDate: null }, { NOT: { lastCheckInDate: today } }],
+    },
     data: {
       renownXP: newXP,
       renownLevel: newLevel,
@@ -99,7 +119,11 @@ export async function POST() {
           day: result.day,
           xpGained: result.xp,
           leveledUp: newLevel > priorLevel,
-          legacy: { ...DEFAULT_LEGACY_SUMMARY, renownXP: newXP, renownLevel: newLevel },
+          legacy: {
+            ...DEFAULT_LEGACY_SUMMARY,
+            renownXP: newXP,
+            renownLevel: newLevel,
+          },
           checkIn: checkInStatus(result.next, today),
         });
       } catch {
@@ -107,7 +131,9 @@ export async function POST() {
         // now-current (already claimed) state.
       }
     }
-    const fresh = (await db.captainLegacy.findUnique({ where: { userId: user.id } })) as LegacyRow | null;
+    const fresh = (await db.captainLegacy.findUnique({
+      where: { userId: user.id },
+    })) as LegacyRow | null;
     return NextResponse.json({
       claimed: false,
       legacy: toSummary(fresh, meritIds),
@@ -120,7 +146,11 @@ export async function POST() {
     day: result.day,
     xpGained: result.xp,
     leveledUp: newLevel > priorLevel,
-    legacy: { ...toSummary(prior, meritIds), renownXP: newXP, renownLevel: newLevel },
+    legacy: {
+      ...toSummary(prior, meritIds),
+      renownXP: newXP,
+      renownLevel: newLevel,
+    },
     checkIn: checkInStatus(result.next, today),
   });
 }

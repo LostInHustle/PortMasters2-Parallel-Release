@@ -28,7 +28,9 @@ function newSessionToken(): string {
   return randomBytes(32).toString("hex");
 }
 
-export async function createSession(userId: string): Promise<{ token: string; expiresAt: Date }> {
+export async function createSession(
+  userId: string,
+): Promise<{ token: string; expiresAt: Date }> {
   const token = newSessionToken();
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
   await db.session.create({ data: { token, userId, expiresAt } });

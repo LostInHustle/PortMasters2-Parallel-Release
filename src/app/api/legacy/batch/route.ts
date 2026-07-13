@@ -7,13 +7,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/api-auth";
-import { DEFAULT_LEGACY_SUMMARY, type CaptainLegacySummary } from "@/lib/game/legacy";
+import {
+  DEFAULT_LEGACY_SUMMARY,
+  type CaptainLegacySummary,
+} from "@/lib/game/legacy";
 
 const BatchSchema = z.object({ userIds: z.array(z.string()).max(200) });
 
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let body: unknown;
   try {
@@ -22,13 +26,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
   const parsed = BatchSchema.safeParse(body);
-  if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  if (!parsed.success)
+    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
   const ids = [...new Set(parsed.data.userIds)];
-  const rows = await db.captainLegacy.findMany({ where: { userId: { in: ids } } });
+  const rows = await db.captainLegacy.findMany({
+    where: { userId: { in: ids } },
+  });
   const byUserId = new Map(rows.map((r) => [r.userId, r]));
 
-  const meritRows = await db.captainMerit.findMany({ where: { userId: { in: ids } }, select: { userId: true, meritId: true } });
+  const meritRows = await db.captainMerit.findMany({
+    where: { userId: { in: ids } },
+    select: { userId: true, meritId: true },
+  });
   const meritsByUserId = new Map<string, string[]>();
   for (const m of meritRows) {
     const list = meritsByUserId.get(m.userId);

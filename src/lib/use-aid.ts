@@ -71,14 +71,23 @@ export function useAid(
     };
     const onGrantedEvent = (data: GrantedLoan & { roomId: string }) => {
       if (data.roomId !== roomId) return;
-      const role = data.helperId === myUserId ? "helper" : data.borrowerId === myUserId ? "borrower" : null;
+      const role =
+        data.helperId === myUserId
+          ? "helper"
+          : data.borrowerId === myUserId
+            ? "borrower"
+            : null;
       if (role) onGrantedRef.current(data, role);
     };
     const onRepaidEvent = (data: RepaidLoan & { roomId: string }) => {
       if (data.roomId !== roomId) return;
       onRepaidRef.current(data);
     };
-    const onHelpFail = (data: { roomId: string; requestId: string; reason: string }) => {
+    const onHelpFail = (data: {
+      roomId: string;
+      requestId: string;
+      reason: string;
+    }) => {
       if (data.roomId !== roomId) return;
       setError(data.reason);
     };
@@ -133,5 +142,13 @@ export function useAid(
     [socket, roomId],
   );
 
-  return { requests, error, clearError: () => setError(null), post, cancel, help, repay };
+  return {
+    requests,
+    error,
+    clearError: () => setError(null),
+    post,
+    cancel,
+    help,
+    repay,
+  };
 }

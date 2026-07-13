@@ -3,9 +3,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser, publicUser } from "@/lib/api-auth";
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ otherUserId: string }> }) {
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ otherUserId: string }> },
+) {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { otherUserId } = await params;
 
   if (otherUserId === user.id) {
@@ -16,7 +20,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ oth
     where: { id: otherUserId },
     select: { id: true, username: true, displayName: true, avatarHue: true },
   });
-  if (!other) return NextResponse.json({ error: "User not found" }, { status: 404 });
+  if (!other)
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
 
   const msgs = await db.message.findMany({
     where: {
@@ -28,7 +33,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ oth
     orderBy: { createdAt: "asc" },
     take: 200,
     include: {
-      sender: { select: { id: true, username: true, displayName: true, avatarHue: true } },
+      sender: {
+        select: {
+          id: true,
+          username: true,
+          displayName: true,
+          avatarHue: true,
+        },
+      },
     },
   });
 

@@ -1,6 +1,14 @@
 "use client";
 
-import { Anchor, Crown, Trophy, Gem, Shield, Medal, type LucideIcon } from "lucide-react";
+import {
+  Anchor,
+  Crown,
+  Trophy,
+  Gem,
+  Shield,
+  Medal,
+  type LucideIcon,
+} from "lucide-react";
 import type { MeritId } from "@/lib/game/merits";
 import { cn } from "@/lib/utils";
 
@@ -42,7 +50,15 @@ export function Avatar({
   );
 }
 
-export function OnlineDot({ online, size = 10, className }: { online: boolean; size?: number; className?: string }) {
+export function OnlineDot({
+  online,
+  size = 10,
+  className,
+}: {
+  online: boolean;
+  size?: number;
+  className?: string;
+}) {
   return (
     <span
       className={cn(
@@ -50,7 +66,11 @@ export function OnlineDot({ online, size = 10, className }: { online: boolean; s
         online ? "bg-emerald-400" : "bg-zinc-400/60",
         className,
       )}
-      style={{ width: size, height: size, boxShadow: online ? "0 0 8px 1px oklch(0.75 0.18 150 / 0.7)" : "none" }}
+      style={{
+        width: size,
+        height: size,
+        boxShadow: online ? "0 0 8px 1px oklch(0.75 0.18 150 / 0.7)" : "none",
+      }}
       aria-hidden
     />
   );
@@ -101,7 +121,13 @@ const MERIT_ICONS: Record<MeritId, LucideIcon> = {
   century_club: Medal,
 };
 
-export function MeritIcon({ id, className }: { id: MeritId; className?: string }) {
+export function MeritIcon({
+  id,
+  className,
+}: {
+  id: MeritId;
+  className?: string;
+}) {
   const Icon = MERIT_ICONS[id];
   return <Icon className={className} aria-hidden />;
 }

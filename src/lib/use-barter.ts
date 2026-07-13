@@ -59,15 +59,25 @@ export function useBarter(
       setOffers(data.offers);
       const mine = new Map<string, BarterRefund>();
       for (const o of data.offers) {
-        if (o.fromUserId === myUserId) mine.set(o.id, { item: o.offerItem, amount: o.offerAmount });
+        if (o.fromUserId === myUserId)
+          mine.set(o.id, { item: o.offerItem, amount: o.offerAmount });
       }
       myOpenRef.current = mine;
     };
-    const onFulfilledEvent = (data: { roomId: string; offer: BarterOffer; accepterId: string; accepterName: string }) => {
+    const onFulfilledEvent = (data: {
+      roomId: string;
+      offer: BarterOffer;
+      accepterId: string;
+      accepterName: string;
+    }) => {
       if (data.roomId !== roomId) return;
       onFulfilledRef.current(data.offer, data.accepterId);
     };
-    const onAcceptFail = (data: { roomId: string; offerId: string; reason: string }) => {
+    const onAcceptFail = (data: {
+      roomId: string;
+      offerId: string;
+      reason: string;
+    }) => {
       if (data.roomId !== roomId) return;
       setError(data.reason);
     };
@@ -91,9 +101,20 @@ export function useBarter(
   }, [socket, roomId, myUserId]);
 
   const post = useCallback(
-    (offerItem: string, offerAmount: number, requestItem: string, requestAmount: number) => {
+    (
+      offerItem: string,
+      offerAmount: number,
+      requestItem: string,
+      requestAmount: number,
+    ) => {
       if (!socket) return;
-      socket.emit("barter:post", { roomId, offerItem, offerAmount, requestItem, requestAmount });
+      socket.emit("barter:post", {
+        roomId,
+        offerItem,
+        offerAmount,
+        requestItem,
+        requestAmount,
+      });
     },
     [socket, roomId],
   );
@@ -121,7 +142,18 @@ export function useBarter(
   // every other captain has also readied up, by then, more of my offers
   // may have been accepted (see the race-safety note in engine.ts's
   // completeBarterPhase).
-  const takeMyOpenRefunds = useCallback((): BarterRefund[] => Array.from(myOpenRef.current.values()), []);
+  const takeMyOpenRefunds = useCallback(
+    (): BarterRefund[] => Array.from(myOpenRef.current.values()),
+    [],
+  );
 
-  return { offers, error, clearError: () => setError(null), post, cancel, accept, takeMyOpenRefunds };
+  return {
+    offers,
+    error,
+    clearError: () => setError(null),
+    post,
+    cancel,
+    accept,
+    takeMyOpenRefunds,
+  };
 }
