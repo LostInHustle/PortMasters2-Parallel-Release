@@ -1,9 +1,14 @@
 "use client";
 
-import { COLORS, ICONS, PRODUCTS, RESOURCES } from "@/lib/game/constants";
+import { COLORS, ICONS } from "@/lib/game/constants";
 import { getHireCost } from "@/lib/game/engine";
 import type { GameState } from "@/lib/game/types";
 import { difficultyConfig } from "@/lib/game/difficulty";
+import {
+  unlockedProducts,
+  unlockedResources,
+  unlockedWorkerTypes,
+} from "@/lib/game/pools";
 import { cn } from "@/lib/utils";
 import { Term } from "../Term";
 import { priceAwareTermContent } from "./PriceTooltips";
@@ -19,15 +24,18 @@ export function GameStatusPanel({
   const discount = game.shipLevel * 5;
   const showObligations = ![0, 5, "endgame", "bankruptcy"].includes(game.phase);
 
-  const ww = game.weavers.length * getHireCost(game, "weaver");
-  const mw = game.masterWeavers.length * getHireCost(game, "master");
-  const sw = game.sachetMakers.length * getHireCost(game, "sachet_maker");
+  const ww = game.workers.weaver.length * getHireCost(game, "weaver");
+  const mw = game.workers.master.length * getHireCost(game, "master");
+  const sw =
+    game.workers.sachet_maker.length * getHireCost(game, "sachet_maker");
   const pendWages = ww + mw + sw;
   const pendMaint = game.fixedCost + game.maintenancePenalty;
   const pendTotal = pendWages + pendMaint;
   const safe = game.money >= pendTotal;
   const nW =
-    game.weavers.length + game.masterWeavers.length + game.sachetMakers.length;
+    game.workers.weaver.length +
+    game.workers.master.length +
+    game.workers.sachet_maker.length;
 
   return (
     <div className="space-y-3">
@@ -81,7 +89,7 @@ export function GameStatusPanel({
         <div className="text-[10px] font-semibold tracking-wide text-muted-foreground/80 mt-0.5 mb-0.5">
           ━━ Raw Materials ━━
         </div>
-        {RESOURCES.map((r) => (
+        {unlockedResources(game.difficulty, game.currentRound).map((r) => (
           <InvItem
             key={r}
             icon={ICONS[r]}
@@ -94,7 +102,7 @@ export function GameStatusPanel({
         <div className="text-[10px] font-semibold tracking-wide text-muted-foreground/80 mt-2 mb-0.5">
           ━━ Finished Goods ━━
         </div>
-        {PRODUCTS.map((r) => (
+        {unlockedProducts(game.difficulty, game.currentRound).map((r) => (
           <InvItem
             key={r}
             icon={ICONS[r]}
@@ -104,9 +112,9 @@ export function GameStatusPanel({
             priceContent={priceAwareTermContent(game, r)}
           />
         ))}
-        {game.weavers.length ||
-        game.masterWeavers.length ||
-        game.sachetMakers.length ? (
+        {game.workers.weaver.length ||
+        game.workers.master.length ||
+        game.workers.sachet_maker.length ? (
           <>
             <div className="text-[10px] font-semibold tracking-wide text-muted-foreground/80 mt-2 mb-0.5">
               ━━ Artisans ━━
@@ -115,21 +123,21 @@ export function GameStatusPanel({
               icon="👩‍🔧"
               name="Weavers"
               term="Weaver"
-              count={game.weavers.length}
+              count={game.workers.weaver.length}
               muted
             />
             <InvItem
               icon="👩‍🎨"
               name="Masters"
               term="Master Weaver"
-              count={game.masterWeavers.length}
+              count={game.workers.master.length}
               muted
             />
             <InvItem
               icon="🌸"
               name="Makers"
               term="Sachet Maker"
-              count={game.sachetMakers.length}
+              count={game.workers.sachet_maker.length}
               muted
             />
           </>
@@ -205,19 +213,19 @@ export function GameStatusPanel({
           </Row>
           {ww > 0 && (
             <SubRow
-              label={`↳ ${game.weavers.length}× Weaver`}
+              label={`↳ ${game.workers.weaver.length}× Weaver`}
               value={`${ww}g`}
             />
           )}
           {mw > 0 && (
             <SubRow
-              label={`↳ ${game.masterWeavers.length}× Master`}
+              label={`↳ ${game.workers.master.length}× Master`}
               value={`${mw}g`}
             />
           )}
           {sw > 0 && (
             <SubRow
-              label={`↳ ${game.sachetMakers.length}× Maker`}
+              label={`↳ ${game.workers.sachet_maker.length}× Maker`}
               value={`${sw}g`}
             />
           )}

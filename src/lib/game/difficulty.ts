@@ -48,7 +48,14 @@ export interface DifficultyConfig {
   // new-content library. An empty schedule (fair_winds) is a flat market.
   purchaseCardsBase: number;
   orderCardsBase: number;
-  charterUnlocks: Record<number, number>;
+  // Content tier to the round its charter opens (see the tiered pools in
+  // ./constants). A tier absent from this map never opens on this difficulty,
+  // which is how Fair Winds stays on the founding trade forever.
+  tierUnlock: Record<number, number>;
+  // Extra cards added to both boards per tier opened, index 0 being the first
+  // charter. One schedule drives content and market breadth together, so the
+  // banner, the new goods, and the busier harbor are all the same event.
+  cardsPerTier: readonly number[];
 
   // Raid probability. One entry is a flat toll all voyage; two entries step up
   // at the midpoint (round > floor(rounds / 2)). Severity itself is unchanged:
@@ -91,7 +98,8 @@ export const DIFFICULTIES: Record<Difficulty, DifficultyConfig> = {
     maintenance: 15,
     purchaseCardsBase: 6,
     orderCardsBase: 6,
-    charterUnlocks: {},
+    tierUnlock: {},
+    cardsPerTier: [],
     pirateChance: [0.2],
     escortCostRate: 0.1,
     brokerCorruption: false,
@@ -113,7 +121,8 @@ export const DIFFICULTIES: Record<Difficulty, DifficultyConfig> = {
     maintenance: 18,
     purchaseCardsBase: 6,
     orderCardsBase: 6,
-    charterUnlocks: { 4: 2, 8: 2 },
+    tierUnlock: { 1: 4, 2: 8 },
+    cardsPerTier: [2, 2],
     pirateChance: [0.22, 0.3],
     escortCostRate: 0.12,
     brokerCorruption: false,
@@ -135,7 +144,8 @@ export const DIFFICULTIES: Record<Difficulty, DifficultyConfig> = {
     maintenance: 22,
     purchaseCardsBase: 6,
     orderCardsBase: 6,
-    charterUnlocks: { 6: 2, 11: 3 },
+    tierUnlock: { 1: 6, 2: 11 },
+    cardsPerTier: [2, 3],
     pirateChance: [0.28, 0.38],
     escortCostRate: 0.15,
     brokerCorruption: true,
@@ -242,28 +252,62 @@ export function brokerCorruptionFor(value: unknown): boolean {
 // Card counts for both boards on a given round: the base plus every charter
 // bump the voyage has reached by now. Mirrors the accumulation of the
 // original's tier unlocks / phaseOptionCount, expressed as card density.
+// The highest content tier whose charter has opened by this round. Everything
+// tier gated (goods, ports, artisans, boons, modules, market breadth) keys off
+// this one number, so they can never disagree about what is available.
+export function unlockedTierFor(value: unknown, roundNo: number): number {
+  const cfg = difficultyConfig(value);
+  let highest = 0;
+  for (const [tierStr, openRound] of Object.entries(cfg.tierUnlock)) {
+    if (roundNo >= openRound) highest = Math.max(highest, Number(tierStr));
+  }
+  return highest;
+}
+
+// Everything from tier 0 up to whatever has opened, in tier order. The generic
+// keeps this usable for every pool (resources, products, ports, boons, modules)
+// without each one restating the accumulation.
+export function unlockedPool<T>(
+  tiers: readonly (readonly T[])[],
+  value: unknown,
+  roundNo: number,
+): T[] {
+  const tier = unlockedTierFor(value, roundNo);
+  const out: T[] = [];
+  for (let i = 0; i <= tier; i++) out.push(...(tiers[i] ?? []));
+  return out;
+}
+
 export function marketCountsFor(
   value: unknown,
   roundNo: number,
 ): { purchase: number; order: number } {
   const cfg = difficultyConfig(value);
+  const tier = unlockedTierFor(value, roundNo);
   let extra = 0;
-  for (const [roundStr, add] of Object.entries(cfg.charterUnlocks)) {
-    if (roundNo >= Number(roundStr)) extra += add;
-  }
+  for (let i = 0; i < tier; i++) extra += cfg.cardsPerTier[i] ?? 0;
   return {
     purchase: cfg.purchaseCardsBase + extra,
     order: cfg.orderCardsBase + extra,
   };
 }
 
-// True on exactly the round a charter opens, so the caller can log the "the
-// harbor grows busy" banner. Independent of the count math above.
+// Which content tier's charter opens on exactly this round, if any, so the
+// caller can announce what actually arrived rather than a generic banner.
+export function charterTierOpeningOn(
+  value: unknown,
+  roundNo: number,
+): number | undefined {
+  for (const [tierStr, openRound] of Object.entries(
+    difficultyConfig(value).tierUnlock,
+  )) {
+    if (roundNo === openRound) return Number(tierStr);
+  }
+  return undefined;
+}
+
 export function charterOpensOn(value: unknown, roundNo: number): boolean {
-  return Object.prototype.hasOwnProperty.call(
-    difficultyConfig(value).charterUnlocks,
-    String(roundNo),
-  );
+  return charterTierOpeningOn(value, roundNo) !== undefined;
 }
 
 // Raid probability for this round: the flat toll, or the second-half tier once

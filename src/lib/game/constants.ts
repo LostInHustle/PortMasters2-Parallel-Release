@@ -27,6 +27,14 @@ export const ICONS: Record<string, string> = {
   "Cotton Clothes": "👕",
   Brocade: "👗",
   Sachet: "🌸",
+  "Porcelain Clay": "🏺",
+  "Copper Ore": "⛏️",
+  "Celadon Ware": "🫖",
+  "Bronze Mirror": "🪞",
+  Spices: "🌶️",
+  Pearls: "🦪",
+  "Foreign Balm": "🧴",
+  "Pearl String": "📿",
 };
 
 export const COLORS: Record<string, string> = {
@@ -38,27 +46,64 @@ export const COLORS: Record<string, string> = {
   "Cotton Clothes": "#4169E1",
   Brocade: "#8B008B",
   Sachet: "#FF1493",
+  "Porcelain Clay": "#8FA5B6",
+  "Copper Ore": "#B87333",
+  "Celadon Ware": "#6FA292",
+  "Bronze Mirror": "#8C7853",
+  Spices: "#C1440E",
+  Pearls: "#9AA7B1",
+  "Foreign Balm": "#C99B6E",
+  "Pearl String": "#B9A externa",
 };
 
-export const RESOURCES = ["Hemp", "Silk", "Tea"] as const;
-export const PRODUCTS = [
+// =====================================================================
+// Content tiers. The founding trade (tier 0) is what every voyage starts
+// with; each charter a difficulty schedules opens the next tier of goods,
+// ports, and artisans (see tierUnlock in ./difficulty). Fair Winds never
+// leaves tier 0, which is what keeps the entry tier exactly the game it
+// has always been.
+//
+// Tier 2 is authored in a following pass, so its arrays are deliberately
+// empty: a difficulty that unlocks tier 2 today simply gains nothing yet,
+// rather than referencing goods that have no price or recipe.
+// =====================================================================
+export const RESOURCES_TIER0 = ["Hemp", "Silk", "Tea"] as const;
+export const RESOURCES_TIER1 = ["Porcelain Clay", "Copper Ore"] as const;
+export const RESOURCES_TIER2 = [] as const;
+export const RESOURCES = [
+  ...RESOURCES_TIER0,
+  ...RESOURCES_TIER1,
+  ...RESOURCES_TIER2,
+] as const;
+
+export const PRODUCTS_TIER0 = [
   "Linen Clothes",
   "Cotton Clothes",
   "Brocade",
   "Sachet",
+] as const;
+export const PRODUCTS_TIER1 = ["Bronze Mirror", "Celadon Ware"] as const;
+export const PRODUCTS_TIER2 = [] as const;
+export const PRODUCTS = [
+  ...PRODUCTS_TIER0,
+  ...PRODUCTS_TIER1,
+  ...PRODUCTS_TIER2,
 ] as const;
 // Anything a captain can put up for barter: Gold plus every raw material
 // and finished good. Kept separate from RESOURCES/PRODUCTS (rather than
 // folding Gold into one of those) so the existing buying/inventory
 // listings that iterate those two arrays don't suddenly pick up Gold.
 export const BARTER_ITEMS = ["Gold", ...RESOURCES, ...PRODUCTS] as const;
-export const PORTS = [
+export const PORTS_TIER0 = [
   "Quanzhou Port",
   "Guangzhou Port",
   "Ningbo Port",
   "Yangzhou Port",
   "Hangzhou Port",
 ] as const;
+export const PORTS_TIER1 = ["Fuzhou Port", "Goryeo Port"] as const;
+export const PORTS_TIER2 = [] as const;
+export const PORTS = [...PORTS_TIER0, ...PORTS_TIER1, ...PORTS_TIER2] as const;
 
 export const RECIPES: Record<
   string,
@@ -76,6 +121,16 @@ export const RECIPES: Record<
     value: 80,
     worker_type: "sachet_maker",
   },
+  "Bronze Mirror": {
+    materials: { "Copper Ore": 3 },
+    value: 45,
+    worker_type: "coppersmith",
+  },
+  "Celadon Ware": {
+    materials: { "Porcelain Clay": 3 },
+    value: 65,
+    worker_type: "potter",
+  },
 };
 
 export const COMMODITIES: Record<
@@ -85,6 +140,14 @@ export const COMMODITIES: Record<
   Hemp: { ports: ["Quanzhou Port", "Ningbo Port"], basePrice: [3, 6] },
   Silk: { ports: ["Hangzhou Port", "Yangzhou Port"], basePrice: [6, 10] },
   Tea: { ports: ["Guangzhou Port", "Quanzhou Port"], basePrice: [10, 14] },
+  "Porcelain Clay": {
+    ports: ["Quanzhou Port", "Fuzhou Port"],
+    basePrice: [8, 12],
+  },
+  "Copper Ore": {
+    ports: ["Guangzhou Port", "Goryeo Port"],
+    basePrice: [10, 15],
+  },
 };
 
 export const PRODUCT_PRICES: Record<string, [number, number]> = {
@@ -92,18 +155,91 @@ export const PRODUCT_PRICES: Record<string, [number, number]> = {
   "Cotton Clothes": [50, 65],
   Brocade: [70, 90],
   Sachet: [95, 120],
+  "Bronze Mirror": [55, 72],
+  "Celadon Ware": [78, 100],
 };
 
-export const RESOURCE_PROBS: Record<string, number> = {
-  Hemp: 0.4,
-  Silk: 0.35,
-  Tea: 0.25,
+// Relative draw weights for the port market, not probabilities: the engine
+// normalizes them across whichever resources are currently unlocked (see
+// genResourceCard). Weights rather than fixed probabilities is what keeps the
+// founding trio at exactly 0.40 / 0.35 / 0.25 while tier 0 is all that is
+// open, so Fair Winds draws precisely the market it always did, while the
+// newer goods stay rarer than the staples once a charter opens.
+export const RESOURCE_WEIGHTS: Record<string, number> = {
+  Hemp: 40,
+  Silk: 35,
+  Tea: 25,
+  "Porcelain Clay": 14,
+  "Copper Ore": 12,
 };
-export const WAGES: Record<string, number> = {
-  weaver: 8,
-  master: 12,
-  sachet_maker: 20,
+
+// The artisan roster. Each type belongs to a content tier and is only
+// hirable once that tier's charter has opened. WAGES is derived from this
+// rather than repeated, so a wage can never drift between the two.
+export type WorkerTypeId =
+  "weaver" | "master" | "sachet_maker" | "coppersmith" | "potter";
+
+export type WorkerType = {
+  id: WorkerTypeId;
+  label: string;
+  plural: string;
+  icon: string;
+  wage: number;
+  tier: number;
 };
+
+export const WORKER_TYPES: WorkerType[] = [
+  {
+    id: "weaver",
+    label: "Weaver",
+    plural: "Weavers",
+    icon: "👩‍🔧",
+    wage: 8,
+    tier: 0,
+  },
+  {
+    id: "master",
+    label: "Master Weaver",
+    plural: "Masters",
+    icon: "👩‍🎨",
+    wage: 12,
+    tier: 0,
+  },
+  {
+    id: "sachet_maker",
+    label: "Sachet Maker",
+    plural: "Makers",
+    icon: "🌸",
+    wage: 20,
+    tier: 0,
+  },
+  {
+    id: "coppersmith",
+    label: "Coppersmith",
+    plural: "Coppersmiths",
+    icon: "🧑‍🏭",
+    wage: 12,
+    tier: 1,
+  },
+  {
+    id: "potter",
+    label: "Potter",
+    plural: "Potters",
+    icon: "🧑‍🎨",
+    wage: 14,
+    tier: 1,
+  },
+];
+
+export const WORKER_TYPE_IDS: WorkerTypeId[] = WORKER_TYPES.map((w) => w.id);
+
+export function workerType(id: string): WorkerType | undefined {
+  return WORKER_TYPES.find((w) => w.id === id);
+}
+
+export const WAGES: Record<string, number> = Object.fromEntries(
+  WORKER_TYPES.map((w) => [w.id, w.wage]),
+);
 
 // Reputation a captain gains for lending Gold to another captain short on
 // funds, scaled to the amount so a token loan doesn't pay the same as
@@ -119,7 +255,7 @@ export type Boon = {
   modifiers: Record<string, number>;
 };
 
-export const BOONS: Boon[] = [
+export const BOONS_TIER0: Boon[] = [
   {
     id: "silk_wind",
     name: "Silk Winds",
@@ -178,9 +314,39 @@ export const BOONS: Boon[] = [
   },
 ];
 
+// Drafted only once the first charter has opened, so they can lean on the
+// goods it brings without ever appearing in a voyage that has no use for them.
+export const BOONS_TIER1: Boon[] = [
+  {
+    id: "farsight",
+    name: "Farsight",
+    icon: "🔮",
+    desc: "Reveals one Broker's rumor for free this round.",
+    modifiers: { free_intel: 1 },
+  },
+  {
+    id: "kiln_and_forge_guild",
+    name: "Kiln and Forge Guild",
+    icon: "🏮",
+    desc: "Celadon Ware & Bronze Mirror orders pay 15% more this round.",
+    modifiers: { charter_order_bonus: 0.15 },
+  },
+  {
+    id: "frontier_tariff_relief",
+    name: "Frontier Tariff Relief",
+    icon: "🧾",
+    desc: "VAT on finished goods is halved this round.",
+    modifiers: { vat_discount: 0.5 },
+  },
+];
+
+export const BOONS_TIER2: Boon[] = [];
+
+export const BOONS: Boon[] = [...BOONS_TIER0, ...BOONS_TIER1, ...BOONS_TIER2];
+
 export type Module = { id: string; name: string; icon: string; desc: string };
 
-export const MODULES: Module[] = [
+export const MODULES_TIER0: Module[] = [
   {
     id: "smugglers_hold",
     name: "Smuggler's Hold",
@@ -229,6 +395,36 @@ export const MODULES: Module[] = [
     icon: "⚙️",
     desc: "Transport cost -5 Gold. Maintenance +10 Gold.",
   },
+];
+
+// Drafted only once the first charter has opened, same as BOONS_TIER1.
+export const MODULES_TIER1: Module[] = [
+  {
+    id: "bureau_token",
+    name: "Maritime Bureau Token",
+    icon: "🎫",
+    desc: "Charter goods (Porcelain Clay, Copper Ore and their products) pay +10% on orders.",
+  },
+  {
+    id: "kiln_cellar",
+    name: "Kiln Cellar",
+    icon: "🔥",
+    desc: "Porcelain Clay and Copper Ore cost 2 Gold less per unit.",
+  },
+  {
+    id: "ocean_relay",
+    name: "Ocean Interpreter",
+    icon: "📡",
+    desc: "Broker's Whisper reveals 1 extra rumor at no extra cost.",
+  },
+];
+
+export const MODULES_TIER2: Module[] = [];
+
+export const MODULES: Module[] = [
+  ...MODULES_TIER0,
+  ...MODULES_TIER1,
+  ...MODULES_TIER2,
 ];
 
 // Voyage length, raid odds, the escort fee, and how many cards each board

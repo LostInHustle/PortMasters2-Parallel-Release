@@ -34,7 +34,9 @@ import {
   PRODUCT_PRICES,
   PRODUCTS,
   RECIPES,
-  RESOURCE_PROBS,
+  RESOURCE_WEIGHTS,
+  WORKER_TYPES,
+  workerType,
   RESOURCES,
   WAGES,
   WORD_ON_THE_DOCKS_REWARD,
@@ -42,7 +44,17 @@ import {
   type Boon,
   type MerchantRating,
   type Module,
+  type WorkerTypeId,
 } from "./constants";
+import {
+  isCharterGood,
+  unlockedBoons,
+  unlockedModules,
+  unlockedPorts,
+  unlockedProducts,
+  unlockedResourceDraw,
+  unlockedResources,
+} from "./pools";
 import { createRng, pick, randInt, weightedPick, type Rng } from "./rng";
 import {
   createInitialGameState,
@@ -182,6 +194,8 @@ export function calcVAT(
   const taxable = sellingPrice - matCost - workerCost;
   if (taxable > 0) {
     let vat = Math.floor(taxable * 0.05);
+    if (state.modifierFlags.vat_discount)
+      vat = Math.floor(vat * (1 - state.modifierFlags.vat_discount));
     if (hasModule(state, "tax_evasion")) vat = Math.floor(vat * 0.5);
     return vat;
   }
@@ -214,6 +228,14 @@ export function explainVAT(
   if (taxable <= 0) return { base: sellingPrice, steps, final: 0 };
   let vat = Math.floor(taxable * 0.05);
   steps.push({ label: "5% VAT on the margin", delta: -vat });
+  if (state.modifierFlags.vat_discount) {
+    const next = Math.floor(vat * (1 - state.modifierFlags.vat_discount));
+    steps.push({
+      label: `${boonNameForModifierKey("vat_discount")} (-${Math.round(state.modifierFlags.vat_discount * 100)}%)`,
+      delta: next - vat,
+    });
+    vat = next;
+  }
   if (hasModule(state, "tax_evasion")) {
     const next = Math.floor(vat * 0.5);
     steps.push({
@@ -280,6 +302,19 @@ export function explainCardPrice(
         label: `${boonNameForModifierKey("hemp_price_reduction")} (-${state.modifierFlags.hemp_price_reduction}g/Hemp)`,
         delta: -reduction,
       });
+      cost -= reduction;
+    }
+  }
+  if (hasModule(state, "kiln_cellar")) {
+    const reduction = card.resources.reduce(
+      (sum, r) =>
+        r.type === "Porcelain Clay" || r.type === "Copper Ore"
+          ? sum + (r.quantity ?? 0) * 2
+          : sum,
+      0,
+    );
+    if (reduction > 0) {
+      steps.push({ label: "Kiln Cellar module (-2g/unit)", delta: -reduction });
       cost -= reduction;
     }
   }
@@ -376,20 +411,42 @@ export function getHireCost(state: GameState, type: string): number {
 // quantityOverride is only ever set by callBrokersFavor, letting a captain
 // choose exactly how much of a filtered good the guaranteed order asks for
 // instead of leaving it to the usual randInt roll below.
+// What the market may draw from this round: whatever the room's tier has
+// unlocked by now (see ./pools). Passed in rather than read from module scope
+// so these generators stay pure functions of (rng, pools) and a captain's
+// seeded draw depends only on the seed and the charter, never on mutable state.
+export type MarketPools = {
+  resources: string[];
+  products: string[];
+  ports: string[];
+  draw: { items: string[]; probs: number[] };
+};
+
+export function poolsFor(state: GameState): MarketPools {
+  const { difficulty, currentRound } = state;
+  return {
+    resources: unlockedResources(difficulty, currentRound),
+    products: unlockedProducts(difficulty, currentRound),
+    ports: unlockedPorts(difficulty, currentRound),
+    draw: unlockedResourceDraw(difficulty, currentRound),
+  };
+}
+
 function genRawOrder(
   rng: Rng,
+  pools: MarketPools,
   filter: string | null = null,
   quantityOverride?: number,
 ): Omit<OrderCard, "id"> {
   const num = randInt(rng, 1, 3);
   const resources: { type: string; required: number }[] = [];
-  const available = [...RESOURCES];
-  const port = pick(rng, PORTS as readonly string[]);
+  const available = [...pools.resources];
+  const port = pick(rng, pools.ports);
   let total = 0;
-  if (filter && (RESOURCES as readonly string[]).includes(filter)) {
+  if (pools.resources.includes(filter ?? "")) {
     const req = quantityOverride ?? randInt(rng, 2, 5);
     total += req;
-    resources.push({ type: filter, required: req });
+    resources.push({ type: filter as string, required: req });
   } else {
     for (let i = 0; i < num; i++) {
       if (!available.length) break;
@@ -412,15 +469,16 @@ function genRawOrder(
 
 function genProductOrder(
   rng: Rng,
+  pools: MarketPools,
   filter: string | null = null,
   quantityOverride?: number,
 ): Omit<OrderCard, "id"> {
   const product =
-    filter && (PRODUCTS as readonly string[]).includes(filter)
+    filter && pools.products.includes(filter)
       ? filter
-      : pick(rng, PRODUCTS as readonly string[]);
+      : pick(rng, pools.products);
   const req = quantityOverride ?? randInt(rng, 1, 3);
-  const port = pick(rng, PORTS as readonly string[]);
+  const port = pick(rng, pools.ports);
   const basePrice = randInt(
     rng,
     PRODUCT_PRICES[product][0],
@@ -446,14 +504,17 @@ function genProductOrder(
 // reload, with different intel state, silently shifted every order after
 // the one the intel touched. See startPhase2 for where the intel guarantee
 // happens now: entirely after, and independent of, this draw.
-function genMixedOrder(rng: Rng): Omit<OrderCard, "id"> {
-  return rng() < 0.5 ? genRawOrder(rng) : genProductOrder(rng);
+function genMixedOrder(rng: Rng, pools: MarketPools): Omit<OrderCard, "id"> {
+  return rng() < 0.5 ? genRawOrder(rng, pools) : genProductOrder(rng, pools);
 }
 
-function genProductPurchaseCard(rng: Rng): Omit<ResourceCard, "id"> {
-  const product = pick(rng, PRODUCTS as readonly string[]);
+function genProductPurchaseCard(
+  rng: Rng,
+  pools: MarketPools,
+): Omit<ResourceCard, "id"> {
+  const product = pick(rng, pools.products);
   const qty = randInt(rng, 1, 2);
-  const port = pick(rng, PORTS as readonly string[]);
+  const port = pick(rng, pools.ports);
   const recipe = RECIPES[product];
   let matCost = 0;
   const details: string[] = [];
@@ -490,14 +551,15 @@ function genProductPurchaseCard(rng: Rng): Omit<ResourceCard, "id"> {
 // pulse is in play, which is always true on round 1.
 function genResourceCard(
   rng: Rng,
+  pools: MarketPools,
   pulse: Record<string, number> = {},
 ): Omit<ResourceCard, "id"> {
-  if (rng() < 0.3) return genProductPurchaseCard(rng);
+  if (rng() < 0.3) return genProductPurchaseCard(rng, pools);
   const num = randInt(rng, 1, 3);
   const resources: { type: string; quantity: number; price: number }[] = [];
-  const available = Object.keys(RESOURCE_PROBS);
-  const probs = Object.values(RESOURCE_PROBS);
-  const port = pick(rng, PORTS as readonly string[]);
+  const available = [...pools.draw.items];
+  const probs = [...pools.draw.probs];
+  const port = pick(rng, pools.ports);
   for (let i = 0; i < num; i++) {
     if (!available.length) break;
     let r = rng(),
@@ -516,9 +578,7 @@ function genResourceCard(
     const qty = randInt(rng, 1, 3);
     const [min, max] = COMMODITIES[chosen].basePrice;
     const base = randInt(rng, min, max);
-    let price = COMMODITIES[chosen].ports.includes(port)
-      ? base - 1
-      : base + 1;
+    let price = COMMODITIES[chosen].ports.includes(port) ? base - 1 : base + 1;
     const nudge = pulse[chosen];
     if (nudge) price = Math.max(1, Math.round(price * (1 + nudge)));
     resources.push({ type: chosen, quantity: qty, price });
@@ -543,7 +603,7 @@ export function tallyPurchasesByResource(
     const card = state.resourceCards.find((c) => c.id === id);
     if (!card || card.isProductCard) continue;
     for (const r of card.resources) {
-      if (!(r.type in RESOURCE_PROBS)) continue;
+      if (!(r.type in RESOURCE_WEIGHTS)) continue;
       out[r.type] = (out[r.type] || 0) + (r.quantity ?? 0);
     }
   }
@@ -568,9 +628,9 @@ export function draftBoons(state: GameState): Boon[] {
   const gs = {
     money: state.money,
     inventory: state.inventory,
-    weavers: state.weavers,
-    master_weavers: state.masterWeavers,
-    sachet_makers: state.sachetMakers,
+    weavers: state.workers.weaver ?? [],
+    master_weavers: state.workers.master ?? [],
+    sachet_makers: state.workers.sachet_maker ?? [],
   };
   const weightFuncs: Record<string, () => number> = {
     silk_wind: () =>
@@ -589,9 +649,9 @@ export function draftBoons(state: GameState): Boon[] {
       (gs.inventory["Hemp"] || 0) < 5 || gs.weavers.length > 0 ? 2.0 : 1.0,
     master_apprentice: () => 1.5,
   };
-  const available = BOONS.map(
-    (b) => [b, weightFuncs[b.id]()] as [Boon, number],
-  ).filter(([, w]) => w > 0);
+  const available = unlockedBoons(state.difficulty, state.currentRound)
+    .map((b) => [b, weightFuncs[b.id]()] as [Boon, number])
+    .filter(([, w]) => w > 0);
   const picks: Boon[] = [];
   const pool = [...available];
   for (let i = 0; i < 3; i++) {
@@ -708,6 +768,22 @@ export function completeOrder(
     reward = Math.floor(reward * 1.2);
     logs.push("👘 Silk Monopoly: +20% Reward!");
   }
+  // Charter-lane payouts: the Kiln and Forge Guild boon and the Maritime
+  // Bureau Token both reward trading the goods a charter opened, so they only
+  // look at orders that actually involve them (see isCharterGood).
+  const hasCharterGood = order.resources.some((r) => isCharterGood(r.type));
+  // Added as `reward + floor(reward * pct)` rather than `floor(reward * (1 +
+  // pct))`: the latter loses a coin to floating point on common rates (100 *
+  // 1.15 is 114.999... in binary), so a stated 15% quietly paid 14%.
+  if (hasCharterGood && state.modifierFlags.charter_order_bonus) {
+    const pct = state.modifierFlags.charter_order_bonus;
+    reward += Math.floor(reward * pct);
+    logs.push(`🏮 Kiln and Forge Guild: +${Math.round(pct * 100)}% Reward!`);
+  }
+  if (hasCharterGood && hasModule(state, "bureau_token")) {
+    reward += Math.floor(reward * 0.1);
+    logs.push("🎫 Maritime Bureau Token: +10% Reward!");
+  }
   if (hasModule(state, "salvage_crane") && Math.random() < 0.3) {
     state.money += transport;
     logs.push(`♻️ Salvage Crane: Refunded ${transport} Gold transport!`);
@@ -718,8 +794,11 @@ export function completeOrder(
     logs.push("🚨 AUDIT! Tax Evasion Ledger triggered. Lost 20 Gold!");
   }
   if (transport !== origTransport) {
+    // Only the Salvage Crane above can move `transport`, and it has already
+    // handed the Gold back. This trues up the cost ledger so the round's
+    // freight total reflects the refund; it used to credit state.money a
+    // second time here as well, paying every crane refund out twice.
     const diff = origTransport - transport;
-    state.money += diff;
     state.roundCosts -= diff;
     state.totalCosts -= diff;
   }
@@ -816,8 +895,8 @@ export function callBrokersFavor(
   }
   const localRng: Rng = Math.random;
   const order = isRaw
-    ? genRawOrder(localRng, item, qty)
-    : genProductOrder(localRng, item, qty);
+    ? genRawOrder(localRng, poolsFor(state), item, qty)
+    : genProductOrder(localRng, poolsFor(state), item, qty);
   const nextId =
     state.customerCards.reduce((m, c) => Math.max(m, c.id), -1) + 1;
   state.customerCards.push({ id: nextId, ...order, isBrokerFavor: true });
@@ -841,20 +920,12 @@ export function hireWorker(state: GameState, type: string, logs: string[]) {
     master: "Master Weaver",
     sachet_maker: "Sachet Maker",
   };
-  const icons: Record<string, string> = {
-    weaver: "👩‍🔧",
-    master: "👩‍🎨",
-    sachet_maker: "🌸",
-  };
-  const list =
-    type === "weaver"
-      ? state.weavers
-      : type === "master"
-        ? state.masterWeavers
-        : state.sachetMakers;
+  const list = state.workers[type as WorkerTypeId];
+  if (!list) return;
+  const def = workerType(type);
   list.push({ task: null, progress: 0, producedCount: 0, isSkilled: false });
   logs.push(
-    `${icons[type]} Hired a ${names[type]}! Wage: ${wage} Gold / Round (paid at round end)`,
+    `${def?.icon ?? "🧑"} Hired a ${def?.label ?? names[type]}! Wage: ${wage} Gold / Round (paid at round end)`,
   );
 }
 
@@ -864,28 +935,18 @@ export function fireWorker(
   idx: number,
   logs: string[],
 ) {
-  const list =
-    type === "weaver"
-      ? state.weavers
-      : type === "master"
-        ? state.masterWeavers
-        : state.sachetMakers;
+  const list = state.workers[type as WorkerTypeId];
+  if (!list) return;
   const wage = WAGES[type];
-  const names: Record<string, string> = {
-    weaver: "Weaver",
-    master: "Master Weaver",
-    sachet_maker: "Sachet Maker",
-  };
+  const label = workerType(type)?.label ?? type;
   if (idx < 0 || idx >= list.length) return;
   if (state.money < wage) {
-    logs.push(
-      `❌ Insufficient funds for ${names[type]}'s severance: ${wage} Gold`,
-    );
+    logs.push(`❌ Insufficient funds for ${label}'s severance: ${wage} Gold`);
     return;
   }
   state.money -= wage;
   const worker = list.splice(idx, 1)[0];
-  logs.push(`💔 Dismissed a ${names[type]}. Severance: ${wage} Gold`);
+  logs.push(`💔 Dismissed a ${label}. Severance: ${wage} Gold`);
   if (worker.task) logs.push(`  This worker was making: ${worker.task}`);
 }
 
@@ -895,12 +956,8 @@ export function assignTask(
   task: string,
   logs: string[],
 ) {
-  const list =
-    type === "weaver"
-      ? state.weavers
-      : type === "master"
-        ? state.masterWeavers
-        : state.sachetMakers;
+  const list = state.workers[type as WorkerTypeId];
+  if (!list) return;
   const recipe = RECIPES[task];
   for (const worker of list) {
     if (worker.task === null) {
@@ -930,12 +987,12 @@ export function assignTask(
 
 export function processProduction(state: GameState, logs: string[]) {
   const bonus = state.modifierFlags.worker_bonus_production || 0;
-  const allLists: { list: GameState["weavers"]; name: string; type: string }[] =
-    [
-      { list: state.weavers, name: "Weaver", type: "weaver" },
-      { list: state.masterWeavers, name: "Master", type: "master" },
-      { list: state.sachetMakers, name: "Maker", type: "sachet_maker" },
-    ];
+  // Every artisan type, whether or not this tier has unlocked it: a captain
+  // can only ever have hired an unlocked one, and an empty list costs nothing.
+  const allLists = WORKER_TYPES.map((w) => ({
+    list: state.workers[w.id] ?? [],
+    name: w.plural.replace(/s$/, ""),
+  }));
   for (const { list, name } of allLists) {
     for (const w of list) {
       if (w.task) {
@@ -968,30 +1025,21 @@ export function payWages(
   state: GameState,
   logs: string[],
 ): true | "bankruptcy" {
-  let total = 0;
-  const countWorkers = (list: GameState["weavers"], type: string) =>
-    list.length * getHireCost(state, type);
-  const ww = countWorkers(state.weavers, "weaver");
-  const mw = countWorkers(state.masterWeavers, "master");
-  const sw = countWorkers(state.sachetMakers, "sachet_maker");
-  total = ww + mw + sw;
+  // One pass over the roster rather than a hardcoded line per artisan type, so
+  // a charter that brings new artisans is paid for without touching this.
+  const bills = WORKER_TYPES.map((w) => {
+    const count = (state.workers[w.id] ?? []).length;
+    return { count, plural: w.plural, due: count * getHireCost(state, w.id) };
+  }).filter((b) => b.due > 0);
+  const total = bills.reduce((sum, b) => sum + b.due, 0);
   if (total === 0) return true;
   if (state.money >= total) {
     state.money -= total;
     state.workerWages += total;
     state.roundCosts += total;
-    if (ww > 0)
-      logs.push(
-        `💰 Paid wages for ${state.weavers.length} Weavers: ${ww} Gold`,
-      );
-    if (mw > 0)
-      logs.push(
-        `💰 Paid wages for ${state.masterWeavers.length} Masters: ${mw} Gold`,
-      );
-    if (sw > 0)
-      logs.push(
-        `💰 Paid wages for ${state.sachetMakers.length} Makers: ${sw} Gold`,
-      );
+    for (const b of bills) {
+      logs.push(`💰 Paid wages for ${b.count} ${b.plural}: ${b.due} Gold`);
+    }
     return true;
   }
   logs.push(
@@ -1083,7 +1131,10 @@ export function purchaseIntel(state: GameState, logs: string[]) {
     logs.push(`❌ Need ${state.intelCost} Gold for a rumor`);
     return;
   }
-  const count = hasModule(state, "brokers_network") ? 2 : 1;
+  // Ocean Interpreter adds a rumor that is genuinely free: only the paid
+  // reveals below deduct the fee, so the extra one costs nothing.
+  const paidCount = hasModule(state, "brokers_network") ? 2 : 1;
+  const count = paidCount + (hasModule(state, "ocean_relay") ? 1 : 0);
   for (let i = 0; i < count; i++) {
     if (!state.phase2DemandTags.length) break;
     const item =
@@ -1091,12 +1142,13 @@ export function purchaseIntel(state: GameState, logs: string[]) {
         Math.floor(Math.random() * state.phase2DemandTags.length)
       ];
     state.phase2DemandTags.splice(state.phase2DemandTags.indexOf(item), 1);
-    const port = PORTS[Math.floor(Math.random() * PORTS.length)];
+    const openPorts = unlockedPorts(state.difficulty, state.currentRound);
+    const port = openPorts[Math.floor(Math.random() * openPorts.length)];
     state.revealedIntel.push({ item, port });
     logs.push(
       `🗣️ Broker's Whisper: 'Word from ${port}: High demand for ${item}!'`,
     );
-    state.money -= state.intelCost;
+    if (i < paidCount) state.money -= state.intelCost;
     // [DIFFICULTY] Corrupt broker (Monsoon only). The rumor above is always
     // delivered and always true, on every tier: the intel guarantee is never
     // touched. What a corrupt broker does instead is also sell word of this
@@ -1227,12 +1279,29 @@ export function startPhase1(
   const intelRng = createRng(
     `${ctx.seedBase}:V${state.voyageEpoch}:R${state.currentRound}:intel`,
   );
-  const allItems = [...RESOURCES, ...PRODUCTS];
+  const marketPools = poolsFor(state);
+  const allItems = [...marketPools.resources, ...marketPools.products];
   for (let i = 0; i < 5; i++) {
     let t = pick(intelRng, allItems as readonly string[]);
     if (!state.phase2DemandTags.includes(t)) state.phase2DemandTags.push(t);
   }
   state.revealedIntel = [];
+  // Farsight hands over its rumors here rather than at boon selection, since
+  // the demand pool above is what they are drawn from and it has only just
+  // been rolled. Free in every sense: no fee, and it does not consume the
+  // captain's paid Broker's Whisper for the round.
+  const freeIntel = state.modifierFlags.free_intel ?? 0;
+  for (let i = 0; i < freeIntel; i++) {
+    if (!state.phase2DemandTags.length) break;
+    const idx = Math.floor(Math.random() * state.phase2DemandTags.length);
+    const item = state.phase2DemandTags.splice(idx, 1)[0];
+    const openPorts = unlockedPorts(state.difficulty, state.currentRound);
+    const port = openPorts[Math.floor(Math.random() * openPorts.length)];
+    state.revealedIntel.push({ item, port });
+    logs.push(
+      `🔮 Farsight: 'Word from ${port}: High demand for ${item}!' (free)`,
+    );
+  }
   logs.push(`\n⚓=== Round ${state.currentRound} · Phase 1: Port Purchase ===`);
   logs.push(`💰 Current Funds: ${state.money} Gold`);
   // [ONLINE] Deterministic port market per (room, round).
@@ -1257,7 +1326,7 @@ export function startPhase1(
   for (let i = 0; i < purchaseCount; i++) {
     state.resourceCards.push({
       id: i,
-      ...genResourceCard(marketRng, state.harborPulse),
+      ...genResourceCard(marketRng, marketPools, state.harborPulse),
     });
   }
 }
@@ -1393,6 +1462,7 @@ export function startPhase2(
     `${ctx.seedBase}:V${state.voyageEpoch}:R${state.currentRound}:orders`,
   );
   state.customerCards = [];
+  const orderPools = poolsFor(state);
   // [DIFFICULTY] Same widening as the port market above, applied to the trade
   // board, so both boards grow together as a tier's charter opens.
   const orderCount = marketCountsFor(
@@ -1400,7 +1470,7 @@ export function startPhase2(
     state.currentRound,
   ).order;
   for (let i = 0; i < orderCount; i++) {
-    state.customerCards.push({ id: i, ...genMixedOrder(orderRng) });
+    state.customerCards.push({ id: i, ...genMixedOrder(orderRng, orderPools) });
   }
   // Broker's Whisper guarantee, applied after the shared draw above and
   // entirely with this captain's own randomness, so it can never nudge
@@ -1419,8 +1489,8 @@ export function startPhase2(
     const intel = state.revealedIntel[i];
     const localRng: Rng = Math.random;
     const guaranteed = (RESOURCES as readonly string[]).includes(intel.item)
-      ? genRawOrder(localRng, intel.item)
-      : genProductOrder(localRng, intel.item);
+      ? genRawOrder(localRng, orderPools, intel.item)
+      : genProductOrder(localRng, orderPools, intel.item);
     state.customerCards[i] = { id: state.customerCards[i].id, ...guaranteed };
   }
   // [DIFFICULTY] Imperial mandate: on the rounds this tier schedules one, the
@@ -1760,6 +1830,7 @@ export function nextPhase(state: GameState, ctx: GameContext, logs: string[]) {
 
 // ---------- Module drafting ----------
 function rollModuleChoices(state: GameState): Module[] {
+  const MODULES = unlockedModules(state.difficulty, state.currentRound);
   const available = MODULES.filter(
     (m) => !state.equippedModules.some((eq) => eq.id === m.id),
   );

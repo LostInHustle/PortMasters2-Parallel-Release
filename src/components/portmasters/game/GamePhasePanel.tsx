@@ -58,6 +58,11 @@ import {
   escortRateFor,
   pirateChanceFor,
 } from "@/lib/game/difficulty";
+import {
+  unlockedProducts,
+  unlockedResources,
+  unlockedWorkerTypes,
+} from "@/lib/game/pools";
 import { cn } from "@/lib/utils";
 import {
   Anchor,
@@ -838,15 +843,30 @@ function WorkerMgmt({
   phaseSync: PhaseSync;
   members: PublicUser[];
 }) {
-  const weaverCost = getHireCost(game, "weaver");
-  const masterCost = getHireCost(game, "master");
-  const makerCost = getHireCost(game, "sachet_maker");
-  const ww = game.weavers.length * weaverCost;
-  const mw = game.masterWeavers.length * masterCost;
-  const sw = game.sachetMakers.length * makerCost;
-  const totalWages = ww + mw + sw;
-  const nW =
-    game.weavers.length + game.masterWeavers.length + game.sachetMakers.length;
+  // Driven by the roster rather than three hardcoded artisans, so the
+  // Coppersmith and Potter a charter brings are hirable, payable, and
+  // assignable the moment they unlock, with no further edits here. Each
+  // type's craftable goods are derived from the recipes that name it, which
+  // is also what keeps the Master's inherited weaver goods correct.
+  const openProducts = unlockedProducts(game.difficulty, game.currentRound);
+  const roster = unlockedWorkerTypes(game.difficulty, game.currentRound).map(
+    (w) => {
+      const list = game.workers[w.id] ?? [];
+      const cost = getHireCost(game, w.id);
+      return {
+        ...w,
+        list,
+        cost,
+        due: list.length * cost,
+        tasks: openProducts.filter((p) => {
+          const owner = RECIPES[p]?.worker_type;
+          return owner === w.id || (w.id === "master" && owner === "weaver");
+        }),
+      };
+    },
+  );
+  const totalWages = roster.reduce((sum, r) => sum + r.due, 0);
+  const nW = roster.reduce((sum, r) => sum + r.list.length, 0);
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -897,7 +917,7 @@ function WorkerMgmt({
             <strong className="text-xs text-teal-700 dark:text-teal-300">
               Raw Materials:
             </strong>
-            {RESOURCES.map((r) => (
+            {unlockedResources(game.difficulty, game.currentRound).map((r) => (
               <div key={r} className="flex items-center text-[11px] py-0.5">
                 <span className="mr-1.5">{ICONS[r]}</span>
                 <span className="flex-1" style={{ color: COLORS[r] }}>
@@ -911,7 +931,7 @@ function WorkerMgmt({
             <strong className="text-xs text-teal-700 dark:text-teal-300">
               Finished Goods:
             </strong>
-            {PRODUCTS.map((r) => (
+            {openProducts.map((r) => (
               <div key={r} className="flex items-center text-[11px] py-0.5">
                 <span className="mr-1.5">{ICONS[r]}</span>
                 <span className="flex-1" style={{ color: COLORS[r] }}>
@@ -930,30 +950,16 @@ function WorkerMgmt({
             💰 Pending Payroll: Deducted at Phase 3
           </h3>
           <div className="text-xs space-y-0.5">
-            {ww > 0 && (
-              <div className="flex justify-between">
-                <span>
-                  👩‍🔧 {game.weavers.length}× Weaver @ {weaverCost}g
-                </span>
-                <b>{ww} Gold</b>
-              </div>
-            )}
-            {mw > 0 && (
-              <div className="flex justify-between">
-                <span>
-                  👩‍🎨 {game.masterWeavers.length}× Master @ {masterCost}g
-                </span>
-                <b>{mw} Gold</b>
-              </div>
-            )}
-            {sw > 0 && (
-              <div className="flex justify-between">
-                <span>
-                  🌸 {game.sachetMakers.length}× Maker @ {makerCost}g
-                </span>
-                <b>{sw} Gold</b>
-              </div>
-            )}
+            {roster
+              .filter((r) => r.due > 0)
+              .map((r) => (
+                <div key={r.id} className="flex justify-between">
+                  <span>
+                    {r.icon} {r.list.length}× {r.label} @ {r.cost}g
+                  </span>
+                  <b>{r.due} Gold</b>
+                </div>
+              ))}
             <div className="flex justify-between border-t border-orange-500/20 pt-1 mt-1 font-bold">
               <span>💸 Total Wages Due</span>
               <span className="text-rose-600 dark:text-rose-400">
@@ -967,88 +973,61 @@ function WorkerMgmt({
       <div className="rounded-xl bg-amber-500/[0.05] border border-teal-500/15 p-4 mb-4">
         <h3 className="text-center font-semibold mb-2">🔨 Hire Workers</h3>
         <div className="text-xs space-y-1 mb-3">
-          <div>
-            <strong>
-              👩‍🔧 <Term term="Weaver">Weaver</Term>
-            </strong>
-            : Linen Clothes(2 Hemp) or Cotton Clothes(2 Hemp+1 Silk),{" "}
-            <span className="text-orange-600 dark:text-orange-400">
-              {WAGES.weaver} Gold/round
-            </span>
-          </div>
-          <div>
-            <strong>
-              👩‍🎨 <Term term="Master Weaver">Master Weaver</Term>
-            </strong>
-            : Linen, Cotton or Brocade(3 Silk),{" "}
-            <span className="text-orange-600 dark:text-orange-400">
-              {WAGES.master} Gold/round
-            </span>
-          </div>
-          <div>
-            <strong>
-              🌸 <Term term="Sachet Maker">Sachet Maker</Term>
-            </strong>
-            : Sachet(1 Silk+2 Tea),{" "}
-            <span className="text-orange-600 dark:text-orange-400">
-              {WAGES.sachet_maker} Gold/round
-            </span>
-          </div>
+          {roster.map((r) => (
+            <div key={r.id}>
+              <strong>
+                {r.icon} <Term term={r.label}>{r.label}</Term>
+              </strong>
+              :{" "}
+              {r.tasks
+                .map((t) => {
+                  const mats = Object.entries(RECIPES[t]?.materials ?? {})
+                    .map(([m, a]) => `${a} ${m}`)
+                    .join("+");
+                  return `${t}(${mats})`;
+                })
+                .join(" or ")}
+              ,{" "}
+              <span className="text-orange-600 dark:text-orange-400">
+                {WAGES[r.id]} Gold/round
+              </span>
+            </div>
+          ))}
         </div>
         <div className="flex flex-wrap justify-center gap-2">
-          <Button
-            size="sm"
-            className="pm-grad-emerald text-white rounded-lg"
-            onClick={() => act((g, l) => hireWorker(g, "weaver", l))}
-          >
-            👩‍🔧 Hire Weaver ({weaverCost}💰/round)
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            className="rounded-lg"
-            onClick={() => act((g, l) => hireWorker(g, "master", l))}
-          >
-            👩‍🎨 Hire Master ({masterCost}💰/round)
-          </Button>
-          <Button
-            size="sm"
-            className="pm-grad-amber text-white rounded-lg"
-            onClick={() => act((g, l) => hireWorker(g, "sachet_maker", l))}
-          >
-            🌸 Hire Maker ({makerCost}💰/round)
-          </Button>
+          {roster.map((r, i) => (
+            <Button
+              key={r.id}
+              size="sm"
+              variant={i % 3 === 1 ? "secondary" : undefined}
+              className={cn(
+                "rounded-lg",
+                i % 3 === 0 && "pm-grad-emerald text-white",
+                i % 3 === 2 && "pm-grad-amber text-white",
+              )}
+              onClick={() => act((g, l) => hireWorker(g, r.id, l))}
+            >
+              {r.icon} Hire {r.label} ({r.cost}💰/round)
+            </Button>
+          ))}
         </div>
       </div>
 
-      {game.weavers.length ||
-      game.masterWeavers.length ||
-      game.sachetMakers.length ? (
+      {nW > 0 ? (
         <div className="rounded-xl border border-teal-500/15 bg-teal-500/[0.03] p-4 mb-4">
           <h3 className="text-center font-semibold mb-2">
             👥 Worker Status & Tasks
           </h3>
-          <WorkerList
-            type="weaver"
-            list={game.weavers}
-            name="Weaver"
-            tasks={["Linen Clothes", "Cotton Clothes"]}
-            act={act}
-          />
-          <WorkerList
-            type="master"
-            list={game.masterWeavers}
-            name="Master"
-            tasks={["Linen Clothes", "Cotton Clothes", "Brocade"]}
-            act={act}
-          />
-          <WorkerList
-            type="sachet_maker"
-            list={game.sachetMakers}
-            name="Maker"
-            tasks={["Sachet"]}
-            act={act}
-          />
+          {roster.map((r) => (
+            <WorkerList
+              key={r.id}
+              type={r.id}
+              list={r.list}
+              name={r.label}
+              tasks={r.tasks}
+              act={act}
+            />
+          ))}
         </div>
       ) : null}
 
@@ -1563,16 +1542,19 @@ function SettlementBills({
   phaseSync: PhaseSync;
   members: PublicUser[];
 }) {
-  const ww = game.weavers.length * getHireCost(game, "weaver");
-  const mw = game.masterWeavers.length * getHireCost(game, "master");
-  const sw = game.sachetMakers.length * getHireCost(game, "sachet_maker");
+  const ww = game.workers.weaver.length * getHireCost(game, "weaver");
+  const mw = game.workers.master.length * getHireCost(game, "master");
+  const sw =
+    game.workers.sachet_maker.length * getHireCost(game, "sachet_maker");
   const wagesDue = ww + mw + sw;
   const maintCost = game.fixedCost + game.maintenancePenalty;
   const totalDue = wagesDue + maintCost;
   const canAfford = game.money >= totalDue;
   const balanceAfter = game.money - totalDue;
   const nWorkers =
-    game.weavers.length + game.masterWeavers.length + game.sachetMakers.length;
+    game.workers.weaver.length +
+    game.workers.master.length +
+    game.workers.sachet_maker.length;
 
   const myRequest = aid.requests.find((r) => r.fromUserId === myUserId);
   const otherRequests = aid.requests.filter((r) => r.fromUserId !== myUserId);

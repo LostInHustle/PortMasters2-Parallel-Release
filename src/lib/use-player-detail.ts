@@ -16,9 +16,7 @@ export type PlayerDetailData = {
   phase: GameState["phase"];
   gameOver: boolean;
   inventory: GameState["inventory"];
-  weavers: GameState["weavers"];
-  masterWeavers: GameState["masterWeavers"];
-  sachetMakers: GameState["sachetMakers"];
+  workers: GameState["workers"];
   equippedModules: Module[];
   logs: string[];
 };
