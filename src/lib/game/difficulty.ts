@@ -205,7 +205,9 @@ export const MANDATE_TEMPLATES: readonly MandateTemplate[] = [
 // default tier rather than throwing, the same defensive shape the original's
 // normalize_difficulty used.
 export function normalizeDifficulty(value: unknown): Difficulty {
-  return value === "fair_winds" || value === "open_waters" || value === "monsoon"
+  return value === "fair_winds" ||
+    value === "open_waters" ||
+    value === "monsoon"
     ? value
     : DEFAULT_DIFFICULTY;
 }
@@ -250,7 +252,10 @@ export function marketCountsFor(
   for (const [roundStr, add] of Object.entries(cfg.charterUnlocks)) {
     if (roundNo >= Number(roundStr)) extra += add;
   }
-  return { purchase: cfg.purchaseCardsBase + extra, order: cfg.orderCardsBase + extra };
+  return {
+    purchase: cfg.purchaseCardsBase + extra,
+    order: cfg.orderCardsBase + extra,
+  };
 }
 
 // True on exactly the round a charter opens, so the caller can log the "the
@@ -278,6 +283,9 @@ export function pirateChanceFor(
 // The scheduled mandate template index for this round, or undefined if none
 // fires. undefined (not a number) keeps "round 1 has no mandate" distinct from
 // "round with template 0".
-export function mandateIndexFor(value: unknown, roundNo: number): number | undefined {
+export function mandateIndexFor(
+  value: unknown,
+  roundNo: number,
+): number | undefined {
   return difficultyConfig(value).mandates[roundNo];
 }

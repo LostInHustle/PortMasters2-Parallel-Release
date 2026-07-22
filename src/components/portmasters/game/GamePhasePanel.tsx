@@ -1502,7 +1502,8 @@ function PirateAttack({
   const raidPct = Math.round(
     Math.min(
       1,
-      pirateChanceFor(game.difficulty, game.currentRound, game.maxRounds) + leak,
+      pirateChanceFor(game.difficulty, game.currentRound, game.maxRounds) +
+        leak,
     ) * 100,
   );
   return (
@@ -2087,8 +2088,8 @@ function Bankruptcy({ game }: { game: GameState }) {
             🤝 Silent Partner
           </div>
           <p className="text-xs text-muted-foreground mb-2.5">
-            Gold you lent before the wreck is still out there, and it lands
-            the moment each captain repays it.
+            Gold you lent before the wreck is still out there, and it lands the
+            moment each captain repays it.
           </p>
           <div className="space-y-1">
             {game.loansGiven.map((l) => (

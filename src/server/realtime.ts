@@ -24,10 +24,18 @@ import type { Server as HttpServer } from "http";
 import { Server } from "socket.io";
 import { db } from "../lib/db";
 import { leaveRoomForUser, roomMemberIds } from "../lib/rooms";
-import { levelForRenownXP, renownTitleForLevel } from "../lib/game/legacy";
+import {
+  levelForRenownXP,
+  parseStatsByDifficulty,
+  recordVoyageInStats,
+  renownTitleForLevel,
+} from "../lib/game/legacy";
 import { BROKERS_FAVOR_UNLOCK_LEVEL } from "../lib/game/constants";
 import { meritById, qualifyingMerits } from "../lib/game/merits";
-import { renownMultiplierFor } from "../lib/game/difficulty";
+import {
+  normalizeDifficulty,
+  renownMultiplierFor,
+} from "../lib/game/difficulty";
 
 // ---------- Types ----------
 type PublicUser = {
@@ -420,7 +428,8 @@ export function attachRealtime(httpServer: HttpServer): Server {
       where: { id: roomId },
       select: { difficulty: true },
     });
-    const renownMultiplier = renownMultiplierFor(roomForDifficulty?.difficulty);
+    const roomDifficulty = normalizeDifficulty(roomForDifficulty?.difficulty);
+    const renownMultiplier = renownMultiplierFor(roomDifficulty);
 
     const crownable = finished.filter((f) => f.phase === "endgame");
     const winnerId = crownable.length
@@ -471,6 +480,14 @@ export function attachRealtime(httpServer: HttpServer): Server {
       const newConsecutiveSolventVoyages = bankrupt
         ? 0
         : (prior?.consecutiveSolventVoyages ?? 0) + 1;
+      // The per tier breakdown behind the all-tier totals above, so a crown or
+      // a high score can be attributed to the waters it was earned on (see
+      // statsByDifficulty in prisma/schema.prisma).
+      const newStatsByDifficulty = recordVoyageInStats(
+        parseStatsByDifficulty(prior?.statsByDifficulty),
+        roomDifficulty,
+        { crowned, reputation: f.reputation },
+      );
       await db.captainLegacy.upsert({
         where: { userId: f.userId },
         create: {
@@ -481,6 +498,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
           seaMasterCrowns: crowned ? 1 : 0,
           bestScore: newBestScore,
           consecutiveSolventVoyages: newConsecutiveSolventVoyages,
+          statsByDifficulty: JSON.stringify(newStatsByDifficulty),
         },
         update: {
           renownXP: newXP,
@@ -489,6 +507,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
           ...(crowned ? { seaMasterCrowns: { increment: 1 } } : {}),
           bestScore: newBestScore,
           consecutiveSolventVoyages: newConsecutiveSolventVoyages,
+          statsByDifficulty: JSON.stringify(newStatsByDifficulty),
         },
       });
 
@@ -509,6 +528,8 @@ export function attachRealtime(httpServer: HttpServer): Server {
         reputation: f.reputation,
         newRenownLevel: newLevel,
         consecutiveSolventVoyages: newConsecutiveSolventVoyages,
+        difficulty: roomDifficulty,
+        bankrupt,
       });
       const newMerits = qualifying.filter((id) => !existingMeritIds.has(id));
       // One upsert per merit rather than a single createMany: SQLite's

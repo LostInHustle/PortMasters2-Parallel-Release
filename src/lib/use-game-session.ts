@@ -181,7 +181,9 @@ export function useGameSession(
           // Refresh difficulty from the room (the authoritative source), the
           // same reason renownLevel is refreshed above; default an old save
           // that predates difficulty to whatever tier the room is on.
-          game.difficulty = normalizeDifficulty(roomDifficulty ?? game.difficulty);
+          game.difficulty = normalizeDifficulty(
+            roomDifficulty ?? game.difficulty,
+          );
           dispatch({ type: "INIT", game, logs: [] });
         } else {
           dispatch({

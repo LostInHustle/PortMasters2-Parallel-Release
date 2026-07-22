@@ -1313,7 +1313,10 @@ export function startPhase2(
   state.customerCards = [];
   // [DIFFICULTY] Same widening as the port market above, applied to the trade
   // board, so both boards grow together as a tier's charter opens.
-  const orderCount = marketCountsFor(state.difficulty, state.currentRound).order;
+  const orderCount = marketCountsFor(
+    state.difficulty,
+    state.currentRound,
+  ).order;
   for (let i = 0; i < orderCount; i++) {
     state.customerCards.push({ id: i, ...genMixedOrder(orderRng) });
   }

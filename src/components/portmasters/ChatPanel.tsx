@@ -41,27 +41,43 @@ export function ChatPanel({
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const seenIds = useRef<Set<string>>(
-    new Set((initialMessages ?? []).map((m) => m.id)),
-  );
 
-  // Seed with initial messages if they change (e.g. switching DM target).
-  useEffect(() => {
+  // Seed with initial messages if they change (e.g. switching DM target, or
+  // the parent's history fetch resolving after this already mounted). Done as
+  // a render-time adjustment rather than in an effect: React throws away the
+  // in-progress render and immediately re-renders with the new state, instead
+  // of committing one pass and then cascading a second one, which is what an
+  // effect calling setState synchronously does (react-hooks/set-state-in-effect).
+  // The trigger is the same pair the old effect's dependency list used, the
+  // conversation identity and the incoming history, so seeding is unchanged.
+  const seedKey = `${mode}:${roomId ?? ""}:${other?.id ?? ""}`;
+  const [seed, setSeed] = useState<{
+    key: string;
+    source: ChatMessage[] | undefined;
+  }>({ key: seedKey, source: initialMessages });
+  if (seed.key !== seedKey || seed.source !== initialMessages) {
+    setSeed({ key: seedKey, source: initialMessages });
     setMessages(initialMessages ?? []);
-    seenIds.current = new Set((initialMessages ?? []).map((m) => m.id));
-  }, [initialMessages, mode, other?.id, roomId]);
+  }
 
   // Live socket listeners.
   useEffect(() => {
     if (!socket) return;
+    // Dedupe against the list itself rather than a separate ref of seen ids.
+    // Returning `prev` untouched for a message already present means React
+    // bails out on the identical reference, so a duplicate costs no re-render,
+    // and there is no parallel bookkeeping to keep in sync when the seeded
+    // history changes underneath it.
     const onRoom = (data: { roomId: string; message: ChatMessage }) => {
       if (mode !== "room" || data.roomId !== roomId) return;
-      if (seenIds.current.has(data.message.id)) return;
-      seenIds.current.add(data.message.id);
-      setMessages((prev) => [
-        ...prev,
-        { ...data.message, mine: data.message.sender.id === me.id },
-      ]);
+      setMessages((prev) =>
+        prev.some((m) => m.id === data.message.id)
+          ? prev
+          : [
+              ...prev,
+              { ...data.message, mine: data.message.sender.id === me.id },
+            ],
+      );
     };
     const onDm = (message: ChatMessage) => {
       if (mode !== "dm") return;
@@ -73,12 +89,11 @@ export function ChatPanel({
       const peerId =
         message.sender.id === me.id ? message.recipient?.id : message.sender.id;
       if (otherId && peerId !== otherId) return;
-      if (seenIds.current.has(message.id)) return;
-      seenIds.current.add(message.id);
-      setMessages((prev) => [
-        ...prev,
-        { ...message, mine: message.sender.id === me.id },
-      ]);
+      setMessages((prev) =>
+        prev.some((m) => m.id === message.id)
+          ? prev
+          : [...prev, { ...message, mine: message.sender.id === me.id }],
+      );
     };
     socket.on("chat:room", onRoom);
     socket.on("chat:dm", onDm);

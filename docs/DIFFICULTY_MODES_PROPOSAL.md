@@ -303,9 +303,9 @@ The plumbing is separable from the balance, so we ship in de risked slices. Each
 
 **Phase B: Open Waters. Implemented.** Turn on the 12 round tier: charter growth to 8 then 10 cards, the pirate step up, higher escort cost, mandates on rounds 4, 8, and 12, and the 1.25 Renown multiplier, plus the host only lobby switch that makes a tier selectable at all. Still to do: playtest with two to four captains and tune the mandate rewards and the second half pirate chance.
 
-**Phase C: Monsoon Season. Gameplay implemented, progression pending.** The 16 round tier: growth to 11 cards, the steepest raids, the corrupt broker leak, and the largest back loaded mandates are all wired. Outstanding for this phase are the difficulty scoped Captain's Merits and the per tier `statsByDifficulty` split (decision 4), plus the heaviest balance playtesting.
+**Phase C: Monsoon Season. Implemented.** The 16 round tier: growth to 11 cards, the steepest raids, the corrupt broker leak, and the largest back loaded mandates, plus the three difficulty scoped Captain's Merits (Open Water Captain, Storm Sovereign, Eye of the Storm) and the per tier `statsByDifficulty` split from decision 4, written at voyage conclusion and surfaced as a per tier chip row on the Captain's Legacy card. Outstanding: balance playtesting, which is the one thing left before this tier can be called tuned.
 
-**Phase D: polish and telemetry.** Charter and mandate banners, tutorial copy, difficulty badges everywhere, and instrumentation (bankruptcy rate, average final reputation, escort uptake, mandate fill rate per difficulty) to drive a data informed balance retune.
+**Phase D: polish and telemetry. Outstanding.** The charter opening banner, difficulty aware tutorial and guide copy (`TUTORIAL_STEPS` and `GUIDE_TEXT` in `constants.ts` still state "Eight voyages", a flat 20% raid chance, a 10% escort fee, and "Round 8", all of which are correct only for Fair Winds), and instrumentation (bankruptcy rate, average final reputation, escort uptake, mandate fill rate per difficulty) to drive a data informed balance retune.
 
 ---
 

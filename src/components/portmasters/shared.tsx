@@ -7,6 +7,9 @@ import {
   Gem,
   Shield,
   Medal,
+  Waves,
+  CloudLightning,
+  Eye,
   type LucideIcon,
 } from "lucide-react";
 import type { MeritId } from "@/lib/game/merits";
@@ -119,6 +122,9 @@ const MERIT_ICONS: Record<MeritId, LucideIcon> = {
   renown_legend: Gem,
   iron_hull: Shield,
   century_club: Medal,
+  open_water_captain: Waves,
+  storm_sovereign: CloudLightning,
+  eye_of_the_storm: Eye,
 };
 
 export function MeritIcon({

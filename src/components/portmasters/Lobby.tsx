@@ -101,9 +101,17 @@ export function Lobby({
   }, []);
 
   useEffect(() => {
-    refreshRooms();
+    // Kicked off on a timer rather than called straight from the effect body,
+    // so the first refresh's setLoadingRooms(true) isn't a synchronous setState
+    // inside an effect (react-hooks/set-state-in-effect). Nothing changes
+    // visually: loadingRooms already starts true, so that first set was a no-op
+    // anyway, and the interval's later calls were never inside an effect body.
+    const kickoff = setTimeout(refreshRooms, 0);
     const t = setInterval(refreshRooms, 8000);
-    return () => clearInterval(t);
+    return () => {
+      clearTimeout(kickoff);
+      clearInterval(t);
+    };
   }, [refreshRooms]);
 
   // A captain's Renown only ever changes when a voyage concludes (see
@@ -257,7 +265,10 @@ export function Lobby({
   useEffect(() => {
     if (!dmTarget) return;
     let alive = true;
-    setDmLoading(true);
+    // No setDmLoading(true) here: the only thing that ever sets a target is
+    // openDm, which raises the flag before this effect can run. Setting it
+    // again synchronously in the effect body only cost a cascading render
+    // (react-hooks/set-state-in-effect).
     api
       .getDmHistory(dmTarget.id)
       .then(({ messages }) => {
@@ -424,7 +435,9 @@ export function Lobby({
                 </div>
 
                 <div className="mt-3">
-                  <Label className="text-xs text-muted-foreground">Waters</Label>
+                  <Label className="text-xs text-muted-foreground">
+                    Waters
+                  </Label>
                   <div className="mt-1.5 grid grid-cols-3 gap-1 rounded-full bg-background/60 p-1">
                     {DIFFICULTY_ORDER.map((key) => {
                       const cfg = DIFFICULTIES[key];

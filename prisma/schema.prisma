@@ -160,6 +160,15 @@ model CaptainLegacy {
   // src/lib/game/merits.ts); nothing else reads it.
   consecutiveSolventVoyages Int @default(0)
 
+  // Sea Master crowns and best score broken down by difficulty tier, as a JSON
+  // map of { [difficulty]: { crowns, bestScore } } (see src/lib/game/legacy.ts).
+  // The seaMasterCrowns and bestScore columns above stay as the all-tier
+  // totals; this only adds the per-tier split, so a Monsoon crown can be shown
+  // as the rarer thing it is and a future leaderboard can be segmented by tier.
+  // A JSON column rather than fixed columns per tier keeps it open ended: a
+  // fourth tier would need no migration.
+  statsByDifficulty String @default("{}")
+
   // Daily Check-In (see src/lib/game/checkin.ts). checkInCount is how many
   // days of the current 7-day cycle have been claimed (0..6, wrapping to 0
   // the moment Day 7 is claimed); lastCheckInDate is the "YYYY-MM-DD" UTC

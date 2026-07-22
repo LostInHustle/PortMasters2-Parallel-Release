@@ -9,6 +9,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/api-auth";
 import {
   DEFAULT_LEGACY_SUMMARY,
+  parseStatsByDifficulty,
   type CaptainLegacySummary,
 } from "@/lib/game/legacy";
 
@@ -57,6 +58,7 @@ export async function POST(req: NextRequest) {
           seaMasterCrowns: row.seaMasterCrowns,
           bestScore: row.bestScore,
           meritIds: meritsByUserId.get(id) ?? [],
+          statsByDifficulty: parseStatsByDifficulty(row.statsByDifficulty),
         }
       : DEFAULT_LEGACY_SUMMARY;
   }
