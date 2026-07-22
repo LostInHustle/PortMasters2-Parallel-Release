@@ -13,6 +13,7 @@ import type { Socket } from "socket.io-client";
 import { phaseLabel, showWelcome, snapToCheckpoint } from "@/lib/game/engine";
 import {
   createInitialGameState,
+  normalizeInventory,
   normalizeWorkerRoster,
   type GameContext,
   type GameState,
@@ -166,7 +167,10 @@ export function useGameSession(
           game.revealedIntel = game.revealedIntel ?? [];
           game.phase2DemandTags = game.phase2DemandTags ?? [];
           game.modifierFlags = game.modifierFlags ?? {};
-          game.inventory = game.inventory ?? {};
+          // Guarantees a key for every catalogued good and scrubs any value a
+          // pre-catalogue save poisoned with NaN (stored as null by JSON), so
+          // a damaged hold heals on load instead of staying broken forever.
+          game.inventory = normalizeInventory(game.inventory);
           game.boonChoices = game.boonChoices ?? [];
           game.boonSwapUsed = game.boonSwapUsed ?? false;
           game.moduleSwapUsed = game.moduleSwapUsed ?? false;

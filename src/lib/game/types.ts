@@ -2,6 +2,8 @@
 // PortMasters 2 Parallel Release: game state types
 // =====================================================================
 import {
+  ITEMS,
+  STARTING_STOCK,
   WORKER_TYPE_IDS,
   type Boon,
   type Module,
@@ -213,6 +215,37 @@ export type GameState = {
   }[];
 };
 
+// The hold every voyage starts with: a key for every good in the catalogue,
+// carrying the founding stock where there is any and zero otherwise. Built
+// rather than hand written, because a hand written literal is what let charter
+// goods start life absent, and an absent key is what turned a purchase into
+// NaN (see normalizeInventory below and addOwnedAmount in ./engine).
+export function initialInventory(): Record<string, number> {
+  const inv: Record<string, number> = {};
+  for (const item of ITEMS) inv[item] = STARTING_STOCK[item] ?? 0;
+  return inv;
+}
+
+// Repairs a hold read back from a save. Guarantees a key for every catalogued
+// good, and coerces anything non numeric to zero: a hold damaged before the
+// catalogue existed stored NaN, which JSON writes as null and which would
+// otherwise stay poisoned for the life of the account. Unknown but valid
+// entries are preserved rather than dropped, so a good retired from the
+// catalogue never silently deletes a captain's cargo.
+export function normalizeInventory(raw: unknown): Record<string, number> {
+  const src = (raw ?? {}) as Record<string, unknown>;
+  const out: Record<string, number> = {};
+  for (const item of ITEMS) {
+    const v = src[item];
+    out[item] = typeof v === "number" && Number.isFinite(v) ? v : 0;
+  }
+  for (const [key, v] of Object.entries(src)) {
+    if (key in out) continue;
+    if (typeof v === "number" && Number.isFinite(v)) out[key] = v;
+  }
+  return out;
+}
+
 export function emptyWorkerRoster(): Record<WorkerTypeId, Worker[]> {
   return Object.fromEntries(
     WORKER_TYPE_IDS.map((id) => [id, [] as Worker[]]),
@@ -282,15 +315,7 @@ export function createInitialGameState(
 ): GameState {
   const cfg = difficultyConfig(difficulty);
   return {
-    inventory: {
-      Hemp: 8,
-      Silk: 5,
-      Tea: 3,
-      "Linen Clothes": 0,
-      "Cotton Clothes": 0,
-      Brocade: 0,
-      Sachet: 0,
-    },
+    inventory: initialInventory(),
     money: cfg.startingGold + startingGoldBonus,
     difficulty,
     renownLevel,

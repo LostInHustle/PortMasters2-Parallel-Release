@@ -24,18 +24,21 @@ export function GameStatusPanel({
   const discount = game.shipLevel * 5;
   const showObligations = ![0, 5, "endgame", "bankruptcy"].includes(game.phase);
 
-  const ww = game.workers.weaver.length * getHireCost(game, "weaver");
-  const mw = game.workers.master.length * getHireCost(game, "master");
-  const sw =
-    game.workers.sachet_maker.length * getHireCost(game, "sachet_maker");
-  const pendWages = ww + mw + sw;
+  // Summed across the whole unlocked roster, not the three founding types.
+  // Hardcoding those three meant a captain who hired a charter artisan was
+  // shown a wages figure that omitted them, understating the round end bill
+  // and therefore the bankruptcy risk this panel exists to warn about.
+  const roster = unlockedWorkerTypes(game.difficulty, game.currentRound).map(
+    (w) => {
+      const list = game.workers[w.id] ?? [];
+      return { ...w, list, due: list.length * getHireCost(game, w.id) };
+    },
+  );
+  const pendWages = roster.reduce((sum, r) => sum + r.due, 0);
   const pendMaint = game.fixedCost + game.maintenancePenalty;
   const pendTotal = pendWages + pendMaint;
   const safe = game.money >= pendTotal;
-  const nW =
-    game.workers.weaver.length +
-    game.workers.master.length +
-    game.workers.sachet_maker.length;
+  const nW = roster.reduce((sum, r) => sum + r.list.length, 0);
 
   return (
     <div className="space-y-3">
@@ -112,34 +115,29 @@ export function GameStatusPanel({
             priceContent={priceAwareTermContent(game, r)}
           />
         ))}
-        {game.workers.weaver.length ||
-        game.workers.master.length ||
-        game.workers.sachet_maker.length ? (
+        {nW > 0 ? (
           <>
             <div className="text-[10px] font-semibold tracking-wide text-muted-foreground/80 mt-2 mb-0.5">
               ━━ Artisans ━━
             </div>
-            <InvItem
-              icon="👩‍🔧"
-              name="Weavers"
-              term="Weaver"
-              count={game.workers.weaver.length}
-              muted
-            />
-            <InvItem
-              icon="👩‍🎨"
-              name="Masters"
-              term="Master Weaver"
-              count={game.workers.master.length}
-              muted
-            />
-            <InvItem
-              icon="🌸"
-              name="Makers"
-              term="Sachet Maker"
-              count={game.workers.sachet_maker.length}
-              muted
-            />
+            {/* Driven by the unlocked roster, so charter artisans appear here
+                too, and each row reports how many are trained. Proficiency is
+                the single most consequential fact about a crew (a skilled
+                artisan produces two items instead of one, see
+                processProduction) and used to be invisible everywhere. */}
+            {roster
+              .filter((r) => r.list.length > 0)
+              .map((r) => (
+                <InvItem
+                  key={r.id}
+                  icon={r.icon}
+                  name={r.plural}
+                  term={r.label}
+                  count={r.list.length}
+                  skilled={r.list.filter((x) => x.isSkilled).length}
+                  muted
+                />
+              ))}
           </>
         ) : null}
       </Section>
@@ -211,24 +209,15 @@ export function GameStatusPanel({
           >
             <b>{nW > 0 ? `${pendWages} Gold` : "…"}</b>
           </Row>
-          {ww > 0 && (
-            <SubRow
-              label={`↳ ${game.workers.weaver.length}× Weaver`}
-              value={`${ww}g`}
-            />
-          )}
-          {mw > 0 && (
-            <SubRow
-              label={`↳ ${game.workers.master.length}× Master`}
-              value={`${mw}g`}
-            />
-          )}
-          {sw > 0 && (
-            <SubRow
-              label={`↳ ${game.workers.sachet_maker.length}× Maker`}
-              value={`${sw}g`}
-            />
-          )}
+          {roster
+            .filter((r) => r.due > 0)
+            .map((r) => (
+              <SubRow
+                key={r.id}
+                label={`↳ ${r.list.length}× ${r.label}`}
+                value={`${r.due}g`}
+              />
+            ))}
           <div
             className={cn(
               "flex justify-between items-center pt-2 mt-1 border-t",
@@ -319,6 +308,7 @@ function InvItem({
   color,
   count,
   muted,
+  skilled,
   priceContent,
 }: {
   icon: string;
@@ -327,6 +317,10 @@ function InvItem({
   color?: string;
   count: number;
   muted?: boolean;
+  // Artisan rows only: how many of this type have been promoted. Rendered as
+  // a star tally beside the head count rather than a second row, so the
+  // Cargo Hold stays scannable.
+  skilled?: number;
   priceContent?: React.ReactNode;
 }) {
   return (
@@ -337,6 +331,14 @@ function InvItem({
           {name}
         </Term>
       </span>
+      {skilled !== undefined && skilled > 0 && (
+        <span
+          className="mr-1.5 text-[10px] text-amber-600 dark:text-amber-400"
+          title={`${skilled} of ${count} trained: each produces 2 per round`}
+        >
+          ⭐{skilled}
+        </span>
+      )}
       <span
         className="font-bold min-w-[30px] text-right"
         style={{ color: muted ? undefined : color }}

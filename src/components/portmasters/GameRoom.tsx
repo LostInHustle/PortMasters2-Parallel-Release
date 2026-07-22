@@ -669,15 +669,26 @@ export function GameRoom({
       {/* Main layout */}
       <main className="flex-1 px-3 sm:px-5 pb-4 max-w-[1600px] w-full mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-[clamp(220px,22vw,300px)_minmax(0,1fr)_clamp(260px,26vw,360px)] gap-3">
-          {/* Left: status + log */}
-          <div className="space-y-3 order-2 lg:order-1">
-            <div className="pm-glass rounded-2xl p-3">
+          {/* Left: status + log.
+              On desktop this rail is pinned to the viewport and each panel
+              scrolls inside its own box, rather than the two simply stacking
+              and growing the page. The status panel grows with play (artisan
+              rows, outstanding loans, round end obligations), which used to
+              push the log far enough down that reaching it scrolled the whole
+              page, including the centre column being worked in. The log keeps
+              a guaranteed share of the rail so it is always on screen.
+              Untouched below lg, where the rail is just another stacked
+              block and the existing mobile ordering still applies. */}
+          <div className="order-2 space-y-3 lg:order-1 lg:sticky lg:top-20 lg:flex lg:h-[calc(100dvh-6rem)] lg:flex-col lg:space-y-0 lg:gap-3">
+            <div className="pm-glass rounded-2xl p-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto pm-scroll">
               <GameStatusPanel
                 game={state.game}
                 onRepayLoan={handleRepayLoan}
               />
             </div>
-            <GameLogPanel logs={state.logs} />
+            <div className="lg:min-h-0 lg:h-[38%] lg:shrink-0">
+              <GameLogPanel logs={state.logs} />
+            </div>
           </div>
 
           {/* Center: phase + controls */}
@@ -844,6 +855,7 @@ export function GameRoom({
             : null
         }
         isMe={selectedPlayerId === me.id}
+        difficulty={state.game.difficulty}
         detail={
           selectedPlayerId ? playerDetail.detail[selectedPlayerId] : undefined
         }

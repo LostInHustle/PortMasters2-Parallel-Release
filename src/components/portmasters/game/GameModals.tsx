@@ -23,6 +23,11 @@ import {
   WORKER_TYPES,
 } from "@/lib/game/constants";
 import type { Difficulty } from "@/lib/game/difficulty";
+import {
+  unlockedProducts,
+  unlockedResources,
+  unlockedWorkerTypes,
+} from "@/lib/game/pools";
 import type { GameState } from "@/lib/game/types";
 import { phaseLabel } from "@/lib/game/engine";
 import type { PlayerDetailData } from "@/lib/use-player-detail";
@@ -443,6 +448,7 @@ export function PlayerDetailModal({
   detail,
   loading,
   legacy,
+  difficulty,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -451,17 +457,24 @@ export function PlayerDetailModal({
   detail: PlayerDetailData | null | undefined;
   loading: boolean;
   legacy: CaptainLegacySummary | null | undefined;
+  // The viewer's own tier. Difficulty is room wide, so this correctly
+  // describes any captain in the harbor without adding it to the payload.
+  difficulty: Difficulty;
 }) {
+  // Only artisans this voyage has actually unlocked, and each group reports
+  // how many are trained. Difficulty is a room property so the viewer's own
+  // tier is authoritative for everyone; the round comes from the subject's own
+  // payload, so a captain a checkpoint behind is still described correctly.
   const workerGroups = detail
-    ? [
-        // Built from the roster rather than three hardcoded rows, so an
-        // artisan a charter introduces shows up here without another edit.
-        ...WORKER_TYPES.map((w) => ({
+    ? unlockedWorkerTypes(difficulty, detail.round).map((w) => {
+        const list = detail.workers?.[w.id] ?? [];
+        return {
           icon: w.icon,
           name: w.plural,
-          list: detail.workers?.[w.id] ?? [],
-        })),
-      ]
+          list,
+          skilled: list.filter((x) => x.isSkilled).length,
+        };
+      })
     : [];
 
   return (
@@ -571,7 +584,7 @@ export function PlayerDetailModal({
                       <div className="text-[10px] font-medium text-muted-foreground mb-1">
                         Raw Materials
                       </div>
-                      {RESOURCES.map((r) => (
+                      {unlockedResources(difficulty, detail.round).map((r) => (
                         <div
                           key={r}
                           className="flex items-center text-[12px] py-0.5"
@@ -590,7 +603,7 @@ export function PlayerDetailModal({
                       <div className="text-[10px] font-medium text-muted-foreground mb-1">
                         Finished Goods
                       </div>
-                      {PRODUCTS.map((r) => (
+                      {unlockedProducts(difficulty, detail.round).map((r) => (
                         <div
                           key={r}
                           className="flex items-center text-[12px] py-0.5"

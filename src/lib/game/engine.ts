@@ -727,7 +727,13 @@ export function purchaseCard(state: GameState, cardId: number, logs: string[]) {
   state.money -= cost;
   state.roundCosts += cost;
   state.totalCosts += cost;
-  for (const r of card.resources) state.inventory[r.type] += r.quantity!;
+  // Routed through addOwnedAmount rather than writing state.inventory
+  // directly. This was the one unguarded `+=` in the engine, so buying a good
+  // whose key the hold did not yet carry evaluated `undefined + n` and stored
+  // NaN, losing the cargo and the Gold that paid for it. Every mutation now
+  // goes through the one defensive helper.
+  for (const r of card.resources)
+    addOwnedAmount(state, r.type, r.quantity ?? 0);
   state.purchasedCards.push(card.id);
   state.purchaseCount++;
   if (card.isProductCard) {
@@ -1571,7 +1577,12 @@ export function startPhase2(
   if (mandate) {
     const nextId =
       state.customerCards.reduce((m, c) => Math.max(m, c.id), -1) + 1;
-    state.customerCards.push({
+    // Placed first rather than appended. It is the round's headline commission
+    // and should read that way regardless of how wide the charter has grown
+    // the board. Inserted after the intel guarantee loop above, which writes
+    // by index, so it cannot be overwritten; card identity stays on `id`, so
+    // position carries presentation only and no logic depends on it.
+    state.customerCards.unshift({
       id: nextId,
       demandPort: mandate.port,
       resources: mandate.resources.map((r) => ({

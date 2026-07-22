@@ -27,7 +27,7 @@ export const ICONS: Record<string, string> = {
   "Cotton Clothes": "👕",
   Brocade: "👗",
   Sachet: "🌸",
-  "Porcelain Clay": "🏺",
+  "Porcelain Clay": "🧱",
   "Copper Ore": "⛏️",
   "Celadon Ware": "🫖",
   "Bronze Mirror": "🪞",
@@ -89,6 +89,20 @@ export const PRODUCTS = [
   ...PRODUCTS_TIER1,
   ...PRODUCTS_TIER2,
 ] as const;
+// Every tradable good across every tier, unlocked or not. This is the
+// catalogue the cargo hold is built from, so a key exists for each good from
+// the moment a voyage starts and no write can ever land on an absent key.
+export const ITEMS = [...RESOURCES, ...PRODUCTS] as const;
+
+// The stock a captain begins a voyage with. Anything not named here starts at
+// zero; the hold is filled in from ITEMS rather than listed by hand, so a good
+// a charter introduces is always represented.
+export const STARTING_STOCK: Record<string, number> = {
+  Hemp: 8,
+  Silk: 5,
+  Tea: 3,
+};
+
 // Anything a captain can put up for barter: Gold plus every raw material
 // and finished good. Kept separate from RESOURCES/PRODUCTS (rather than
 // folding Gold into one of those) so the existing buying/inventory
@@ -242,7 +256,7 @@ export const WORKER_TYPES: WorkerType[] = [
     id: "coppersmith",
     label: "Coppersmith",
     plural: "Coppersmiths",
-    icon: "🧑‍🏭",
+    icon: "🪞",
     wage: 12,
     tier: 1,
   },
@@ -250,7 +264,7 @@ export const WORKER_TYPES: WorkerType[] = [
     id: "potter",
     label: "Potter",
     plural: "Potters",
-    icon: "🧑‍🎨",
+    icon: "🫖",
     wage: 14,
     tier: 1,
   },
@@ -258,7 +272,7 @@ export const WORKER_TYPES: WorkerType[] = [
     id: "perfumer",
     label: "Perfumer",
     plural: "Perfumers",
-    icon: "🧑‍🔬",
+    icon: "🧴",
     wage: 18,
     tier: 2,
   },
@@ -266,7 +280,7 @@ export const WORKER_TYPES: WorkerType[] = [
     id: "jeweler",
     label: "Jeweler",
     plural: "Jewelers",
-    icon: "💎",
+    icon: "📿",
     wage: 24,
     tier: 2,
   },
