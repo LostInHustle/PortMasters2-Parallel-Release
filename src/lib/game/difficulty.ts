@@ -225,28 +225,22 @@ export function difficultyConfig(value: unknown): DifficultyConfig {
   return DIFFICULTIES[normalizeDifficulty(value)];
 }
 
+// Voyage length is read often enough, and by the test suite in particular, to
+// justify its own accessor. There are deliberately no startingGoldFor /
+// maintenanceFor / brokerCorruptionFor twins: those existed and nothing ever
+// called them, since every consumer reads difficultyConfig(x).field directly,
+// which is just as clear and one fewer indirection to keep in step. The
+// selectors below earn their place because they compute something (a
+// midpoint, an accumulation, a normalization) rather than forwarding a field.
 export function roundsFor(value: unknown): number {
   return difficultyConfig(value).rounds;
 }
-
-export function startingGoldFor(value: unknown): number {
-  return difficultyConfig(value).startingGold;
-}
-
-export function maintenanceFor(value: unknown): number {
-  return difficultyConfig(value).maintenance;
-}
-
 export function escortRateFor(value: unknown): number {
   return difficultyConfig(value).escortCostRate;
 }
 
 export function renownMultiplierFor(value: unknown): number {
   return difficultyConfig(value).renownXpMultiplier;
-}
-
-export function brokerCorruptionFor(value: unknown): boolean {
-  return difficultyConfig(value).brokerCorruption;
 }
 
 // Card counts for both boards on a given round: the base plus every charter
