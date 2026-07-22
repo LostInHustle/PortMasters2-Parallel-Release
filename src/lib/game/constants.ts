@@ -53,7 +53,7 @@ export const COLORS: Record<string, string> = {
   Spices: "#C1440E",
   Pearls: "#9AA7B1",
   "Foreign Balm": "#C99B6E",
-  "Pearl String": "#B9A externa",
+  "Pearl String": "#B9A0E0",
 };
 
 // =====================================================================
@@ -69,7 +69,7 @@ export const COLORS: Record<string, string> = {
 // =====================================================================
 export const RESOURCES_TIER0 = ["Hemp", "Silk", "Tea"] as const;
 export const RESOURCES_TIER1 = ["Porcelain Clay", "Copper Ore"] as const;
-export const RESOURCES_TIER2 = [] as const;
+export const RESOURCES_TIER2 = ["Spices", "Pearls"] as const;
 export const RESOURCES = [
   ...RESOURCES_TIER0,
   ...RESOURCES_TIER1,
@@ -83,7 +83,7 @@ export const PRODUCTS_TIER0 = [
   "Sachet",
 ] as const;
 export const PRODUCTS_TIER1 = ["Bronze Mirror", "Celadon Ware"] as const;
-export const PRODUCTS_TIER2 = [] as const;
+export const PRODUCTS_TIER2 = ["Foreign Balm", "Pearl String"] as const;
 export const PRODUCTS = [
   ...PRODUCTS_TIER0,
   ...PRODUCTS_TIER1,
@@ -102,7 +102,7 @@ export const PORTS_TIER0 = [
   "Hangzhou Port",
 ] as const;
 export const PORTS_TIER1 = ["Fuzhou Port", "Goryeo Port"] as const;
-export const PORTS_TIER2 = [] as const;
+export const PORTS_TIER2 = ["Srivijaya Port", "Dashi Port"] as const;
 export const PORTS = [...PORTS_TIER0, ...PORTS_TIER1, ...PORTS_TIER2] as const;
 
 export const RECIPES: Record<
@@ -131,6 +131,16 @@ export const RECIPES: Record<
     value: 65,
     worker_type: "potter",
   },
+  "Foreign Balm": {
+    materials: { Spices: 2, Silk: 1 },
+    value: 85,
+    worker_type: "perfumer",
+  },
+  "Pearl String": {
+    materials: { Pearls: 2, Silk: 1 },
+    value: 105,
+    worker_type: "jeweler",
+  },
 };
 
 export const COMMODITIES: Record<
@@ -148,6 +158,11 @@ export const COMMODITIES: Record<
     ports: ["Guangzhou Port", "Goryeo Port"],
     basePrice: [10, 15],
   },
+  Spices: { ports: ["Srivijaya Port", "Dashi Port"], basePrice: [14, 20] },
+  Pearls: {
+    ports: ["Guangzhou Port", "Srivijaya Port"],
+    basePrice: [16, 24],
+  },
 };
 
 export const PRODUCT_PRICES: Record<string, [number, number]> = {
@@ -157,6 +172,8 @@ export const PRODUCT_PRICES: Record<string, [number, number]> = {
   Sachet: [95, 120],
   "Bronze Mirror": [55, 72],
   "Celadon Ware": [78, 100],
+  "Foreign Balm": [100, 130],
+  "Pearl String": [125, 160],
 };
 
 // Relative draw weights for the port market, not probabilities: the engine
@@ -171,13 +188,21 @@ export const RESOURCE_WEIGHTS: Record<string, number> = {
   Tea: 25,
   "Porcelain Clay": 14,
   "Copper Ore": 12,
+  Spices: 8,
+  Pearls: 6,
 };
 
 // The artisan roster. Each type belongs to a content tier and is only
 // hirable once that tier's charter has opened. WAGES is derived from this
 // rather than repeated, so a wage can never drift between the two.
 export type WorkerTypeId =
-  "weaver" | "master" | "sachet_maker" | "coppersmith" | "potter";
+  | "weaver"
+  | "master"
+  | "sachet_maker"
+  | "coppersmith"
+  | "potter"
+  | "perfumer"
+  | "jeweler";
 
 export type WorkerType = {
   id: WorkerTypeId;
@@ -228,6 +253,22 @@ export const WORKER_TYPES: WorkerType[] = [
     icon: "🧑‍🎨",
     wage: 14,
     tier: 1,
+  },
+  {
+    id: "perfumer",
+    label: "Perfumer",
+    plural: "Perfumers",
+    icon: "🧑‍🔬",
+    wage: 18,
+    tier: 2,
+  },
+  {
+    id: "jeweler",
+    label: "Jeweler",
+    plural: "Jewelers",
+    icon: "💎",
+    wage: 24,
+    tier: 2,
   },
 ];
 
@@ -340,7 +381,29 @@ export const BOONS_TIER1: Boon[] = [
   },
 ];
 
-export const BOONS_TIER2: Boon[] = [];
+export const BOONS_TIER2: Boon[] = [
+  {
+    id: "exotic_treasures",
+    name: "Exotic Treasures",
+    icon: "💎",
+    desc: "Foreign Balm & Pearl String orders pay 15% more this round.",
+    modifiers: { exotic_order_bonus: 0.15 },
+  },
+  {
+    id: "deep_sea_escort_pact",
+    name: "Deep Sea Escort Pact",
+    icon: "🛡️",
+    desc: "Escort cost halved; pirate risk halved this round.",
+    modifiers: { escort_discount: 0.5, pirate_risk_discount: 0.5 },
+  },
+  {
+    id: "merchants_converge",
+    name: "Merchants Converge",
+    icon: "🛍️",
+    desc: "One extra trade order appears this round's board.",
+    modifiers: { extra_order: 1 },
+  },
+];
 
 export const BOONS: Boon[] = [...BOONS_TIER0, ...BOONS_TIER1, ...BOONS_TIER2];
 
@@ -419,7 +482,26 @@ export const MODULES_TIER1: Module[] = [
   },
 ];
 
-export const MODULES_TIER2: Module[] = [];
+export const MODULES_TIER2: Module[] = [
+  {
+    id: "foreign_quarter_pass",
+    name: "Foreign Quarter Pass",
+    icon: "🪪",
+    desc: "Spices and Pearls cost 3 Gold less per unit.",
+  },
+  {
+    id: "persian_dome_compass",
+    name: "Persian Dome Compass",
+    icon: "🧿",
+    desc: "Pirate raid risk reduced by 30%.",
+  },
+  {
+    id: "fleet_of_treasures",
+    name: "Fleet of Treasures",
+    icon: "⛵",
+    desc: "Freight on Foreign Balm & Pearl String orders is 3 Gold cheaper per unit.",
+  },
+];
 
 export const MODULES: Module[] = [
   ...MODULES_TIER0,

@@ -318,6 +318,22 @@ export function explainCardPrice(
       cost -= reduction;
     }
   }
+  if (hasModule(state, "foreign_quarter_pass")) {
+    const reduction = card.resources.reduce(
+      (sum, r) =>
+        r.type === "Spices" || r.type === "Pearls"
+          ? sum + (r.quantity ?? 0) * 3
+          : sum,
+      0,
+    );
+    if (reduction > 0) {
+      steps.push({
+        label: "Foreign Quarter Pass module (-3g/unit)",
+        delta: -reduction,
+      });
+      cost -= reduction;
+    }
+  }
   if (hasModule(state, "smugglers_hold")) {
     const next = Math.floor(cost * 0.85);
     steps.push({ label: "Smuggler's Hold module (-15%)", delta: next - cost });
@@ -631,6 +647,10 @@ export function draftBoons(state: GameState): Boon[] {
     weavers: state.workers.weaver ?? [],
     master_weavers: state.workers.master ?? [],
     sachet_makers: state.workers.sachet_maker ?? [],
+    coppersmiths: state.workers.coppersmith ?? [],
+    potters: state.workers.potter ?? [],
+    perfumers: state.workers.perfumer ?? [],
+    jewelers: state.workers.jeweler ?? [],
   };
   const weightFuncs: Record<string, () => number> = {
     silk_wind: () =>
@@ -648,6 +668,24 @@ export function draftBoons(state: GameState): Boon[] {
     hemp_monopoly: () =>
       (gs.inventory["Hemp"] || 0) < 5 || gs.weavers.length > 0 ? 2.0 : 1.0,
     master_apprentice: () => 1.5,
+    // Tier 1 unlocks only once the first charter has opened, so a captain
+    // who hasn't reached that round yet simply never sees them. Once
+    // unlocked, their weights are tuned to the conditions they reward.
+    farsight: () => (gs.money < 40 ? 2.5 : 1.2),
+    kiln_and_forge_guild: () =>
+      (gs.inventory["Copper Ore"] ?? 0) > 1 ||
+      (gs.inventory["Porcelain Clay"] ?? 0) > 1
+        ? 2.8
+        : 1.0,
+    frontier_tariff_relief: () =>
+      gs.sachet_makers.length > 0 || gs.master_weavers.length > 0 ? 3.0 : 0.8,
+    // Tier 2 preferences, same gating contract as tier 1 above.
+    exotic_treasures: () =>
+      (gs.inventory["Spices"] ?? 0) > 1 || (gs.inventory["Pearls"] ?? 0) > 1
+        ? 3.0
+        : 1.0,
+    deep_sea_escort_pact: () => (gs.money > 60 ? 1.8 : 3.2),
+    merchants_converge: () => 1.6,
   };
   const available = unlockedBoons(state.difficulty, state.currentRound)
     .map((b) => [b, weightFuncs[b.id]()] as [Boon, number])
@@ -760,6 +798,21 @@ export function completeOrder(
     state.vatPaid += totalVat;
     logs.push(`🧾 Product Sales VAT: ${totalVat} Gold`);
   }
+  // Fleet of Treasures discount applied before money moves, so the captain
+  // is never charged the pre-discount freight.
+  if (
+    hasModule(state, "fleet_of_treasures") &&
+    ["Foreign Balm", "Pearl String"].some((g) =>
+      order.resources.some((r) => r.type === g),
+    )
+  ) {
+    const t2items = order.resources
+      .filter((r) => ["Foreign Balm", "Pearl String"].includes(r.type))
+      .reduce((s, r) => s + (r.required ?? 0), 0);
+    transport = Math.max(0, transport - t2items * 3);
+    if (t2items > 0)
+      logs.push(`⛵ Fleet of Treasures: -${t2items * 3}g freight`);
+  }
   state.money -= transport;
   state.roundCosts += transport;
   state.totalCosts += transport;
@@ -783,6 +836,11 @@ export function completeOrder(
   if (hasCharterGood && hasModule(state, "bureau_token")) {
     reward += Math.floor(reward * 0.1);
     logs.push("🎫 Maritime Bureau Token: +10% Reward!");
+  }
+  if (hasCharterGood && state.modifierFlags.exotic_order_bonus) {
+    const pct = state.modifierFlags.exotic_order_bonus;
+    reward += Math.floor(reward * pct);
+    logs.push(`💎 Exotic Treasures: +${Math.round(pct * 100)}% Reward!`);
   }
   if (hasModule(state, "salvage_crane") && Math.random() < 0.3) {
     state.money += transport;
@@ -1472,6 +1530,15 @@ export function startPhase2(
   for (let i = 0; i < orderCount; i++) {
     state.customerCards.push({ id: i, ...genMixedOrder(orderRng, orderPools) });
   }
+  const extraOrders = state.modifierFlags.extra_order ?? 0;
+  for (let i = 0; i < extraOrders; i++) {
+    const nextId = orderCount + i;
+    state.customerCards.push({
+      id: nextId,
+      ...genMixedOrder(orderRng, orderPools),
+    });
+    logs.push("🛍️ Merchants Converge: One extra order appeared.");
+  }
   // Broker's Whisper guarantee, applied after the shared draw above and
   // entirely with this captain's own randomness, so it can never nudge
   // what anyone else in the room sees. One order slot is overwritten per
@@ -1557,7 +1624,10 @@ export function resolvePirateAttack(state: GameState, logs: string[]) {
   const leak = state.brokerTippedPirates
     ? difficultyConfig(state.difficulty).brokerCorruptionRisk
     : 0;
-  const chance = Math.min(1, base + leak);
+  let chance = Math.min(1, base + leak);
+  if (state.modifierFlags.pirate_risk_discount)
+    chance *= 1 - state.modifierFlags.pirate_risk_discount;
+  if (hasModule(state, "persian_dome_compass")) chance *= 0.7;
   if (Math.random() < chance) {
     const lost = state.money;
     state.money = 0;
@@ -1576,7 +1646,10 @@ export function hireEscort(state: GameState, logs: string[]) {
     logs.push("❌ Too late, this round's waters are already resolved");
     return;
   }
-  const cost = Math.floor(state.money * escortRateFor(state.difficulty));
+  let escortRate = escortRateFor(state.difficulty);
+  if (state.modifierFlags.escort_discount)
+    escortRate *= 1 - state.modifierFlags.escort_discount;
+  const cost = Math.floor(state.money * escortRate);
   state.money -= cost;
   state.escortHired = true;
   state.pirateAttackResolved = true;
