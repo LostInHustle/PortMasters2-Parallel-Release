@@ -14,7 +14,9 @@
 // =====================================================================
 
 // Must load .env before importing anything that reads DATABASE_URL.
-try { process.loadEnvFile() } catch {}
+try {
+  process.loadEnvFile();
+} catch {}
 
 import { PrismaClient } from "../generated/prisma/index.js";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";

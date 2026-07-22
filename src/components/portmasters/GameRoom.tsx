@@ -56,6 +56,7 @@ import {
 import { normalizeRoomName } from "@/lib/utils";
 import {
   acceptBarterOffer,
+  claimWordOnTheDocksReward,
   grantLoan,
   nextPhase,
   purchaseIntel,
@@ -260,6 +261,50 @@ export function GameRoom({
     });
   }, [state.game._pendingDebtSettlements, aid.repay, act]);
 
+  // [MANIFEST 02: Word on the Docks] completeOrder (engine.ts) sets this the
+  // instant this captain's own running total crosses the threshold; only
+  // the server actually knows whether anyone else in the room got there
+  // first, so this just reports the claim and clears the flag, the same
+  // relay-then-clear shape as _pendingDebtSettlements above.
+  useEffect(() => {
+    if (!state.game._pendingDocksClaim || !socket) return;
+    socket.emit("docks:claim", { roomId: room.id });
+    act((g) => {
+      g._pendingDocksClaim = undefined;
+    });
+  }, [state.game._pendingDocksClaim, socket, room.id, act]);
+
+  // The server has decided who, if anyone, won this voyage's Word on the
+  // Docks race. Only the winner's own client actually credits the Gold
+  // (claimWordOnTheDocksReward), since Gold is this captain's own local
+  // truth; everyone else in the room just hears about it, the same split
+  // every other cross-player event in this file already follows.
+  useEffect(() => {
+    if (!socket) return;
+    const onDocksWon = (data: {
+      roomId: string;
+      winnerId: string;
+      winnerName: string;
+      reward: number;
+    }) => {
+      if (data.roomId !== room.id) return;
+      if (data.winnerId === me.id) {
+        act((g, l) => claimWordOnTheDocksReward(g, l));
+        toast.success("📣 Word on the Docks!", {
+          description: `First to complete 3 trade orders this voyage. +${data.reward} Gold.`,
+        });
+      } else {
+        toast("📣 Word on the Docks", {
+          description: `${data.winnerName} was first to complete 3 trade orders this voyage.`,
+        });
+      }
+    };
+    socket.on("docks:won", onDocksWon);
+    return () => {
+      socket.off("docks:won", onDocksWon);
+    };
+  }, [socket, room.id, me.id, act]);
+
   const handleRepayLoan = useCallback(
     (debtId: string) => {
       const debt = state.game.debts.find((d) => d.id === debtId);
@@ -282,9 +327,7 @@ export function GameRoom({
       phase: state.game.phase,
       gameOver: state.game.gameOver,
       inventory: state.game.inventory,
-      weavers: state.game.weavers,
-      masterWeavers: state.game.masterWeavers,
-      sachetMakers: state.game.sachetMakers,
+      workers: state.game.workers,
       equippedModules: state.game.equippedModules,
       logs: state.logs.slice(-30),
     }),

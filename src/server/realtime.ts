@@ -30,7 +30,11 @@ import {
   recordVoyageInStats,
   renownTitleForLevel,
 } from "../lib/game/legacy";
-import { BROKERS_FAVOR_UNLOCK_LEVEL } from "../lib/game/constants";
+import {
+  BROKERS_FAVOR_UNLOCK_LEVEL,
+  WORD_ON_THE_DOCKS_REWARD,
+  WORD_ON_THE_DOCKS_THRESHOLD,
+} from "../lib/game/constants";
 import { meritById, qualifyingMerits } from "../lib/game/merits";
 import {
   normalizeDifficulty,
@@ -227,6 +231,8 @@ export function attachRealtime(httpServer: HttpServer): Server {
         roomStatuses.delete(roomId);
         roomBarterOffers.delete(roomId);
         roomAidRequests.delete(roomId);
+        roomPulseTallies.delete(roomId);
+        roomDocksWinners.delete(roomId);
         concludedRooms.delete(roomId);
       } else {
         io.to(`room:${roomId}`).emit("room:system", {
@@ -364,10 +370,20 @@ export function attachRealtime(httpServer: HttpServer): Server {
       if (!cp.readyUserIds.has(id)) return;
     }
     cp.advancing = true;
+    // [MANIFEST 01: The Harbor Pulse] cp.phase is still "5" here, the
+    // checkpoint everyone just readied out of; whoever's pendingFn runs next
+    // is startPhase1 for cp.round. That makes this the one moment to hand
+    // over last round's finished tally, computed once and read by every
+    // client's genResourceCard before this round's cards are ever rolled.
+    const harborPulse =
+      cp.phase === "5"
+        ? computeHarborPulse(roomPulseTallies.get(roomId)?.get(cp.round - 1))
+        : undefined;
     io.to(`room:${roomId}`).emit("phase:advance", {
       roomId,
       round: cp.round,
       phase: cp.phase,
+      ...(harborPulse ? { harborPulse } : {}),
     });
   }
 
@@ -686,6 +702,76 @@ export function attachRealtime(httpServer: HttpServer): Server {
     else roomAidRequests.delete(roomId);
     broadcastAid(roomId);
   }
+
+  // ---------- The Harbor Pulse ----------
+  // [MANIFEST 01] Every client already knows what it bought this round; this
+  // just adds up everyone's reports so the next round's market can lean
+  // toward or away from whatever the room actually did, instead of every
+  // captain's price roll staying completely blind to the rest of the harbor.
+  // Keyed by room, then by round, since a report can arrive for the round
+  // that's just ending while a slower captain is still mid-report for the
+  // one before it. Reports for a round are only ever read once, the moment
+  // the room advances into the next round's Phase 1 (see maybeAdvance
+  // below), and are never written to the database: losing this on a server
+  // restart just means one round rolls with a neutral market, which is the
+  // same as round 1 every voyage already looks like.
+  const roomPulseTallies = new Map<
+    string,
+    Map<number, Record<string, number>>
+  >();
+
+  function addPulseReport(
+    roomId: string,
+    round: number,
+    tally: Record<string, number>,
+  ) {
+    let byRound = roomPulseTallies.get(roomId);
+    if (!byRound) {
+      byRound = new Map();
+      roomPulseTallies.set(roomId, byRound);
+    }
+    const existing = byRound.get(round) ?? {};
+    for (const [item, qty] of Object.entries(tally)) {
+      if (typeof qty !== "number" || !Number.isFinite(qty) || qty <= 0)
+        continue;
+      existing[item] = (existing[item] ?? 0) + qty;
+    }
+    byRound.set(round, existing);
+  }
+
+  // Turns a round's raw summed quantities into a small per-item price
+  // multiplier: an item the room leaned into harder than an even three-way
+  // split gets pricier, one nobody touched gets cheaper. PULSE_CAP bounds it
+  // to a lean rather than a shove, and an empty or missing tally (round 1,
+  // or a round nobody reported for) is neutral rather than guessed at.
+  const PULSE_CAP = 0.12;
+  const PULSE_SENSITIVITY = 0.6;
+  function computeHarborPulse(
+    tally: Record<string, number> | undefined,
+  ): Record<string, number> {
+    if (!tally) return {};
+    const items = Object.keys(tally);
+    const total = items.reduce((sum, k) => sum + tally[k], 0);
+    if (total <= 0 || items.length === 0) return {};
+    const baseline = 1 / 3; // Hemp, Silk, Tea: an even split of the harbor's buying
+    const out: Record<string, number> = {};
+    for (const item of items) {
+      const share = tally[item] / total;
+      const nudge = (share - baseline) * PULSE_SENSITIVITY;
+      out[item] = Math.max(-PULSE_CAP, Math.min(PULSE_CAP, nudge));
+    }
+    return out;
+  }
+
+  // ---------- Word on the Docks ----------
+  // [MANIFEST 02] A spontaneous, room wide race layered alongside the
+  // scheduled Imperial Mandates (see difficulty.ts), which stay untouched.
+  // Whoever's own client is first to report crossing the completed-orders
+  // threshold wins; this server's only job is deciding who was first, the
+  // same "first report wins" arbitration the barter board already uses for
+  // who gets to accept a given offer. One winner per room per voyage, so
+  // this is keyed by room, not by round, and cleared on restart below.
+  const roomDocksWinners = new Map<string, { userId: string; name: string }>();
 
   // ---------- Helpers ----------
   async function validateToken(token: string): Promise<PublicUser | null> {
@@ -1033,6 +1119,58 @@ export function attachRealtime(httpServer: HttpServer): Server {
       const cp = await getCheckpoint(roomId);
       cp.readyUserIds.delete(s.userId);
       await broadcastReadyState(roomId, cp);
+    });
+
+    // [MANIFEST 01: The Harbor Pulse] Fired once per captain per round, the
+    // moment their own client is about to leave Phase 1 for good (see
+    // use-phase-sync.ts), carrying what they personally bought. Purely
+    // additive and read only once, by maybeAdvance above when the next
+    // round's Phase 1 begins, so there is nothing here for a late or
+    // duplicate report to corrupt: the worst a stale or repeated report can
+    // do is nudge the pulse by one captain's draw a little further than
+    // intended, never break it.
+    socket.on(
+      "harbor:pulse:report",
+      (payload: {
+        roomId?: string;
+        round?: number;
+        tally?: Record<string, number>;
+      }) => {
+        const s = requireAuth();
+        if (!s) return;
+        const roomId = payload?.roomId ?? s.roomId;
+        if (!roomId || roomId !== s.roomId) return;
+        if (typeof payload?.round !== "number" || !payload.tally) return;
+        addPulseReport(roomId, payload.round, payload.tally);
+      },
+    );
+
+    // [MANIFEST 02: Word on the Docks] Fired by a captain's own client the
+    // instant their local totalOrdersCompleted crosses the threshold (see
+    // completeOrder in engine.ts). First claim in for a room wins; every
+    // later claim, including one from the same captain if this ever fired
+    // twice, is silently ignored, the same "first report wins, everything
+    // else is a no-op" shape maybeAdvance already uses for the ready check.
+    socket.on("docks:claim", (payload: { roomId?: string }) => {
+      const s = requireAuth();
+      if (!s) return;
+      const roomId = payload?.roomId ?? s.roomId;
+      if (!roomId || roomId !== s.roomId) return;
+      if (roomDocksWinners.has(roomId)) return;
+      roomDocksWinners.set(roomId, {
+        userId: s.userId,
+        name: s.user.displayName,
+      });
+      io.to(`room:${roomId}`).emit("docks:won", {
+        roomId,
+        winnerId: s.userId,
+        winnerName: s.user.displayName,
+        reward: WORD_ON_THE_DOCKS_REWARD,
+      });
+      io.to(`room:${roomId}`).emit("room:system", {
+        roomId,
+        content: `📣 Word on the Docks: ${s.user.displayName} was first to complete ${WORD_ON_THE_DOCKS_THRESHOLD} trade orders this voyage, and pockets ${WORD_ON_THE_DOCKS_REWARD} Gold for it!`,
+      });
     });
 
     // ---------- Bartering ----------
@@ -1597,6 +1735,14 @@ export function attachRealtime(httpServer: HttpServer): Server {
         roomStatuses.delete(roomId);
         clearBarter(roomId);
         clearAid(roomId);
+        // A restart resets currentRound back to 1, so any tally still held
+        // under the old voyage's round numbers would otherwise leak into the
+        // new voyage's identically numbered rounds.
+        roomPulseTallies.delete(roomId);
+        // A brand new voyage means a brand new race to be first to three
+        // completed orders, so the old one's winner (if any) can't linger
+        // and silently block every claim in the new voyage.
+        roomDocksWinners.delete(roomId);
         // A restarted room can sail, and conclude, all over again.
         concludedRooms.delete(roomId);
 

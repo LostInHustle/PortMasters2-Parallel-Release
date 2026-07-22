@@ -20,6 +20,7 @@ import {
   PRODUCTS,
   ICONS,
   COLORS,
+  WORKER_TYPES,
 } from "@/lib/game/constants";
 import type { Difficulty } from "@/lib/game/difficulty";
 import type { GameState } from "@/lib/game/types";
@@ -453,9 +454,13 @@ export function PlayerDetailModal({
 }) {
   const workerGroups = detail
     ? [
-        { icon: "👩‍🔧", name: "Weavers", list: detail.weavers },
-        { icon: "👩‍🎨", name: "Master Weavers", list: detail.masterWeavers },
-        { icon: "🌸", name: "Sachet Makers", list: detail.sachetMakers },
+        // Built from the roster rather than three hardcoded rows, so an
+        // artisan a charter introduces shows up here without another edit.
+        ...WORKER_TYPES.map((w) => ({
+          icon: w.icon,
+          name: w.plural,
+          list: detail.workers?.[w.id] ?? [],
+        })),
       ]
     : [];
 

@@ -13,6 +13,7 @@ import type { Socket } from "socket.io-client";
 import { phaseLabel, showWelcome, snapToCheckpoint } from "@/lib/game/engine";
 import {
   createInitialGameState,
+  normalizeWorkerRoster,
   type GameContext,
   type GameState,
 } from "@/lib/game/types";
@@ -151,9 +152,17 @@ export function useGameSession(
           game.resourceCards = game.resourceCards ?? [];
           game.customerCards = game.customerCards ?? [];
           game.equippedModules = game.equippedModules ?? [];
-          game.weavers = game.weavers ?? [];
-          game.masterWeavers = game.masterWeavers ?? [];
-          game.sachetMakers = game.sachetMakers ?? [];
+          // Rebuild the artisan roster defensively: fills in any type this
+          // save predates, and reads a pre-charter save that still carried
+          // three separate weavers / masterWeavers / sachetMakers arrays.
+          game.workers = normalizeWorkerRoster(
+            (game as unknown as { workers?: unknown }).workers,
+            game as unknown as {
+              weavers?: GameState["workers"]["weaver"];
+              masterWeavers?: GameState["workers"]["master"];
+              sachetMakers?: GameState["workers"]["sachet_maker"];
+            },
+          );
           game.revealedIntel = game.revealedIntel ?? [];
           game.phase2DemandTags = game.phase2DemandTags ?? [];
           game.modifierFlags = game.modifierFlags ?? {};

@@ -1,7 +1,12 @@
 // =====================================================================
 // PortMasters 2 Parallel Release: game state types
 // =====================================================================
-import { type Boon, type Module } from "./constants";
+import {
+  WORKER_TYPE_IDS,
+  type Boon,
+  type Module,
+  type WorkerTypeId,
+} from "./constants";
 import {
   DEFAULT_DIFFICULTY,
   difficultyConfig,
@@ -106,9 +111,12 @@ export type GameState = {
   incomeTaxPaid: number;
   roundRevenue: number;
   roundCosts: number;
-  weavers: Worker[];
-  masterWeavers: Worker[];
-  sachetMakers: Worker[];
+  // Every artisan the captain employs, keyed by type (see WORKER_TYPES in
+  // ./constants). One record rather than a field per type, so a charter that
+  // brings new artisans needs no new state field and no new migration: the
+  // roster normalizer below fills in whatever key a save predates. This
+  // replaced the three separate weavers / masterWeavers / sachetMakers arrays.
+  workers: Record<WorkerTypeId, Worker[]>;
   fixedCost: number;
   shipLevel: number;
   shipUpgradeCost: number[];
@@ -121,11 +129,35 @@ export type GameState = {
   completedOrders: number[];
   purchaseCount: number;
   orderCount: number;
+  // [MANIFEST 02: Word on the Docks] Trade orders completed across the whole
+  // voyage, never reset per round the way orderCount is, only by a fresh
+  // voyage (createInitialGameState). completeOrder increments this alongside
+  // orderCount; it's what the milestone race below actually watches.
+  totalOrdersCompleted: number;
+  // [MANIFEST 02: Word on the Docks] Set once, by completeOrder, the instant
+  // totalOrdersCompleted crosses WORD_ON_THE_DOCKS_THRESHOLD, since the pure
+  // engine has no way to call socket.emit itself. GameRoom.tsx relays it as
+  // a docks:claim report and clears it, the same convention
+  // _pendingDebtSettlements/_draftChoices/_newModule already use for an
+  // engine function that needs the React layer to act on its behalf.
+  _pendingDocksClaim?: { total: number };
   gameOver: boolean;
   modifierFlags: Record<string, number>;
   phase2DemandTags: string[];
   revealedIntel: IntelItem[];
   intelCost: number;
+  // [MANIFEST 01: The Harbor Pulse] A per resource price nudge for this
+  // round's Phase 1, keyed by resource name (Hemp, Silk, Tea), derived room
+  // wide from what the whole harbor bought last round (see
+  // computeHarborPulse in src/server/realtime.ts) and delivered on the same
+  // phase:advance broadcast that already carries every captain into Phase 1
+  // together. Read by genResourceCard in engine.ts as one more multiplier
+  // alongside Boons and modules; never persisted beyond the round it was
+  // delivered for, and empty on round 1 since there is no prior round to
+  // react to. A captain who buys nothing never changes anyone's pulse but
+  // their own report still contributes a zero tally, exactly like everyone
+  // else's.
+  harborPulse: Record<string, number>;
   // The captain's persistent Renown level (see src/lib/game/legacy.ts),
   // copied onto the voyage state so the engine can gate Renown-locked skills
   // like Broker's Favor without reaching back into account data. Personal to
@@ -180,6 +212,42 @@ export type GameState = {
     debtId: string;
   }[];
 };
+
+export function emptyWorkerRoster(): Record<WorkerTypeId, Worker[]> {
+  return Object.fromEntries(
+    WORKER_TYPE_IDS.map((id) => [id, [] as Worker[]]),
+  ) as unknown as Record<WorkerTypeId, Worker[]>;
+}
+
+// Accepts whatever a save actually holds and returns a complete roster: any
+// artisan type the save predates comes back empty rather than undefined, and a
+// save written before the roster existed is read from the three separate
+// arrays it used to carry. Deliberately tolerant, since this runs on every
+// load and a malformed roster should cost a captain their artisans, not their
+// whole voyage.
+export function normalizeWorkerRoster(
+  raw: unknown,
+  legacy?: {
+    weavers?: Worker[];
+    masterWeavers?: Worker[];
+    sachetMakers?: Worker[];
+  },
+): Record<WorkerTypeId, Worker[]> {
+  const roster = emptyWorkerRoster();
+  const src = (raw ?? {}) as Partial<Record<string, Worker[]>>;
+  for (const id of WORKER_TYPE_IDS) {
+    if (Array.isArray(src[id])) roster[id] = src[id] as Worker[];
+  }
+  if (legacy) {
+    if (!Array.isArray(src.weaver) && Array.isArray(legacy.weavers))
+      roster.weaver = legacy.weavers;
+    if (!Array.isArray(src.master) && Array.isArray(legacy.masterWeavers))
+      roster.master = legacy.masterWeavers;
+    if (!Array.isArray(src.sachet_maker) && Array.isArray(legacy.sachetMakers))
+      roster.sachet_maker = legacy.sachetMakers;
+  }
+  return roster;
+}
 
 export type GameContext = {
   // Per-captain deterministic seed identity, "roomId:userId" (see
@@ -240,9 +308,7 @@ export function createInitialGameState(
     incomeTaxPaid: 0,
     roundRevenue: 0,
     roundCosts: 0,
-    weavers: [],
-    masterWeavers: [],
-    sachetMakers: [],
+    workers: emptyWorkerRoster(),
     fixedCost: cfg.maintenance,
     shipLevel: 0,
     shipUpgradeCost: [15, 25, 40],
@@ -255,11 +321,13 @@ export function createInitialGameState(
     completedOrders: [],
     purchaseCount: 0,
     orderCount: 0,
+    totalOrdersCompleted: 0,
     gameOver: false,
     modifierFlags: {},
     phase2DemandTags: [],
     revealedIntel: [],
     intelCost: 5,
+    harborPulse: {},
     equippedModules: [],
     boonChoices: [],
     boonSwapUsed: false,
