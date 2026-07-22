@@ -5,6 +5,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentUser, generateRoomCode, publicUser } from "@/lib/api-auth";
 import { normalizeRoomName } from "@/lib/utils";
+import { normalizeDifficulty } from "@/lib/game/difficulty";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -46,6 +47,7 @@ export async function GET() {
       name: r.name,
       isPublic: r.isPublic,
       started: r.started,
+      difficulty: r.difficulty,
       createdAt: r.createdAt,
       host: publicUser(r.host),
       memberCount: r.members.length,
@@ -60,6 +62,11 @@ export async function GET() {
 const CreateSchema = z.object({
   name: z.string().min(1).max(40),
   isPublic: z.boolean().optional().default(true),
+  // Optional so existing callers keep working; any unknown value is coerced to
+  // the entry tier by normalizeDifficulty below. Phase A only ever sends the
+  // default, but the field is accepted now so the lobby switch (a later phase)
+  // needs no route change.
+  difficulty: z.string().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -81,6 +88,7 @@ export async function POST(req: NextRequest) {
     );
   }
   const { name, isPublic } = parsed.data;
+  const difficulty = normalizeDifficulty(parsed.data.difficulty);
 
   // Ensure host isn't already in another room as host of a duplicate; allow multiple.
   const room = await db.room.create({
@@ -89,6 +97,7 @@ export async function POST(req: NextRequest) {
       name: normalizeRoomName(name),
       hostId: user.id,
       isPublic,
+      difficulty,
       members: { create: [{ userId: user.id }] },
     },
     include: {
@@ -122,6 +131,7 @@ export async function POST(req: NextRequest) {
       name: room.name,
       isPublic: room.isPublic,
       started: room.started,
+      difficulty: room.difficulty,
       createdAt: room.createdAt,
       host: publicUser(room.host),
       memberCount: room.members.length,

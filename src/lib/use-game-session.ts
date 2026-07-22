@@ -17,6 +17,7 @@ import {
   type GameState,
 } from "@/lib/game/types";
 import { renownStartingGoldBonus } from "@/lib/game/legacy";
+import { normalizeDifficulty, type Difficulty } from "@/lib/game/difficulty";
 
 type SessionState = {
   game: GameState;
@@ -40,6 +41,7 @@ type Action =
       startingGoldBonus?: number;
       renownLevel?: number;
       voyageEpoch?: number;
+      difficulty?: Difficulty;
     }
   | { type: "SET_SAVING"; saving: boolean; at: number };
 
@@ -52,6 +54,7 @@ function reducer(state: SessionState, action: Action): SessionState {
         action.startingGoldBonus ?? 0,
         action.renownLevel ?? 1,
         action.voyageEpoch ?? 0,
+        action.difficulty,
       );
       const logs: string[] = [];
       showWelcome(g, logs);
@@ -123,7 +126,10 @@ export function useGameSession(
 
     (async () => {
       try {
-        const [{ state: raw, checkpoint }, legacyResult] = await Promise.all([
+        const [
+          { state: raw, checkpoint, difficulty: roomDifficulty },
+          legacyResult,
+        ] = await Promise.all([
           api.getGameState(roomId),
           // A brand new captain (no CaptainLegacy row yet) or a fetch
           // that fails outright just means no bonus this load; never
@@ -171,6 +177,10 @@ export function useGameSession(
           // Their already-generated cards restore from the blob untouched, so
           // only a future round would reseed, which is fine.
           game.voyageEpoch = game.voyageEpoch ?? 0;
+          // Refresh difficulty from the room (the authoritative source), the
+          // same reason renownLevel is refreshed above; default an old save
+          // that predates difficulty to whatever tier the room is on.
+          game.difficulty = normalizeDifficulty(roomDifficulty ?? game.difficulty);
           dispatch({ type: "INIT", game, logs: [] });
         } else {
           dispatch({
@@ -185,6 +195,7 @@ export function useGameSession(
             startingGoldBonus: goldBonus,
             renownLevel,
             voyageEpoch: checkpoint?.voyageEpoch ?? 0,
+            difficulty: roomDifficulty,
           });
         }
       } catch {

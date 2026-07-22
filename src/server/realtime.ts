@@ -27,6 +27,7 @@ import { leaveRoomForUser, roomMemberIds } from "../lib/rooms";
 import { levelForRenownXP, renownTitleForLevel } from "../lib/game/legacy";
 import { BROKERS_FAVOR_UNLOCK_LEVEL } from "../lib/game/constants";
 import { meritById, qualifyingMerits } from "../lib/game/merits";
+import { renownMultiplierFor } from "../lib/game/difficulty";
 
 // ---------- Types ----------
 type PublicUser = {
@@ -412,6 +413,15 @@ export function attachRealtime(httpServer: HttpServer): Server {
     // same conclusion twice.
     concludedRooms.add(roomId);
 
+    // The room's difficulty scales how much Reputation banks as Renown XP, so a
+    // harder voyage advances the permanent Captain's Legacy faster. Fair Winds
+    // is 1.0, leaving the entry tier exactly as it was.
+    const roomForDifficulty = await db.room.findUnique({
+      where: { id: roomId },
+      select: { difficulty: true },
+    });
+    const renownMultiplier = renownMultiplierFor(roomForDifficulty?.difficulty);
+
     const crownable = finished.filter((f) => f.phase === "endgame");
     const winnerId = crownable.length
       ? crownable.reduce((best, f) =>
@@ -436,7 +446,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
     }[] = [];
 
     for (const f of finished) {
-      const xpGained = Math.max(0, f.reputation);
+      const xpGained = Math.round(Math.max(0, f.reputation) * renownMultiplier);
       const crowned = f.userId === winnerId;
       const bankrupt = f.phase === "bankruptcy";
       const prior = await db.captainLegacy.findUnique({
@@ -1572,6 +1582,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         io.to(`room:${roomId}`).emit("room:restarted", {
           roomId,
           voyageEpoch: restarted.voyageEpoch,
+          difficulty: restarted.difficulty,
         });
         const cp = await getCheckpoint(roomId);
         await broadcastReadyState(roomId, cp);

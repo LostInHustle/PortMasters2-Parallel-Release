@@ -16,24 +16,38 @@ export async function GET(req: NextRequest) {
     where: { userId_roomId: { userId: user.id, roomId } },
   });
 
-  // A brand new captain (no save yet) should drop into the voyage at
+  // Always load the room's difficulty so the client can seed a fresh voyage on
+  // the right tier and refresh a restored one from the room. The room is the
+  // single source of truth for difficulty (a save can predate a restart that
+  // changed it), the same reason renownLevel is refreshed on load.
+  // A brand new captain (no save yet) should also drop into the voyage at
   // wherever the room currently is, not back at round 1. The room's
   // checkpoint is what the synchronized ready-check (src/server/realtime.ts)
   // keeps everyone else lined up against.
-  let checkpoint: {
-    currentRound: number;
-    currentPhase: string;
-    voyageEpoch: number;
-  } | null = null;
-  if (!state) {
-    const room = await db.room.findUnique({
-      where: { id: roomId },
-      select: { currentRound: true, currentPhase: true, voyageEpoch: true },
-    });
-    if (room) checkpoint = room;
-  }
+  const room = await db.room.findUnique({
+    where: { id: roomId },
+    select: {
+      currentRound: true,
+      currentPhase: true,
+      voyageEpoch: true,
+      difficulty: true,
+    },
+  });
+  const difficulty = room?.difficulty ?? "fair_winds";
+  const checkpoint =
+    !state && room
+      ? {
+          currentRound: room.currentRound,
+          currentPhase: room.currentPhase,
+          voyageEpoch: room.voyageEpoch,
+        }
+      : null;
 
-  return NextResponse.json({ state: state?.data ?? null, checkpoint });
+  return NextResponse.json({
+    state: state?.data ?? null,
+    checkpoint,
+    difficulty,
+  });
 }
 
 const SaveSchema = z.object({

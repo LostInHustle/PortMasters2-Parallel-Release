@@ -3,6 +3,7 @@
 // =====================================================================
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import type { CheckInStatus } from "@/lib/game/checkin";
+import type { Difficulty } from "@/lib/game/difficulty";
 
 export type PublicUser = {
   id: string;
@@ -17,6 +18,7 @@ export type RoomSummary = {
   name: string;
   isPublic: boolean;
   started: boolean;
+  difficulty: Difficulty;
   createdAt: string;
   host: PublicUser;
   memberCount: number;
@@ -83,7 +85,11 @@ export const api = {
 
   // Rooms
   listRooms: () => jfetch<{ rooms: RoomSummary[] }>("/api/rooms"),
-  createRoom: (body: { name: string; isPublic?: boolean }) =>
+  createRoom: (body: {
+    name: string;
+    isPublic?: boolean;
+    difficulty?: Difficulty;
+  }) =>
     jfetch<{ room: RoomSummary }>("/api/rooms", {
       method: "POST",
       body: JSON.stringify(body),
@@ -109,6 +115,7 @@ export const api = {
         currentPhase: string;
         voyageEpoch: number;
       } | null;
+      difficulty: Difficulty;
     }>(`/api/game/state?roomId=${roomId}`),
   saveGameState: (roomId: string, data: unknown) =>
     jfetch<{ ok: true; updatedAt: string }>("/api/game/state", {

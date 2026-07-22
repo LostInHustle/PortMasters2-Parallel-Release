@@ -64,6 +64,7 @@ export async function GET(
       name: room.name,
       isPublic: room.isPublic,
       started: room.started,
+      difficulty: room.difficulty,
       createdAt: room.createdAt,
       host: publicUser(room.host),
       memberCount: room.members.length,

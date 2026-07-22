@@ -92,6 +92,13 @@ model Room {
   // who isn't already a member.
   started      Boolean  @default(false)
 
+  // The difficulty tier the host chose for this harbor (see
+  // src/lib/game/difficulty.ts). One tier for the whole room: every captain
+  // folds it into their own game state so they all resolve the same voyage
+  // length, market breadth, and raid odds. Defaults to the entry tier so every
+  // pre-existing room keeps the current single mode with no change.
+  difficulty   String   @default("fair_winds")
+
   host        User       @relation("RoomHost", fields: [hostId], references: [id], onDelete: Cascade)
   members     RoomMember[]
   messages    Message[]

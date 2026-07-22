@@ -5,6 +5,7 @@ import type { Socket } from "socket.io-client";
 import type { GameState } from "@/lib/game/types";
 import { restartGame, startBoonDrafting } from "@/lib/game/engine";
 import { renownStartingGoldBonus } from "@/lib/game/legacy";
+import { normalizeDifficulty } from "@/lib/game/difficulty";
 import { api } from "@/lib/api";
 
 export type ReadyState = {
@@ -185,6 +186,7 @@ export function usePhaseSync(
     const onRestarted = async (data: {
       roomId: string;
       voyageEpoch?: number;
+      difficulty?: string;
     }) => {
       if (data.roomId !== roomId) return;
       pendingFn.current = null;
@@ -213,6 +215,9 @@ export function usePhaseSync(
           bonus,
           level ?? state.renownLevel,
           data.voyageEpoch ?? state.voyageEpoch + 1,
+          // The room's tier is the source of truth; if the payload lacks it,
+          // keep the captain's current tier rather than silently resetting it.
+          normalizeDifficulty(data.difficulty ?? state.difficulty),
         ),
       );
     };

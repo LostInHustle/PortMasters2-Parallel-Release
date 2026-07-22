@@ -27,16 +27,12 @@ import {
   BROKERS_FAVOR_PAYOUT_CAP,
   BROKERS_FAVOR_UNLOCK_LEVEL,
   COMMODITIES,
-  ESCORT_COST_RATE,
   ICONS,
   MERCHANT_RATINGS,
   MODULES,
-  ORDER_CARD_COUNT,
-  PIRATE_ATTACK_CHANCE,
   PORTS,
   PRODUCT_PRICES,
   PRODUCTS,
-  PURCHASE_CARD_COUNT,
   RECIPES,
   RESOURCE_PROBS,
   RESOURCES,
@@ -53,6 +49,13 @@ import {
   type OrderCard,
   type ResourceCard,
 } from "./types";
+import {
+  DEFAULT_DIFFICULTY,
+  escortRateFor,
+  marketCountsFor,
+  pirateChanceFor,
+  type Difficulty,
+} from "./difficulty";
 
 // ---------- Helpers ----------
 export function hasModule(state: GameState, id: string): boolean {
@@ -1146,7 +1149,13 @@ export function startPhase1(
     `${ctx.seedBase}:V${state.voyageEpoch}:R${state.currentRound}:market`,
   );
   state.resourceCards = [];
-  for (let i = 0; i < PURCHASE_CARD_COUNT; i++) {
+  // [DIFFICULTY] Card count comes from the room's tier and the current round
+  // (see marketCountsFor): flat for Fair Winds, widening on the harder tiers.
+  const purchaseCount = marketCountsFor(
+    state.difficulty,
+    state.currentRound,
+  ).purchase;
+  for (let i = 0; i < purchaseCount; i++) {
     state.resourceCards.push({ id: i, ...genResourceCard(marketRng) });
   }
 }
@@ -1282,7 +1291,10 @@ export function startPhase2(
     `${ctx.seedBase}:V${state.voyageEpoch}:R${state.currentRound}:orders`,
   );
   state.customerCards = [];
-  for (let i = 0; i < ORDER_CARD_COUNT; i++) {
+  // [DIFFICULTY] Same widening as the port market above, applied to the trade
+  // board, so both boards grow together as a tier's charter opens.
+  const orderCount = marketCountsFor(state.difficulty, state.currentRound).order;
+  for (let i = 0; i < orderCount; i++) {
     state.customerCards.push({ id: i, ...genMixedOrder(orderRng) });
   }
   // Broker's Whisper guarantee, applied after the shared draw above and
@@ -1328,7 +1340,15 @@ export function startPhase3(state: GameState, logs: string[]) {
 export function resolvePirateAttack(state: GameState, logs: string[]) {
   if (state.pirateAttackResolved) return;
   state.pirateAttackResolved = true;
-  if (Math.random() < PIRATE_ATTACK_CHANCE) {
+  // [DIFFICULTY] Raid chance comes from the room's tier, stepping up past the
+  // midpoint on the harder tiers (see pirateChanceFor). A raid still takes
+  // every coin, so severity is unchanged; only the odds move.
+  const chance = pirateChanceFor(
+    state.difficulty,
+    state.currentRound,
+    state.maxRounds,
+  );
+  if (Math.random() < chance) {
     const lost = state.money;
     state.money = 0;
     logs.push(`🏴‍☠️ Pirates raided your hold! Lost all ${lost} Gold.`);
@@ -1346,7 +1366,7 @@ export function hireEscort(state: GameState, logs: string[]) {
     logs.push("❌ Too late, this round's waters are already resolved");
     return;
   }
-  const cost = Math.floor(state.money * ESCORT_COST_RATE);
+  const cost = Math.floor(state.money * escortRateFor(state.difficulty));
   state.money -= cost;
   state.escortHired = true;
   state.pirateAttackResolved = true;
@@ -1560,11 +1580,13 @@ export function restartGame(
   startingGoldBonus: number = 0,
   renownLevel: number = 1,
   voyageEpoch: number = 0,
+  difficulty: Difficulty = DEFAULT_DIFFICULTY,
 ) {
   const fresh = createInitialGameState(
     startingGoldBonus,
     renownLevel,
     voyageEpoch,
+    difficulty,
   );
   Object.assign(state, fresh);
   logs.length = 0;

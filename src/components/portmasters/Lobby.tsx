@@ -9,6 +9,7 @@ import {
   type RoomSummary,
 } from "@/lib/api";
 import { useRealtime } from "@/lib/use-realtime";
+import { difficultyConfig } from "@/lib/game/difficulty";
 import { Avatar, OnlineDot, Pill } from "./shared";
 import { ChatPanel } from "./ChatPanel";
 import { CaptainLegacyCard } from "./CaptainLegacyCard";
@@ -482,6 +483,10 @@ export function Lobby({
                             <span className="font-medium truncate">
                               {normalizeRoomName(room.name)}
                             </span>
+                            <Pill tone="sea">
+                              {difficultyConfig(room.difficulty).icon}{" "}
+                              {difficultyConfig(room.difficulty).badge}
+                            </Pill>
                             {room.host.id === me.id && (
                               <Pill tone="gold">Host</Pill>
                             )}

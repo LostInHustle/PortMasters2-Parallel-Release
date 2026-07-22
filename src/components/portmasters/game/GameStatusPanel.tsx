@@ -3,6 +3,7 @@
 import { COLORS, ICONS, PRODUCTS, RESOURCES } from "@/lib/game/constants";
 import { getHireCost } from "@/lib/game/engine";
 import type { GameState } from "@/lib/game/types";
+import { difficultyConfig } from "@/lib/game/difficulty";
 import { cn } from "@/lib/utils";
 import { Term } from "../Term";
 import { priceAwareTermContent } from "./PriceTooltips";
@@ -35,6 +36,12 @@ export function GameStatusPanel({
           <b className="text-foreground">
             {game.currentRound}/{game.maxRounds}
           </b>
+        </Row>
+        <Row label="🧭 Waters">
+          <span className="text-foreground/90">
+            {difficultyConfig(game.difficulty).icon}{" "}
+            {difficultyConfig(game.difficulty).name}
+          </span>
         </Row>
         <Row label="💰 Funds">
           <span className="text-emerald-600 dark:text-emerald-400 font-bold text-[15px]">
@@ -176,7 +183,8 @@ export function GameStatusPanel({
             </Row>
           ))}
           <p className="text-[10px] text-muted-foreground/80 pt-1">
-            Unpaid loans settle automatically at the end of Round 8.
+            Unpaid loans settle automatically at the end of Round{" "}
+            {game.maxRounds}.
           </p>
         </Section>
       )}

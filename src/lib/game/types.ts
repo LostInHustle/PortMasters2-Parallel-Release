@@ -1,7 +1,12 @@
 // =====================================================================
 // PortMasters 2 Parallel Release: game state types
 // =====================================================================
-import { MAX_ROUNDS, type Boon, type Module } from "./constants";
+import { type Boon, type Module } from "./constants";
+import {
+  DEFAULT_DIFFICULTY,
+  difficultyConfig,
+  type Difficulty,
+} from "./difficulty";
 
 export type Phase =
   | 0 // welcome
@@ -76,6 +81,12 @@ export type GameState = {
   score: number;
   currentRound: number;
   maxRounds: number;
+  // The room's difficulty tier (see src/lib/game/difficulty.ts), stamped onto
+  // this state when the voyage is created and refreshed from the room on every
+  // load, so the engine derives voyage length, market breadth, and raid odds
+  // from a single room-wide source. Every captain in a room carries their own
+  // copy of the same room value, which is what keeps their conclusion aligned.
+  difficulty: Difficulty;
   // The room's voyage epoch (see Room.voyageEpoch in prisma/schema.prisma),
   // stamped onto this state when the voyage is created and folded into the
   // deterministic seed so a restart (which bumps the epoch) rerolls every
@@ -181,11 +192,17 @@ export type GameContext = {
 // voyageEpoch defaults to 0 (the room's first voyage) for the same reason;
 // callers that know the room's current epoch pass it so a fresh voyage is
 // seeded distinctly from the ones before it.
+// difficulty defaults to the entry tier (see DEFAULT_DIFFICULTY) so any caller
+// that doesn't yet know the room's tier still produces a valid state; callers
+// that know it pass it so maxRounds, starting Gold, and maintenance all follow
+// the room's chosen tier.
 export function createInitialGameState(
   startingGoldBonus: number = 0,
   renownLevel: number = 1,
   voyageEpoch: number = 0,
+  difficulty: Difficulty = DEFAULT_DIFFICULTY,
 ): GameState {
+  const cfg = difficultyConfig(difficulty);
   return {
     inventory: {
       Hemp: 8,
@@ -196,13 +213,14 @@ export function createInitialGameState(
       Brocade: 0,
       Sachet: 0,
     },
-    money: 100 + startingGoldBonus,
+    money: cfg.startingGold + startingGoldBonus,
+    difficulty,
     renownLevel,
     brokersFavorUsed: false,
     voyageEpoch,
     score: 0,
     currentRound: 1,
-    maxRounds: MAX_ROUNDS,
+    maxRounds: cfg.rounds,
     totalRevenue: 0,
     totalCosts: 0,
     materialCosts: 0,
@@ -215,7 +233,7 @@ export function createInitialGameState(
     weavers: [],
     masterWeavers: [],
     sachetMakers: [],
-    fixedCost: 15,
+    fixedCost: cfg.maintenance,
     shipLevel: 0,
     shipUpgradeCost: [15, 25, 40],
     shipUpgradePenalty: 0,

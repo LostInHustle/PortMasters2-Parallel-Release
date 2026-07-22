@@ -85,6 +85,7 @@ export async function POST(req: NextRequest) {
       isPublic: room.isPublic,
       createdAt: room.createdAt,
       started: room.started,
+      difficulty: room.difficulty,
       host: publicUser(room.host),
       memberCount: members.length,
       members: members.map((m) => ({
