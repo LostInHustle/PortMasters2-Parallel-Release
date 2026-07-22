@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { QuantityInput } from "@/components/ui/quantity-input";
 import {
   APP_NAME,
   BARTER_ITEMS,
@@ -672,14 +673,11 @@ function BarterPhase({
         </h3>
         <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
           <span className="text-muted-foreground">I&apos;ll give</span>
-          <Input
-            type="number"
-            min={1}
-            step={1}
+          <QuantityInput
             value={offerAmount}
-            onChange={(e) =>
-              setOfferAmount(Math.max(1, parseInt(e.target.value, 10) || 1))
-            }
+            onCommit={setOfferAmount}
+            min={1}
+            aria-label="Amount to offer"
             className="w-16 h-9"
           />
           <select
@@ -694,14 +692,11 @@ function BarterPhase({
             ))}
           </select>
           <span className="text-muted-foreground">for</span>
-          <Input
-            type="number"
-            min={1}
-            step={1}
+          <QuantityInput
             value={requestAmount}
-            onChange={(e) =>
-              setRequestAmount(Math.max(1, parseInt(e.target.value, 10) || 1))
-            }
+            onCommit={setRequestAmount}
+            min={1}
+            aria-label="Amount to request"
             className="w-16 h-9"
           />
           <select
@@ -1219,20 +1214,12 @@ function Orders({
                 {ICONS[favorItem]} How much {favorItem} should the Broker sell?
               </div>
               <div className="flex items-center gap-2">
-                <Input
-                  type="number"
+                <QuantityInput
+                  value={favorQty}
+                  onCommit={setFavorQty}
                   min={1}
                   max={favorHeld}
-                  step={1}
-                  value={favorQty}
-                  onChange={(e) =>
-                    setFavorQty(
-                      Math.min(
-                        favorHeld,
-                        Math.max(1, parseInt(e.target.value, 10) || 1),
-                      ),
-                    )
-                  }
+                  aria-label={`How much ${favorItem} to sell`}
                   className="w-20 h-9"
                 />
                 <span className="text-muted-foreground">
@@ -1309,8 +1296,12 @@ function Orders({
               key={o.id}
               className={cn(
                 "rounded-xl border overflow-hidden flex flex-col",
+                // Harbour gold, filled rather than outlined. The intel
+                // "Guaranteed" highlight already owns amber as a thin outline,
+                // so filled versus outlined keeps the two distinguishable
+                // without relying on hue alone.
                 o.isMandate
-                  ? "border-violet-500/45 bg-violet-500/[0.05]"
+                  ? "border-amber-400/70 bg-gradient-to-br from-amber-400/[0.18] to-amber-500/[0.06] shadow-[0_0_0_1px_rgba(245,190,80,0.25)]"
                   : o.isBrokerFavor
                     ? "border-emerald-500/45 bg-emerald-500/[0.05]"
                     : matchesIntel
@@ -1330,7 +1321,7 @@ function Orders({
                   </span>
                 </span>
                 {o.isMandate ? (
-                  <span className="text-violet-600 dark:text-violet-400 shrink-0">
+                  <span className="pm-text-gold shrink-0 font-bold">
                     📜 Imperial Mandate
                   </span>
                 ) : o.isBrokerFavor ? (
@@ -1663,16 +1654,11 @@ function SettlementBills({
           ) : (
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <span className="text-muted-foreground">Request</span>
-              <Input
-                type="number"
-                min={1}
-                step={1}
+              <QuantityInput
                 value={requestAmount}
-                onChange={(e) =>
-                  setRequestAmount(
-                    Math.max(1, parseInt(e.target.value, 10) || 1),
-                  )
-                }
+                onCommit={setRequestAmount}
+                min={1}
+                aria-label="Loan amount to request"
                 className="w-20 h-9"
               />
               <span className="text-muted-foreground">

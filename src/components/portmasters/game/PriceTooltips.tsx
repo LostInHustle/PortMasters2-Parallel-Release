@@ -7,7 +7,7 @@ import {
 } from "@/lib/game/engine";
 import type { GameState } from "@/lib/game/types";
 import { GLOSSARY } from "@/lib/game/glossary";
-import { RESOURCES, PRODUCTS } from "@/lib/game/constants";
+import { unlockedProducts, unlockedResources } from "@/lib/game/pools";
 
 /**
  * Tooltip bodies for the two price-explanation hovers in the game: an
@@ -79,10 +79,13 @@ export function ExpectedPriceTooltip({ price }: { price: ExpectedPrice }) {
 // demand and prices later in the voyage can vary.
 export function priceAwareTermContent(game: GameState, itemType: string) {
   if (game.phase !== 1) return undefined;
-  if (
-    !(RESOURCES as readonly string[]).includes(itemType) &&
-    !(PRODUCTS as readonly string[]).includes(itemType)
-  )
+  // Gated on what this voyage has actually unlocked, not the whole catalogue.
+  // Quoting a market price for a good no charter has opened advertises
+  // something the captain cannot buy, and the figure would be meaningless
+  // anyway since a locked good never appears on a market card.
+  const openResources = unlockedResources(game.difficulty, game.currentRound);
+  const openProducts = unlockedProducts(game.difficulty, game.currentRound);
+  if (!openResources.includes(itemType) && !openProducts.includes(itemType))
     return undefined;
   const description = GLOSSARY[itemType];
   const price = explainExpectedPrice(game, itemType);

@@ -26,7 +26,6 @@ import { PlayerDetailModal } from "./game/GameModals";
 import { GameStatusPanel } from "./game/GameStatusPanel";
 import { GamePhasePanel } from "./game/GamePhasePanel";
 import { GameControlPanel } from "./game/GameControlPanel";
-import { GameLogPanel } from "./game/GameLogPanel";
 import {
   GuideModal,
   TipsModal,
@@ -56,6 +55,7 @@ import {
 import { normalizeRoomName } from "@/lib/utils";
 import {
   acceptBarterOffer,
+  applyTidewatchSurge,
   claimWordOnTheDocksReward,
   grantLoan,
   nextPhase,
@@ -65,6 +65,10 @@ import {
   repayLoan,
   settleBarterTrade,
 } from "@/lib/game/engine";
+
+// Browser scoped: the onboarding guide is a "you have played this before"
+// signal, not per room state, so joining a second harbor does not replay it.
+const TUTORIAL_SEEN_KEY = "portmasters_tutorial_seen";
 
 export function GameRoom({
   me,
@@ -305,6 +309,28 @@ export function GameRoom({
     };
   }, [socket, room.id, me.id, act]);
 
+  // [MANIFEST 03: Tidewatch Alerts] The server has decided the room's
+  // combined Reputation cleared the threshold (see the game:status handler
+  // in src/server/realtime.ts). Unlike Word on the Docks there is no winner
+  // here, every captain in the room applies the same flip and sees the same
+  // toast; the room:system chat message is the room-wide announcement,
+  // this toast is just each captain's own client noticing the same thing.
+  useEffect(() => {
+    if (!socket) return;
+    const onSurge = (data: { roomId: string }) => {
+      if (data.roomId !== room.id) return;
+      act((g, l) => applyTidewatchSurge(g, l));
+      toast("🌊 Tidewatch Alert", {
+        description:
+          "The harbor takes notice of a bustling crew. One more cargo lot joins the Port Purchase board for the rest of this voyage.",
+      });
+    };
+    socket.on("tidewatch:surge", onSurge);
+    return () => {
+      socket.off("tidewatch:surge", onSurge);
+    };
+  }, [socket, room.id, act]);
+
   const handleRepayLoan = useCallback(
     (debtId: string) => {
       const debt = state.game.debts.find((d) => d.id === debtId);
@@ -458,16 +484,41 @@ export function GameRoom({
   }, [socket, room.id, me.id, notifications.push]);
 
   // First-time tutorial hint.
+  //
+  // This flag was read but never written anywhere in the app, so the guard was
+  // always false and the guide reopened every time the room returned to phase
+  // 0. A restart does exactly that (restartGame calls showWelcome, which sets
+  // phase 0), which is why the guide replayed mid session. Recording the flag
+  // the moment the guide is dismissed is what actually makes it "first time".
+  // The ref is a second guard so it can fire at most once per mount even
+  // before the write lands.
+  const autoTutorialFired = useRef(false);
   useEffect(() => {
+    if (autoTutorialFired.current) return;
     const seen =
       typeof window !== "undefined"
-        ? localStorage.getItem("portmasters_tutorial_seen")
+        ? localStorage.getItem(TUTORIAL_SEEN_KEY)
         : null;
     if (!seen && state.loaded && state.game.phase === 0) {
+      autoTutorialFired.current = true;
       const t = setTimeout(() => setTutOpen(true), 600);
       return () => clearTimeout(t);
     }
   }, [state.loaded, state.game.phase]);
+
+  // Dismissing the guide, however it was opened, is what marks it seen.
+  // Wrapped in try/catch because localStorage throws outright in private
+  // browsing on some engines, and a storage failure must not break the modal.
+  const handleTutorialOpenChange = useCallback((open: boolean) => {
+    setTutOpen(open);
+    if (!open && typeof window !== "undefined") {
+      try {
+        localStorage.setItem(TUTORIAL_SEEN_KEY, "1");
+      } catch {
+        /* storage unavailable; the guide simply offers itself again */
+      }
+    }
+  }, []);
 
   const handleSave = useCallback(async () => {
     try {
@@ -669,15 +720,32 @@ export function GameRoom({
       {/* Main layout */}
       <main className="flex-1 px-3 sm:px-5 pb-4 max-w-[1600px] w-full mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-[clamp(220px,22vw,300px)_minmax(0,1fr)_clamp(260px,26vw,360px)] gap-3">
-          {/* Left: status + log */}
-          <div className="space-y-3 order-2 lg:order-1">
-            <div className="pm-glass rounded-2xl p-3">
+          {/* Left: status + log.
+              On desktop this rail is pinned to the viewport and each panel
+              scrolls inside its own box, rather than the two simply stacking
+              and growing the page. The status panel grows with play (artisan
+              rows, outstanding loans, round end obligations), which used to
+              push the log far enough down that reaching it scrolled the whole
+              page, including the centre column being worked in. The log keeps
+              a guaranteed share of the rail so it is always on screen.
+              Untouched below lg, where the rail is just another stacked
+              block and the existing mobile ordering still applies. */}
+          {/* Left: the captain's own rail, now a single panel rather than a
+              status column with the ledger stacked underneath it. The panel
+              pins itself to the viewport on desktop and manages its own
+              scrolling internally (pinned summary, then tabs), so the page
+              never grows with it and the ledger is a tab away instead of
+              below the fold. On smaller screens it is just another stacked
+              block with its natural height, and the existing mobile ordering
+              is untouched. */}
+          <div className="order-2 lg:order-1 lg:sticky lg:top-20 lg:h-[calc(100dvh-6rem)]">
+            <div className="pm-glass h-full rounded-2xl p-3">
               <GameStatusPanel
                 game={state.game}
+                logs={state.logs}
                 onRepayLoan={handleRepayLoan}
               />
             </div>
-            <GameLogPanel logs={state.logs} />
           </div>
 
           {/* Center: phase + controls */}
@@ -816,7 +884,7 @@ export function GameRoom({
       />
       <TutorialModal
         open={tutOpen}
-        onOpenChange={setTutOpen}
+        onOpenChange={handleTutorialOpenChange}
         difficulty={state.game.difficulty}
       />
       <RestartConfirmModal
@@ -844,6 +912,7 @@ export function GameRoom({
             : null
         }
         isMe={selectedPlayerId === me.id}
+        difficulty={state.game.difficulty}
         detail={
           selectedPlayerId ? playerDetail.detail[selectedPlayerId] : undefined
         }

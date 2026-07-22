@@ -27,7 +27,7 @@ export const ICONS: Record<string, string> = {
   "Cotton Clothes": "👕",
   Brocade: "👗",
   Sachet: "🌸",
-  "Porcelain Clay": "🏺",
+  "Porcelain Clay": "🧱",
   "Copper Ore": "⛏️",
   "Celadon Ware": "🫖",
   "Bronze Mirror": "🪞",
@@ -89,6 +89,20 @@ export const PRODUCTS = [
   ...PRODUCTS_TIER1,
   ...PRODUCTS_TIER2,
 ] as const;
+// Every tradable good across every tier, unlocked or not. This is the
+// catalogue the cargo hold is built from, so a key exists for each good from
+// the moment a voyage starts and no write can ever land on an absent key.
+export const ITEMS = [...RESOURCES, ...PRODUCTS] as const;
+
+// The stock a captain begins a voyage with. Anything not named here starts at
+// zero; the hold is filled in from ITEMS rather than listed by hand, so a good
+// a charter introduces is always represented.
+export const STARTING_STOCK: Record<string, number> = {
+  Hemp: 8,
+  Silk: 5,
+  Tea: 3,
+};
+
 // Anything a captain can put up for barter: Gold plus every raw material
 // and finished good. Kept separate from RESOURCES/PRODUCTS (rather than
 // folding Gold into one of those) so the existing buying/inventory
@@ -242,7 +256,7 @@ export const WORKER_TYPES: WorkerType[] = [
     id: "coppersmith",
     label: "Coppersmith",
     plural: "Coppersmiths",
-    icon: "🧑‍🏭",
+    icon: "🪞",
     wage: 12,
     tier: 1,
   },
@@ -250,7 +264,7 @@ export const WORKER_TYPES: WorkerType[] = [
     id: "potter",
     label: "Potter",
     plural: "Potters",
-    icon: "🧑‍🎨",
+    icon: "🫖",
     wage: 14,
     tier: 1,
   },
@@ -258,7 +272,7 @@ export const WORKER_TYPES: WorkerType[] = [
     id: "perfumer",
     label: "Perfumer",
     plural: "Perfumers",
-    icon: "🧑‍🔬",
+    icon: "🧴",
     wage: 18,
     tier: 2,
   },
@@ -266,7 +280,7 @@ export const WORKER_TYPES: WorkerType[] = [
     id: "jeweler",
     label: "Jeweler",
     plural: "Jewelers",
-    icon: "💎",
+    icon: "📿",
     wage: 24,
     tier: 2,
   },
@@ -553,6 +567,18 @@ export const BROKERS_FAVOR_PAYOUT_CAP = 200;
 export const WORD_ON_THE_DOCKS_THRESHOLD = 3;
 export const WORD_ON_THE_DOCKS_REWARD = 25;
 
+// [MANIFEST 03: Tidewatch Alerts] Deliberately not a difficulty dial: this
+// never changes voyage length, card count baseline, or which tier's content
+// is visible, all of which stay entirely the host's choice (see
+// difficulty.ts). Once every active captain's own reported Reputation
+// (GameState.score) sums past this, room wide, the harbor takes notice of a
+// bustling crew and every captain's Phase 1 board gets one extra card for
+// the rest of the voyage. A one time, one direction flip per voyage, purely
+// additive on top of whatever the difficulty tier's own charter schedule is
+// already doing, and never subtracted back out. See the game:status handler
+// in src/server/realtime.ts for where the combined total is actually read.
+export const TIDEWATCH_SURGE_THRESHOLD = 250;
+
 // =====================================================================
 // Player-facing copy. The wording is preserved from the original game; the
 // numbers are not baked in any more, because they now depend on the room's
@@ -744,6 +770,11 @@ ${mandates.length ? `\n📜 Imperial Mandates:\n• On voyage${mandates.length =
 • Whichever captain is first in the harbor to complete ${WORD_ON_THE_DOCKS_THRESHOLD} trade orders total this voyage wins ${WORD_ON_THE_DOCKS_REWARD} Gold on the spot
 • It's a race against the rest of the room, not a scheduled event: it can land on any round, for any captain
 • Announced to the whole harbor the moment it's won, same as any other harbor wide milestone
+
+🌊 Tidewatch Alerts:
+• Once everyone in the harbor's own Reputation adds up past ${TIDEWATCH_SURGE_THRESHOLD}, the harbor takes notice of a bustling crew
+• From the next Port Purchase onward, every captain's board gets one extra cargo lot, for the rest of the voyage
+• This never changes your voyage length or which tier's goods you see, only how busy the market gets
 
 🆘 Financial Aid:
 • Can't cover this round's wages or maintenance? Ask the harbor for a loan, right on the settlement screen

@@ -2,6 +2,8 @@
 // PortMasters 2 Parallel Release: game state types
 // =====================================================================
 import {
+  ITEMS,
+  STARTING_STOCK,
   WORKER_TYPE_IDS,
   type Boon,
   type Module,
@@ -158,6 +160,14 @@ export type GameState = {
   // their own report still contributes a zero tally, exactly like everyone
   // else's.
   harborPulse: Record<string, number>;
+  // [MANIFEST 03: Tidewatch Alerts] Flips true, once, the moment the whole
+  // room's combined Reputation crosses TIDEWATCH_SURGE_THRESHOLD (see the
+  // game:status handler in src/server/realtime.ts, which is where every
+  // captain's Reputation is already visible). Read by startPhase1 to add one
+  // extra card to this captain's board from the next round onward; never
+  // flips back, and never touches maxRounds, difficulty, or which tier's
+  // content is visible, all of which stay the host's own choice.
+  tidewatchSurge: boolean;
   // The captain's persistent Renown level (see src/lib/game/legacy.ts),
   // copied onto the voyage state so the engine can gate Renown-locked skills
   // like Broker's Favor without reaching back into account data. Personal to
@@ -212,6 +222,37 @@ export type GameState = {
     debtId: string;
   }[];
 };
+
+// The hold every voyage starts with: a key for every good in the catalogue,
+// carrying the founding stock where there is any and zero otherwise. Built
+// rather than hand written, because a hand written literal is what let charter
+// goods start life absent, and an absent key is what turned a purchase into
+// NaN (see normalizeInventory below and addOwnedAmount in ./engine).
+export function initialInventory(): Record<string, number> {
+  const inv: Record<string, number> = {};
+  for (const item of ITEMS) inv[item] = STARTING_STOCK[item] ?? 0;
+  return inv;
+}
+
+// Repairs a hold read back from a save. Guarantees a key for every catalogued
+// good, and coerces anything non numeric to zero: a hold damaged before the
+// catalogue existed stored NaN, which JSON writes as null and which would
+// otherwise stay poisoned for the life of the account. Unknown but valid
+// entries are preserved rather than dropped, so a good retired from the
+// catalogue never silently deletes a captain's cargo.
+export function normalizeInventory(raw: unknown): Record<string, number> {
+  const src = (raw ?? {}) as Record<string, unknown>;
+  const out: Record<string, number> = {};
+  for (const item of ITEMS) {
+    const v = src[item];
+    out[item] = typeof v === "number" && Number.isFinite(v) ? v : 0;
+  }
+  for (const [key, v] of Object.entries(src)) {
+    if (key in out) continue;
+    if (typeof v === "number" && Number.isFinite(v)) out[key] = v;
+  }
+  return out;
+}
 
 export function emptyWorkerRoster(): Record<WorkerTypeId, Worker[]> {
   return Object.fromEntries(
@@ -282,15 +323,7 @@ export function createInitialGameState(
 ): GameState {
   const cfg = difficultyConfig(difficulty);
   return {
-    inventory: {
-      Hemp: 8,
-      Silk: 5,
-      Tea: 3,
-      "Linen Clothes": 0,
-      "Cotton Clothes": 0,
-      Brocade: 0,
-      Sachet: 0,
-    },
+    inventory: initialInventory(),
     money: cfg.startingGold + startingGoldBonus,
     difficulty,
     renownLevel,
@@ -328,6 +361,7 @@ export function createInitialGameState(
     revealedIntel: [],
     intelCost: 5,
     harborPulse: {},
+    tidewatchSurge: false,
     equippedModules: [],
     boonChoices: [],
     boonSwapUsed: false,

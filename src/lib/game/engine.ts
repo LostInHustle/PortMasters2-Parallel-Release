@@ -639,6 +639,21 @@ export function applyHarborPulse(
   state.harborPulse = pulse;
 }
 
+// [MANIFEST 03: Tidewatch Alerts] Applied on every client in the room the
+// instant the server confirms the combined Reputation threshold was crossed
+// (see the game:status handler in src/server/realtime.ts). A one direction
+// flip: nothing in this codebase ever sets tidewatchSurge back to false
+// mid-voyage, and a fresh voyage already resets it through
+// createInitialGameState. Logged once here, at the moment it happens,
+// rather than every round afterward in startPhase1.
+export function applyTidewatchSurge(state: GameState, logs: string[]) {
+  if (state.tidewatchSurge) return;
+  state.tidewatchSurge = true;
+  logs.push(
+    `🌊 Tidewatch Alert: the harbor takes notice of a bustling crew! One more cargo lot joins the Port Purchase board, every round, for the rest of this voyage.`,
+  );
+}
+
 // ---------- Boon drafting (preserved verbatim, personalized per captain) ----------
 export function draftBoons(state: GameState): Boon[] {
   const gs = {
@@ -727,7 +742,13 @@ export function purchaseCard(state: GameState, cardId: number, logs: string[]) {
   state.money -= cost;
   state.roundCosts += cost;
   state.totalCosts += cost;
-  for (const r of card.resources) state.inventory[r.type] += r.quantity!;
+  // Routed through addOwnedAmount rather than writing state.inventory
+  // directly. This was the one unguarded `+=` in the engine, so buying a good
+  // whose key the hold did not yet carry evaluated `undefined + n` and stored
+  // NaN, losing the cargo and the Gold that paid for it. Every mutation now
+  // goes through the one defensive helper.
+  for (const r of card.resources)
+    addOwnedAmount(state, r.type, r.quantity ?? 0);
   state.purchasedCards.push(card.id);
   state.purchaseCount++;
   if (card.isProductCard) {
@@ -1369,18 +1390,26 @@ export function startPhase1(
   state.resourceCards = [];
   // [DIFFICULTY] Card count comes from the room's tier and the current round
   // (see marketCountsFor): flat for Fair Winds, widening on the harder tiers.
-  const purchaseCount = marketCountsFor(
+  const tierPurchaseCount = marketCountsFor(
     state.difficulty,
     state.currentRound,
   ).purchase;
   // Announce the charter the moment it opens, so the market getting busier
   // reads as an event rather than an unexplained jump in card count. Fair
-  // Winds schedules none, so this never fires on the entry tier.
+  // Winds schedules none, so this never fires on the entry tier. Based on
+  // the tier's own count, not the Tidewatch bonus below, so the charter
+  // banner never takes credit for a card the room itself earned.
   if (charterOpensOn(state.difficulty, state.currentRound)) {
     logs.push(
-      `🗺️ The Silk Road Charter opens! The harbor grows busier: ${purchaseCount} cargo lots and as many buyers from this voyage on.`,
+      `🗺️ The Silk Road Charter opens! The harbor grows busier: ${tierPurchaseCount} cargo lots and as many buyers from this voyage on.`,
     );
   }
+  // [MANIFEST 03: Tidewatch Alerts] Purely additive on top of whatever the
+  // difficulty tier already rolls, never a substitute for it. Already
+  // announced once, the moment the surge itself triggered (see
+  // applyTidewatchSurge), so this stays a quiet +1 every round after that
+  // rather than repeating the announcement.
+  const purchaseCount = tierPurchaseCount + (state.tidewatchSurge ? 1 : 0);
   for (let i = 0; i < purchaseCount; i++) {
     state.resourceCards.push({
       id: i,
@@ -1571,7 +1600,12 @@ export function startPhase2(
   if (mandate) {
     const nextId =
       state.customerCards.reduce((m, c) => Math.max(m, c.id), -1) + 1;
-    state.customerCards.push({
+    // Placed first rather than appended. It is the round's headline commission
+    // and should read that way regardless of how wide the charter has grown
+    // the board. Inserted after the intel guarantee loop above, which writes
+    // by index, so it cannot be overwritten; card identity stays on `id`, so
+    // position carries presentation only and no logic depends on it.
+    state.customerCards.unshift({
       id: nextId,
       demandPort: mandate.port,
       resources: mandate.resources.map((r) => ({
