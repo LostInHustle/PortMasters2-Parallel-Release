@@ -160,6 +160,14 @@ export type GameState = {
   // their own report still contributes a zero tally, exactly like everyone
   // else's.
   harborPulse: Record<string, number>;
+  // [MANIFEST 03: Tidewatch Alerts] Flips true, once, the moment the whole
+  // room's combined Reputation crosses TIDEWATCH_SURGE_THRESHOLD (see the
+  // game:status handler in src/server/realtime.ts, which is where every
+  // captain's Reputation is already visible). Read by startPhase1 to add one
+  // extra card to this captain's board from the next round onward; never
+  // flips back, and never touches maxRounds, difficulty, or which tier's
+  // content is visible, all of which stay the host's own choice.
+  tidewatchSurge: boolean;
   // The captain's persistent Renown level (see src/lib/game/legacy.ts),
   // copied onto the voyage state so the engine can gate Renown-locked skills
   // like Broker's Favor without reaching back into account data. Personal to
@@ -353,6 +361,7 @@ export function createInitialGameState(
     revealedIntel: [],
     intelCost: 5,
     harborPulse: {},
+    tidewatchSurge: false,
     equippedModules: [],
     boonChoices: [],
     boonSwapUsed: false,

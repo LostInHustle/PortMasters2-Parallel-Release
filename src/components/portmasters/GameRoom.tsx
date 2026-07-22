@@ -55,6 +55,7 @@ import {
 import { normalizeRoomName } from "@/lib/utils";
 import {
   acceptBarterOffer,
+  applyTidewatchSurge,
   claimWordOnTheDocksReward,
   grantLoan,
   nextPhase,
@@ -307,6 +308,28 @@ export function GameRoom({
       socket.off("docks:won", onDocksWon);
     };
   }, [socket, room.id, me.id, act]);
+
+  // [MANIFEST 03: Tidewatch Alerts] The server has decided the room's
+  // combined Reputation cleared the threshold (see the game:status handler
+  // in src/server/realtime.ts). Unlike Word on the Docks there is no winner
+  // here, every captain in the room applies the same flip and sees the same
+  // toast; the room:system chat message is the room-wide announcement,
+  // this toast is just each captain's own client noticing the same thing.
+  useEffect(() => {
+    if (!socket) return;
+    const onSurge = (data: { roomId: string }) => {
+      if (data.roomId !== room.id) return;
+      act((g, l) => applyTidewatchSurge(g, l));
+      toast("🌊 Tidewatch Alert", {
+        description:
+          "The harbor takes notice of a bustling crew. One more cargo lot joins the Port Purchase board for the rest of this voyage.",
+      });
+    };
+    socket.on("tidewatch:surge", onSurge);
+    return () => {
+      socket.off("tidewatch:surge", onSurge);
+    };
+  }, [socket, room.id, act]);
 
   const handleRepayLoan = useCallback(
     (debtId: string) => {

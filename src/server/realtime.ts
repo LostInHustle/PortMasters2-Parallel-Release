@@ -32,6 +32,7 @@ import {
 } from "../lib/game/legacy";
 import {
   BROKERS_FAVOR_UNLOCK_LEVEL,
+  TIDEWATCH_SURGE_THRESHOLD,
   WORD_ON_THE_DOCKS_REWARD,
   WORD_ON_THE_DOCKS_THRESHOLD,
 } from "../lib/game/constants";
@@ -233,6 +234,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         roomAidRequests.delete(roomId);
         roomPulseTallies.delete(roomId);
         roomDocksWinners.delete(roomId);
+        roomSurges.delete(roomId);
         concludedRooms.delete(roomId);
       } else {
         io.to(`room:${roomId}`).emit("room:system", {
@@ -773,6 +775,26 @@ export function attachRealtime(httpServer: HttpServer): Server {
   // this is keyed by room, not by round, and cleared on restart below.
   const roomDocksWinners = new Map<string, { userId: string; name: string }>();
 
+  // ---------- Tidewatch Alerts ----------
+  // [MANIFEST 03] Never a difficulty dial: voyage length, tier content, and
+  // card count baseline all stay entirely the host's choice (see
+  // difficulty.ts). This only reads Reputation every captain is already
+  // reporting through the ordinary game:status heartbeat (see rememberStatus
+  // above) and, once the room's combined total clears
+  // TIDEWATCH_SURGE_THRESHOLD, flips a one direction, one time flag for the
+  // room. roomSurges tracks which rooms have already triggered this voyage,
+  // so a status report arriving after the flip is a harmless no-op, not a
+  // repeat trigger.
+  const roomSurges = new Set<string>();
+
+  function combinedReputation(roomId: string): number {
+    const statuses = roomStatuses.get(roomId);
+    if (!statuses) return 0;
+    let total = 0;
+    for (const st of statuses.values()) total += st.reputation ?? 0;
+    return total;
+  }
+
   // ---------- Helpers ----------
   async function validateToken(token: string): Promise<PublicUser | null> {
     const session = await db.session.findUnique({
@@ -1009,6 +1031,25 @@ export function attachRealtime(httpServer: HttpServer): Server {
         };
         rememberStatus(roomId, broadcast);
         io.to(`room:${roomId}`).emit("game:status", broadcast);
+
+        // [MANIFEST 03: Tidewatch Alerts] Checked on every status report,
+        // right after this one's Reputation is folded into the room's
+        // remembered totals above, so the sum is always current. Fires at
+        // most once per room per voyage; roomSurges is what makes every
+        // later report, from anyone, a harmless no-op instead of a repeat
+        // trigger.
+        if (
+          !roomSurges.has(roomId) &&
+          combinedReputation(roomId) >= TIDEWATCH_SURGE_THRESHOLD
+        ) {
+          roomSurges.add(roomId);
+          io.to(`room:${roomId}`).emit("tidewatch:surge", { roomId });
+          io.to(`room:${roomId}`).emit("room:system", {
+            roomId,
+            content:
+              "🌊 Tidewatch Alert: the harbor takes notice of a bustling crew! One more cargo lot joins every captain's Port Purchase board, for the rest of this voyage.",
+          });
+        }
 
         // Move the room's synchronized checkpoint forward if this report puts
         // someone further along than where the room currently is, and recheck
@@ -1743,6 +1784,10 @@ export function attachRealtime(httpServer: HttpServer): Server {
         // completed orders, so the old one's winner (if any) can't linger
         // and silently block every claim in the new voyage.
         roomDocksWinners.delete(roomId);
+        // A brand new voyage starts with nobody's Reputation counted yet, so
+        // the room can earn its own Tidewatch surge all over again rather
+        // than inheriting the last voyage's already-tripped flag.
+        roomSurges.delete(roomId);
         // A restarted room can sail, and conclude, all over again.
         concludedRooms.delete(roomId);
 
