@@ -52,6 +52,7 @@ import {
 import {
   DEFAULT_DIFFICULTY,
   MANDATE_TEMPLATES,
+  charterOpensOn,
   difficultyConfig,
   escortRateFor,
   mandateIndexFor,
@@ -307,7 +308,7 @@ export type ExpectedPrice = {
 // or product, independent of any specific market card. Used for the
 // hover preview during the buying phase (Phase 1) so a captain can size
 // up the whole market, including goods that didn't happen to roll onto
-// one of this round's PURCHASE_CARD_COUNT cards. Ports nudge a raw
+// one of this round's market cards. Ports nudge a raw
 // material's roll by
 // 1 Gold up or down depending on whether the port specializes in it
 // (see genResourceCard), which is why the range carries a margin note
@@ -1175,6 +1176,14 @@ export function startPhase1(
     state.difficulty,
     state.currentRound,
   ).purchase;
+  // Announce the charter the moment it opens, so the market getting busier
+  // reads as an event rather than an unexplained jump in card count. Fair
+  // Winds schedules none, so this never fires on the entry tier.
+  if (charterOpensOn(state.difficulty, state.currentRound)) {
+    logs.push(
+      `🗺️ The Silk Road Charter opens! The harbor grows busier: ${purchaseCount} cargo lots and as many buyers from this voyage on.`,
+    );
+  }
   for (let i = 0; i < purchaseCount; i++) {
     state.resourceCards.push({ id: i, ...genResourceCard(marketRng) });
   }
@@ -1305,7 +1314,7 @@ export function startPhase2(
     `\n🤝=== Round ${state.currentRound} · Phase 2: Trade Transaction ===`,
   );
   // [ONLINE] Deterministic trade orders per (room, round): every captain
-  // in the room independently derives the identical base ORDER_CARD_COUNT
+  // in the room independently derives the identical base set of
   // orders here, since this loop never reads anything captain specific.
   const orderRng = createRng(
     `${ctx.seedBase}:V${state.voyageEpoch}:R${state.currentRound}:orders`,

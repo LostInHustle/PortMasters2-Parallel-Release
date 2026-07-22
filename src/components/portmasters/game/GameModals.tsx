@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -13,14 +13,15 @@ import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   APP_NAME,
-  GUIDE_TEXT,
-  TIPS_TEXT,
-  TUTORIAL_STEPS,
+  guideText,
+  tipsText,
+  tutorialSteps,
   RESOURCES,
   PRODUCTS,
   ICONS,
   COLORS,
 } from "@/lib/game/constants";
+import type { Difficulty } from "@/lib/game/difficulty";
 import type { GameState } from "@/lib/game/types";
 import { phaseLabel } from "@/lib/game/engine";
 import type { PlayerDetailData } from "@/lib/use-player-detail";
@@ -49,9 +50,11 @@ import type { NotificationItem } from "@/lib/use-notifications";
 export function GuideModal({
   open,
   onOpenChange,
+  difficulty,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  difficulty: Difficulty;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -66,7 +69,7 @@ export function GuideModal({
           </DialogDescription>
         </DialogHeader>
         <pre className="whitespace-pre-wrap font-sans text-[12px] leading-relaxed bg-muted/40 rounded-lg p-3.5 max-h-[60vh] overflow-y-auto pm-scroll">
-          {GUIDE_TEXT}
+          {guideText(difficulty)}
         </pre>
         <div className="flex justify-end">
           <Button variant="secondary" onClick={() => onOpenChange(false)}>
@@ -81,9 +84,11 @@ export function GuideModal({
 export function TipsModal({
   open,
   onOpenChange,
+  difficulty,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  difficulty: Difficulty;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -98,7 +103,7 @@ export function TipsModal({
           </DialogDescription>
         </DialogHeader>
         <pre className="whitespace-pre-wrap font-sans text-[12px] leading-relaxed bg-muted/40 rounded-lg p-3.5 max-h-[60vh] overflow-y-auto pm-scroll">
-          {TIPS_TEXT}
+          {tipsText(difficulty)}
         </pre>
         <div className="flex justify-end">
           <Button variant="secondary" onClick={() => onOpenChange(false)}>
@@ -304,13 +309,16 @@ export function RestartConfirmModal({
 export function TutorialModal({
   open,
   onOpenChange,
+  difficulty,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  difficulty: Difficulty;
 }) {
   const [step, setStep] = useState(0);
-  const total = TUTORIAL_STEPS.length;
-  const s = TUTORIAL_STEPS[step];
+  const steps = useMemo(() => tutorialSteps(difficulty), [difficulty]);
+  const total = steps.length;
+  const s = steps[step];
   const pct = Math.round(((step + 1) / total) * 100);
   const isLast = step === total - 1;
 

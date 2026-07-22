@@ -13,13 +13,12 @@
 // captain's seeded market and orders keep their own personal draw while the
 // structure (how many cards, how likely a raid) stays consistent room wide.
 //
-// Phase A ships only "fair_winds", whose values equal the pre-difficulty
-// constants exactly (MAX_ROUNDS 8, PIRATE_ATTACK_CHANCE 0.2, ESCORT_COST_RATE
-// 0.1, PURCHASE/ORDER_CARD_COUNT 6), so wiring the engine to read from here
-// instead of those constants changes nothing for the existing mode. The two
-// richer tiers are defined in full below (dark launched data), but their
-// extra systems (imperial mandates, corrupt brokers, the Renown multiplier
-// above 1.0) are wired on in later phases. See docs/DIFFICULTY_MODES_PROPOSAL.md.
+// The "fair_winds" tier is calibrated to the game exactly as it played before
+// difficulty existed: 8 rounds, a flat 0.2 raid chance, a 0.1 escort fee, 6
+// cards on each board, no mandates and no corrupt brokers. Those numbers used
+// to be flat constants in ./constants; moving them here changed nothing for
+// the existing mode, and it is what lets the two richer tiers vary them.
+// See docs/DIFFICULTY_MODES_PROPOSAL.md.
 // =====================================================================
 
 export type Difficulty = "fair_winds" | "open_waters" | "monsoon";

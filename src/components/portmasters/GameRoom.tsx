@@ -755,15 +755,27 @@ export function GameRoom({
         </div>
       </main>
 
-      <GuideModal open={guideOpen} onOpenChange={setGuideOpen} />
-      <TipsModal open={tipsOpen} onOpenChange={setTipsOpen} />
+      <GuideModal
+        open={guideOpen}
+        onOpenChange={setGuideOpen}
+        difficulty={state.game.difficulty}
+      />
+      <TipsModal
+        open={tipsOpen}
+        onOpenChange={setTipsOpen}
+        difficulty={state.game.difficulty}
+      />
       <RumorBoardModal
         open={rumorOpen}
         onOpenChange={setRumorOpen}
         game={state.game}
         onBuy={() => act((g, l) => purchaseIntel(g, l))}
       />
-      <TutorialModal open={tutOpen} onOpenChange={setTutOpen} />
+      <TutorialModal
+        open={tutOpen}
+        onOpenChange={setTutOpen}
+        difficulty={state.game.difficulty}
+      />
       <RestartConfirmModal
         open={restartConfirmOpen}
         onOpenChange={setRestartConfirmOpen}
