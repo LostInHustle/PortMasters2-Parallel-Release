@@ -3,7 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
 import type { GameState } from "@/lib/game/types";
-import { restartGame, startBoonDrafting } from "@/lib/game/engine";
+import {
+  restartGame,
+  startBoonDrafting,
+  tallyPurchasesByResource,
+  applyHarborPulse,
+} from "@/lib/game/engine";
 import { renownStartingGoldBonus } from "@/lib/game/legacy";
 import { normalizeDifficulty } from "@/lib/game/difficulty";
 import { api } from "@/lib/api";
@@ -147,6 +152,14 @@ export function usePhaseSync(
       roomId: string;
       round: number;
       phase: string;
+      // [MANIFEST 01: The Harbor Pulse] Only ever present when phase is "5",
+      // meaning every captain just readied up out of boon drafting and is
+      // about to run startPhase1 for this round. Computed server side from
+      // last round's room wide purchase tally (see maybeAdvance in
+      // src/server/realtime.ts) and delivered on this same broadcast so it
+      // lands before genResourceCard runs, never as a separate race-prone
+      // round trip.
+      harborPulse?: Record<string, number>;
     }) => {
       if (data.roomId !== roomId) return;
       const g = gameRef.current;
@@ -155,13 +168,31 @@ export function usePhaseSync(
       if (advanceRank === null || clientRank === null) return;
       // Stale advance for a checkpoint we've already passed, ignore.
       if (advanceRank < clientRank) return;
+      // [MANIFEST 01: The Harbor Pulse] We are leaving Phase 1 for good this
+      // round (purchasedCards/resourceCards are about to be cleared by the
+      // pending completePhase1 below), so this is the one moment this
+      // captain's own draw can still be read and handed to the server for
+      // next round's pulse. A captain who bought nothing still reports an
+      // empty tally, exactly like everyone else who sits this round out.
+      if (String(g.phase) === "1") {
+        socket.emit("harbor:pulse:report", {
+          roomId,
+          round: g.currentRound,
+          tally: tallyPurchasesByResource(g),
+        });
+      }
       // Exact match (normal case) or advance is ahead (we missed an
       // earlier advance, ngrok drop, etc.).  Either way, execute the
       // pending transition if one is waiting.
       const fn = pendingFn.current;
       pendingFn.current = null;
       setWaiting(false);
-      if (fn) act(fn);
+      if (fn) {
+        act((state, logs) => {
+          if (data.harborPulse) applyHarborPulse(state, data.harborPulse);
+          fn(state, logs);
+        });
+      }
     };
     const onStarted = (data: { roomId: string }) => {
       if (data.roomId !== roomId) return;

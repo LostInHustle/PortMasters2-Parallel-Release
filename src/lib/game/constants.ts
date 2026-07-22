@@ -264,6 +264,17 @@ export const MERCHANT_RATINGS: MerchantRating[] = [
 export const BROKERS_FAVOR_UNLOCK_LEVEL = 5;
 export const BROKERS_FAVOR_PAYOUT_CAP = 200;
 
+// [MANIFEST 02: Word on the Docks] A room wide race, layered alongside the
+// scheduled Imperial Mandates above rather than replacing them: whichever
+// captain is first in the harbor to complete this many trade orders across
+// the whole voyage (cumulative, not per round, see GameState.
+// totalOrdersCompleted) wins a flat Gold reward, announced to the room the
+// moment it happens. Deliberately tier independent, same reward and same
+// threshold on every difficulty, since the point is a spontaneous race
+// between real captains, not one more dial to retune per tier.
+export const WORD_ON_THE_DOCKS_THRESHOLD = 3;
+export const WORD_ON_THE_DOCKS_REWARD = 25;
+
 // =====================================================================
 // Player-facing copy. The wording is preserved from the original game; the
 // numbers are not baked in any more, because they now depend on the room's
@@ -450,6 +461,11 @@ Brocade(70-90💰), Sachet(95-120💰)
 • Hire an escort for ${escortPct(cfg)} of your current Gold to guarantee safe passage instead
 • The choice has to be made before that round's pirates are rolled for
 ${mandates.length ? `\n📜 Imperial Mandates:\n• On voyage${mandates.length === 1 ? "" : "s"} ${mandates.join(", ")} the Emperor commissions one large order at a fixed reward\n• A mandate is the only order exempt from VAT\n• Every captain in the harbor is dealt the same mandate, so it is a race\n` : ""}
+
+📣 Word on the Docks:
+• Whichever captain is first in the harbor to complete ${WORD_ON_THE_DOCKS_THRESHOLD} trade orders total this voyage wins ${WORD_ON_THE_DOCKS_REWARD} Gold on the spot
+• It's a race against the rest of the room, not a scheduled event: it can land on any round, for any captain
+• Announced to the whole harbor the moment it's won, same as any other harbor wide milestone
 
 🆘 Financial Aid:
 • Can't cover this round's wages or maintenance? Ask the harbor for a loan, right on the settlement screen

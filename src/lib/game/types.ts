@@ -121,11 +121,35 @@ export type GameState = {
   completedOrders: number[];
   purchaseCount: number;
   orderCount: number;
+  // [MANIFEST 02: Word on the Docks] Trade orders completed across the whole
+  // voyage, never reset per round the way orderCount is, only by a fresh
+  // voyage (createInitialGameState). completeOrder increments this alongside
+  // orderCount; it's what the milestone race below actually watches.
+  totalOrdersCompleted: number;
+  // [MANIFEST 02: Word on the Docks] Set once, by completeOrder, the instant
+  // totalOrdersCompleted crosses WORD_ON_THE_DOCKS_THRESHOLD, since the pure
+  // engine has no way to call socket.emit itself. GameRoom.tsx relays it as
+  // a docks:claim report and clears it, the same convention
+  // _pendingDebtSettlements/_draftChoices/_newModule already use for an
+  // engine function that needs the React layer to act on its behalf.
+  _pendingDocksClaim?: { total: number };
   gameOver: boolean;
   modifierFlags: Record<string, number>;
   phase2DemandTags: string[];
   revealedIntel: IntelItem[];
   intelCost: number;
+  // [MANIFEST 01: The Harbor Pulse] A per resource price nudge for this
+  // round's Phase 1, keyed by resource name (Hemp, Silk, Tea), derived room
+  // wide from what the whole harbor bought last round (see
+  // computeHarborPulse in src/server/realtime.ts) and delivered on the same
+  // phase:advance broadcast that already carries every captain into Phase 1
+  // together. Read by genResourceCard in engine.ts as one more multiplier
+  // alongside Boons and modules; never persisted beyond the round it was
+  // delivered for, and empty on round 1 since there is no prior round to
+  // react to. A captain who buys nothing never changes anyone's pulse but
+  // their own report still contributes a zero tally, exactly like everyone
+  // else's.
+  harborPulse: Record<string, number>;
   // The captain's persistent Renown level (see src/lib/game/legacy.ts),
   // copied onto the voyage state so the engine can gate Renown-locked skills
   // like Broker's Favor without reaching back into account data. Personal to
@@ -255,11 +279,13 @@ export function createInitialGameState(
     completedOrders: [],
     purchaseCount: 0,
     orderCount: 0,
+    totalOrdersCompleted: 0,
     gameOver: false,
     modifierFlags: {},
     phase2DemandTags: [],
     revealedIntel: [],
     intelCost: 5,
+    harborPulse: {},
     equippedModules: [],
     boonChoices: [],
     boonSwapUsed: false,

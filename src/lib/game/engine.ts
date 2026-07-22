@@ -37,6 +37,8 @@ import {
   RESOURCE_PROBS,
   RESOURCES,
   WAGES,
+  WORD_ON_THE_DOCKS_REWARD,
+  WORD_ON_THE_DOCKS_THRESHOLD,
   type Boon,
   type MerchantRating,
   type Module,
@@ -480,7 +482,16 @@ function genProductPurchaseCard(rng: Rng): Omit<ResourceCard, "id"> {
   };
 }
 
-function genResourceCard(rng: Rng): Omit<ResourceCard, "id"> {
+// [MANIFEST 01: The Harbor Pulse] pulse holds a per resource multiplier for
+// this round, e.g. { Silk: 0.08 } meaning Silk runs 8% pricier this round
+// because the room leaned into it last round. Optional and defaulted to an
+// empty object so every existing call site (and every test of the
+// preserved-verbatim economy) keeps producing identical prices when no
+// pulse is in play, which is always true on round 1.
+function genResourceCard(
+  rng: Rng,
+  pulse: Record<string, number> = {},
+): Omit<ResourceCard, "id"> {
   if (rng() < 0.3) return genProductPurchaseCard(rng);
   const num = randInt(rng, 1, 3);
   const resources: { type: string; quantity: number; price: number }[] = [];
@@ -505,13 +516,51 @@ function genResourceCard(rng: Rng): Omit<ResourceCard, "id"> {
     const qty = randInt(rng, 1, 3);
     const [min, max] = COMMODITIES[chosen].basePrice;
     const base = randInt(rng, min, max);
-    const price = COMMODITIES[chosen].ports.includes(port)
+    let price = COMMODITIES[chosen].ports.includes(port)
       ? base - 1
       : base + 1;
+    const nudge = pulse[chosen];
+    if (nudge) price = Math.max(1, Math.round(price * (1 + nudge)));
     resources.push({ type: chosen, quantity: qty, price });
   }
   const total = resources.reduce((s, r) => s + r.quantity * r.price, 0);
   return { port, resources, totalCost: total, isProductCard: false };
+}
+
+// [MANIFEST 01: The Harbor Pulse] What this captain bought this Phase 1,
+// summed by raw resource only (Hemp, Silk, Tea), the same set genResourceCard
+// prices. Finished-product purchase cards (genProductPurchaseCard) don't
+// count, the pulse is about the harbor leaning into a raw good, not about who
+// bought a finished Sachet. Read once, right before completePhase1 clears
+// purchasedCards/resourceCards, and relayed to the server (see
+// src/lib/use-phase-sync.ts) so it can fold this captain's draw into the
+// room wide tally the next round's pulse is built from.
+export function tallyPurchasesByResource(
+  state: GameState,
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const id of state.purchasedCards) {
+    const card = state.resourceCards.find((c) => c.id === id);
+    if (!card || card.isProductCard) continue;
+    for (const r of card.resources) {
+      if (!(r.type in RESOURCE_PROBS)) continue;
+      out[r.type] = (out[r.type] || 0) + (r.quantity ?? 0);
+    }
+  }
+  return out;
+}
+
+// [MANIFEST 01: The Harbor Pulse] Stamps the room wide pulse the server
+// computed for this round onto local state, so genResourceCard picks it up
+// the moment startPhase1 runs below. A plain setter kept as its own function,
+// the same convention purchaseIntel/receiveLoan/etc already follow, so the
+// client's phase-advance handler can call it through the same act() dispatch
+// as every other socket-driven state change.
+export function applyHarborPulse(
+  state: GameState,
+  pulse: Record<string, number>,
+) {
+  state.harborPulse = pulse;
 }
 
 // ---------- Boon drafting (preserved verbatim, personalized per captain) ----------
@@ -690,6 +739,7 @@ export function completeOrder(
   state.score += Math.floor(reward - transport);
   state.completedOrders.push(order.id);
   state.orderCount++;
+  state.totalOrdersCompleted++;
   const txt = order.resources
     .map((r) => `${ICONS[r.type]}${r.type}×${r.required}`)
     .join(" + ");
@@ -698,6 +748,26 @@ export function completeOrder(
     `   💰 Reward: ${reward} Gold · ⚓ Freight: ${transport} Gold = 📊 Net Profit: ${reward - transport} Gold`,
   );
   logs.push(`📊 Completed ${state.orderCount} transactions`);
+  // [MANIFEST 02: Word on the Docks] Fires exactly once per voyage, the
+  // instant this captain's own running total crosses the threshold, whether
+  // or not they actually turn out to be first in the room. The React layer
+  // (see GameRoom.tsx) relays this as a claim to the server, which is the
+  // one place that actually knows whether anyone else beat them to it.
+  if (state.totalOrdersCompleted === WORD_ON_THE_DOCKS_THRESHOLD) {
+    state._pendingDocksClaim = { total: state.totalOrdersCompleted };
+  }
+}
+
+// [MANIFEST 02: Word on the Docks] Applied only on the one client the
+// server confirmed actually won the race (see the docks:won listener in
+// GameRoom.tsx); every other client that also crossed the threshold just
+// never receives this call, so a losing claim costs nothing and needs no
+// rollback.
+export function claimWordOnTheDocksReward(state: GameState, logs: string[]) {
+  state.money += WORD_ON_THE_DOCKS_REWARD;
+  logs.push(
+    `📣 Word on the Docks: you were first to complete ${WORD_ON_THE_DOCKS_THRESHOLD} trade orders this voyage! +${WORD_ON_THE_DOCKS_REWARD} Gold`,
+  );
 }
 
 // Broker's Favor: the Renown-gated, once-per-voyage skill (see the flag on
@@ -1185,7 +1255,10 @@ export function startPhase1(
     );
   }
   for (let i = 0; i < purchaseCount; i++) {
-    state.resourceCards.push({ id: i, ...genResourceCard(marketRng) });
+    state.resourceCards.push({
+      id: i,
+      ...genResourceCard(marketRng, state.harborPulse),
+    });
   }
 }
 
