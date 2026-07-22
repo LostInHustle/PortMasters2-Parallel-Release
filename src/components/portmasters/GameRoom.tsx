@@ -26,7 +26,6 @@ import { PlayerDetailModal } from "./game/GameModals";
 import { GameStatusPanel } from "./game/GameStatusPanel";
 import { GamePhasePanel } from "./game/GamePhasePanel";
 import { GameControlPanel } from "./game/GameControlPanel";
-import { GameLogPanel } from "./game/GameLogPanel";
 import {
   GuideModal,
   TipsModal,
@@ -65,6 +64,10 @@ import {
   repayLoan,
   settleBarterTrade,
 } from "@/lib/game/engine";
+
+// Browser scoped: the onboarding guide is a "you have played this before"
+// signal, not per room state, so joining a second harbor does not replay it.
+const TUTORIAL_SEEN_KEY = "portmasters_tutorial_seen";
 
 export function GameRoom({
   me,
@@ -458,16 +461,41 @@ export function GameRoom({
   }, [socket, room.id, me.id, notifications.push]);
 
   // First-time tutorial hint.
+  //
+  // This flag was read but never written anywhere in the app, so the guard was
+  // always false and the guide reopened every time the room returned to phase
+  // 0. A restart does exactly that (restartGame calls showWelcome, which sets
+  // phase 0), which is why the guide replayed mid session. Recording the flag
+  // the moment the guide is dismissed is what actually makes it "first time".
+  // The ref is a second guard so it can fire at most once per mount even
+  // before the write lands.
+  const autoTutorialFired = useRef(false);
   useEffect(() => {
+    if (autoTutorialFired.current) return;
     const seen =
       typeof window !== "undefined"
-        ? localStorage.getItem("portmasters_tutorial_seen")
+        ? localStorage.getItem(TUTORIAL_SEEN_KEY)
         : null;
     if (!seen && state.loaded && state.game.phase === 0) {
+      autoTutorialFired.current = true;
       const t = setTimeout(() => setTutOpen(true), 600);
       return () => clearTimeout(t);
     }
   }, [state.loaded, state.game.phase]);
+
+  // Dismissing the guide, however it was opened, is what marks it seen.
+  // Wrapped in try/catch because localStorage throws outright in private
+  // browsing on some engines, and a storage failure must not break the modal.
+  const handleTutorialOpenChange = useCallback((open: boolean) => {
+    setTutOpen(open);
+    if (!open && typeof window !== "undefined") {
+      try {
+        localStorage.setItem(TUTORIAL_SEEN_KEY, "1");
+      } catch {
+        /* storage unavailable; the guide simply offers itself again */
+      }
+    }
+  }, []);
 
   const handleSave = useCallback(async () => {
     try {
@@ -679,15 +707,21 @@ export function GameRoom({
               a guaranteed share of the rail so it is always on screen.
               Untouched below lg, where the rail is just another stacked
               block and the existing mobile ordering still applies. */}
-          <div className="order-2 space-y-3 lg:order-1 lg:sticky lg:top-20 lg:flex lg:h-[calc(100dvh-6rem)] lg:flex-col lg:space-y-0 lg:gap-3">
-            <div className="pm-glass rounded-2xl p-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto pm-scroll">
+          {/* Left: the captain's own rail, now a single panel rather than a
+              status column with the ledger stacked underneath it. The panel
+              pins itself to the viewport on desktop and manages its own
+              scrolling internally (pinned summary, then tabs), so the page
+              never grows with it and the ledger is a tab away instead of
+              below the fold. On smaller screens it is just another stacked
+              block with its natural height, and the existing mobile ordering
+              is untouched. */}
+          <div className="order-2 lg:order-1 lg:sticky lg:top-20 lg:h-[calc(100dvh-6rem)]">
+            <div className="pm-glass h-full rounded-2xl p-3">
               <GameStatusPanel
                 game={state.game}
+                logs={state.logs}
                 onRepayLoan={handleRepayLoan}
               />
-            </div>
-            <div className="lg:min-h-0 lg:h-[38%] lg:shrink-0">
-              <GameLogPanel logs={state.logs} />
             </div>
           </div>
 
@@ -827,7 +861,7 @@ export function GameRoom({
       />
       <TutorialModal
         open={tutOpen}
-        onOpenChange={setTutOpen}
+        onOpenChange={handleTutorialOpenChange}
         difficulty={state.game.difficulty}
       />
       <RestartConfirmModal
