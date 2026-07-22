@@ -13,6 +13,7 @@ import {
   type CaptainLegacySummary,
 } from "@/lib/game/legacy";
 import { BROKERS_FAVOR_UNLOCK_LEVEL } from "@/lib/game/constants";
+import { DIFFICULTIES, DIFFICULTY_ORDER } from "@/lib/game/difficulty";
 import { MERITS } from "@/lib/game/merits";
 import { MeritIcon } from "./shared";
 import { cn } from "@/lib/utils";
@@ -40,6 +41,15 @@ export function CaptainLegacyCard({
       : 100;
   const favorUnlocked = level >= BROKERS_FAVOR_UNLOCK_LEVEL;
   const favorLevelsToGo = BROKERS_FAVOR_UNLOCK_LEVEL - level;
+  // Crowns and best score split by the waters they were earned on. Only tiers
+  // this captain has actually sailed appear, so a new account sees nothing
+  // extra while a veteran sees where their crowns were really won. Optional
+  // chaining guards a cached response written before this field existed.
+  const perTier = DIFFICULTY_ORDER.map((key) => ({
+    key,
+    cfg: DIFFICULTIES[key],
+    stats: legacy.statsByDifficulty?.[key],
+  })).filter((t) => t.stats && (t.stats.crowns > 0 || t.stats.bestScore > 0));
 
   return (
     <div
@@ -118,29 +128,62 @@ export function CaptainLegacyCard({
         })}
       </div>
       {!compact && (
-        <div className="grid grid-cols-3 gap-2 text-center">
-          <div className="rounded-lg bg-background/60 py-1.5">
-            <div className="text-sm font-bold flex items-center justify-center gap-1">
-              <Ship className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />{" "}
-              {legacy.voyagesCompleted}
+        <>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="rounded-lg bg-background/60 py-1.5">
+              <div className="text-sm font-bold flex items-center justify-center gap-1">
+                <Ship className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />{" "}
+                {legacy.voyagesCompleted}
+              </div>
+              <div className="text-[9px] text-muted-foreground">Voyages</div>
             </div>
-            <div className="text-[9px] text-muted-foreground">Voyages</div>
-          </div>
-          <div className="rounded-lg bg-background/60 py-1.5">
-            <div className="text-sm font-bold flex items-center justify-center gap-1">
-              <Crown className="h-3.5 w-3.5 text-amber-500" />{" "}
-              {legacy.seaMasterCrowns}
+            <div className="rounded-lg bg-background/60 py-1.5">
+              <div className="text-sm font-bold flex items-center justify-center gap-1">
+                <Crown className="h-3.5 w-3.5 text-amber-500" />{" "}
+                {legacy.seaMasterCrowns}
+              </div>
+              <div className="text-[9px] text-muted-foreground">Sea Master</div>
             </div>
-            <div className="text-[9px] text-muted-foreground">Sea Master</div>
-          </div>
-          <div className="rounded-lg bg-background/60 py-1.5">
-            <div className="text-sm font-bold flex items-center justify-center gap-1">
-              <Trophy className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />{" "}
-              {legacy.bestScore}
+            <div className="rounded-lg bg-background/60 py-1.5">
+              <div className="text-sm font-bold flex items-center justify-center gap-1">
+                <Trophy className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />{" "}
+                {legacy.bestScore}
+              </div>
+              <div className="text-[9px] text-muted-foreground">Best Rep.</div>
             </div>
-            <div className="text-[9px] text-muted-foreground">Best Rep.</div>
           </div>
-        </div>
+          {perTier.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {perTier.map(({ key, cfg, stats }) => (
+                <Tooltip key={key}>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex cursor-default items-center gap-1 rounded-full bg-background/60 px-2 py-0.5 text-[10px]">
+                      <span>{cfg.icon}</span>
+                      <span className="text-muted-foreground">{cfg.badge}</span>
+                      {stats!.crowns > 0 && (
+                        <span className="inline-flex items-center gap-0.5 font-semibold">
+                          <Crown className="h-2.5 w-2.5 text-amber-500" />
+                          {stats!.crowns}
+                        </span>
+                      )}
+                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                        {stats!.bestScore}
+                      </span>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <div className="font-semibold">{cfg.name}</div>
+                    <div className="text-muted-foreground">
+                      {stats!.crowns} Sea Master crown
+                      {stats!.crowns === 1 ? "" : "s"} · best Reputation{" "}
+                      {stats!.bestScore}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

@@ -84,6 +84,70 @@ export function renownStartingGoldBonus(level: number): number {
   );
 }
 
+// ---------- Per difficulty breakdown ----------
+// Sea Master crowns and best score split by the tier they were earned on (see
+// Room.difficulty and src/lib/game/difficulty.ts). The account level
+// seaMasterCrowns and bestScore stay the all-tier totals; this is the breakdown
+// behind them, so a crown won in a storm reads as the rarer thing it is, and a
+// future leaderboard can be segmented per tier rather than ranking every tier
+// against each other in one list. Keyed by plain string rather than the
+// Difficulty union so this module stays free of any difficulty import and
+// tolerates a tier that no longer exists in the config.
+export type DifficultyStats = { crowns: number; bestScore: number };
+export type StatsByDifficulty = Record<string, DifficultyStats>;
+
+// Deliberately defensive: this parses a free-form JSON column that rows written
+// before the column existed never populated, so anything missing or malformed
+// degrades to "no record yet" instead of throwing inside the voyage conclusion
+// write, which runs for every finisher at once.
+export function parseStatsByDifficulty(
+  raw: string | null | undefined,
+): StatsByDifficulty {
+  if (!raw) return {};
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+      return {};
+    const out: StatsByDifficulty = {};
+    for (const [key, value] of Object.entries(
+      parsed as Record<string, unknown>,
+    )) {
+      if (!value || typeof value !== "object") continue;
+      const v = value as { crowns?: unknown; bestScore?: unknown };
+      out[key] = {
+        crowns:
+          typeof v.crowns === "number" && Number.isFinite(v.crowns)
+            ? v.crowns
+            : 0,
+        bestScore:
+          typeof v.bestScore === "number" && Number.isFinite(v.bestScore)
+            ? v.bestScore
+            : 0,
+      };
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+// Folds one finished voyage into the breakdown, returning a new map rather than
+// mutating, so the caller can hand the result straight to a Prisma write.
+export function recordVoyageInStats(
+  stats: StatsByDifficulty,
+  difficulty: string,
+  voyage: { crowned: boolean; reputation: number },
+): StatsByDifficulty {
+  const prior = stats[difficulty] ?? { crowns: 0, bestScore: 0 };
+  return {
+    ...stats,
+    [difficulty]: {
+      crowns: prior.crowns + (voyage.crowned ? 1 : 0),
+      bestScore: Math.max(prior.bestScore, voyage.reputation),
+    },
+  };
+}
+
 // Shape returned by GET /api/legacy (and its [userId]/batch siblings) and
 // carried on room:voyage_complete standings (see src/server/realtime.ts).
 // A brand new captain with no CaptainLegacy row yet is simply level 1
@@ -98,6 +162,7 @@ export type CaptainLegacySummary = {
   seaMasterCrowns: number;
   bestScore: number;
   meritIds: string[];
+  statsByDifficulty: StatsByDifficulty;
 };
 
 export const DEFAULT_LEGACY_SUMMARY: CaptainLegacySummary = {
@@ -107,4 +172,5 @@ export const DEFAULT_LEGACY_SUMMARY: CaptainLegacySummary = {
   seaMasterCrowns: 0,
   bestScore: 0,
   meritIds: [],
+  statsByDifficulty: {},
 };

@@ -92,6 +92,13 @@ model Room {
   // who isn't already a member.
   started      Boolean  @default(false)
 
+  // The difficulty tier the host chose for this harbor (see
+  // src/lib/game/difficulty.ts). One tier for the whole room: every captain
+  // folds it into their own game state so they all resolve the same voyage
+  // length, market breadth, and raid odds. Defaults to the entry tier so every
+  // pre-existing room keeps the current single mode with no change.
+  difficulty   String   @default("fair_winds")
+
   host        User       @relation("RoomHost", fields: [hostId], references: [id], onDelete: Cascade)
   members     RoomMember[]
   messages    Message[]
@@ -152,6 +159,15 @@ model CaptainLegacy {
   // moment one ends in bankruptcy. Powers the "iron_hull" merit (see
   // src/lib/game/merits.ts); nothing else reads it.
   consecutiveSolventVoyages Int @default(0)
+
+  // Sea Master crowns and best score broken down by difficulty tier, as a JSON
+  // map of { [difficulty]: { crowns, bestScore } } (see src/lib/game/legacy.ts).
+  // The seaMasterCrowns and bestScore columns above stay as the all-tier
+  // totals; this only adds the per-tier split, so a Monsoon crown can be shown
+  // as the rarer thing it is and a future leaderboard can be segmented by tier.
+  // A JSON column rather than fixed columns per tier keeps it open ended: a
+  // fourth tier would need no migration.
+  statsByDifficulty String @default("{}")
 
   // Daily Check-In (see src/lib/game/checkin.ts). checkInCount is how many
   // days of the current 7-day cycle have been claimed (0..6, wrapping to 0

@@ -27,16 +27,12 @@ import {
   BROKERS_FAVOR_PAYOUT_CAP,
   BROKERS_FAVOR_UNLOCK_LEVEL,
   COMMODITIES,
-  ESCORT_COST_RATE,
   ICONS,
   MERCHANT_RATINGS,
   MODULES,
-  ORDER_CARD_COUNT,
-  PIRATE_ATTACK_CHANCE,
   PORTS,
   PRODUCT_PRICES,
   PRODUCTS,
-  PURCHASE_CARD_COUNT,
   RECIPES,
   RESOURCE_PROBS,
   RESOURCES,
@@ -53,6 +49,17 @@ import {
   type OrderCard,
   type ResourceCard,
 } from "./types";
+import {
+  DEFAULT_DIFFICULTY,
+  MANDATE_TEMPLATES,
+  charterOpensOn,
+  difficultyConfig,
+  escortRateFor,
+  mandateIndexFor,
+  marketCountsFor,
+  pirateChanceFor,
+  type Difficulty,
+} from "./difficulty";
 
 // ---------- Helpers ----------
 export function hasModule(state: GameState, id: string): boolean {
@@ -301,7 +308,7 @@ export type ExpectedPrice = {
 // or product, independent of any specific market card. Used for the
 // hover preview during the buying phase (Phase 1) so a captain can size
 // up the whole market, including goods that didn't happen to roll onto
-// one of this round's PURCHASE_CARD_COUNT cards. Ports nudge a raw
+// one of this round's market cards. Ports nudge a raw
 // material's roll by
 // 1 Gold up or down depending on whether the port specializes in it
 // (see genResourceCard), which is why the range carries a margin note
@@ -1020,6 +1027,22 @@ export function purchaseIntel(state: GameState, logs: string[]) {
       `🗣️ Broker's Whisper: 'Word from ${port}: High demand for ${item}!'`,
     );
     state.money -= state.intelCost;
+    // [DIFFICULTY] Corrupt broker (Monsoon only). The rumor above is always
+    // delivered and always true, on every tier: the intel guarantee is never
+    // touched. What a corrupt broker does instead is also sell word of this
+    // hold to the pirates, raising the round's raid chance once. Announced
+    // plainly here rather than hidden, so the captain can price the risk.
+    const cfg = difficultyConfig(state.difficulty);
+    if (
+      cfg.brokerCorruption &&
+      !state.brokerTippedPirates &&
+      Math.random() < cfg.brokerCorruptionChance
+    ) {
+      state.brokerTippedPirates = true;
+      logs.push(
+        `🕵️ That broker was corrupt. The word is good, but your position leaked: raid risk is up ${Math.round(cfg.brokerCorruptionRisk * 100)} points this round.`,
+      );
+    }
   }
 }
 
@@ -1081,6 +1104,7 @@ export function startBoonDrafting(state: GameState, logs: string[]) {
   state.boonChoices = draftBoons(state);
   state.pirateAttackResolved = false;
   state.escortHired = false;
+  state.brokerTippedPirates = false;
   logs.push("\n🧭=== The Navigator's Compass ===");
   logs.push("Choose a Boon to bend the rules of the upcoming voyage...");
 }
@@ -1146,7 +1170,21 @@ export function startPhase1(
     `${ctx.seedBase}:V${state.voyageEpoch}:R${state.currentRound}:market`,
   );
   state.resourceCards = [];
-  for (let i = 0; i < PURCHASE_CARD_COUNT; i++) {
+  // [DIFFICULTY] Card count comes from the room's tier and the current round
+  // (see marketCountsFor): flat for Fair Winds, widening on the harder tiers.
+  const purchaseCount = marketCountsFor(
+    state.difficulty,
+    state.currentRound,
+  ).purchase;
+  // Announce the charter the moment it opens, so the market getting busier
+  // reads as an event rather than an unexplained jump in card count. Fair
+  // Winds schedules none, so this never fires on the entry tier.
+  if (charterOpensOn(state.difficulty, state.currentRound)) {
+    logs.push(
+      `🗺️ The Silk Road Charter opens! The harbor grows busier: ${purchaseCount} cargo lots and as many buyers from this voyage on.`,
+    );
+  }
+  for (let i = 0; i < purchaseCount; i++) {
     state.resourceCards.push({ id: i, ...genResourceCard(marketRng) });
   }
 }
@@ -1276,13 +1314,19 @@ export function startPhase2(
     `\n🤝=== Round ${state.currentRound} · Phase 2: Trade Transaction ===`,
   );
   // [ONLINE] Deterministic trade orders per (room, round): every captain
-  // in the room independently derives the identical base ORDER_CARD_COUNT
+  // in the room independently derives the identical base set of
   // orders here, since this loop never reads anything captain specific.
   const orderRng = createRng(
     `${ctx.seedBase}:V${state.voyageEpoch}:R${state.currentRound}:orders`,
   );
   state.customerCards = [];
-  for (let i = 0; i < ORDER_CARD_COUNT; i++) {
+  // [DIFFICULTY] Same widening as the port market above, applied to the trade
+  // board, so both boards grow together as a tier's charter opens.
+  const orderCount = marketCountsFor(
+    state.difficulty,
+    state.currentRound,
+  ).order;
+  for (let i = 0; i < orderCount; i++) {
     state.customerCards.push({ id: i, ...genMixedOrder(orderRng) });
   }
   // Broker's Whisper guarantee, applied after the shared draw above and
@@ -1306,6 +1350,36 @@ export function startPhase2(
       : genProductOrder(localRng, intel.item);
     state.customerCards[i] = { id: state.customerCards[i].id, ...guaranteed };
   }
+  // [DIFFICULTY] Imperial mandate: on the rounds this tier schedules one, the
+  // Emperor commissions a single large order. Fixed template data with no rng,
+  // appended after the shared draw, so every captain in the room is dealt the
+  // identical mandate and nobody's seeded market shifts. Flagged
+  // isProductOrder: false, since an imperial levy is never charged VAT.
+  const mandateIdx = mandateIndexFor(state.difficulty, state.currentRound);
+  const mandate =
+    mandateIdx === undefined ? undefined : MANDATE_TEMPLATES[mandateIdx];
+  if (mandate) {
+    const nextId =
+      state.customerCards.reduce((m, c) => Math.max(m, c.id), -1) + 1;
+    state.customerCards.push({
+      id: nextId,
+      demandPort: mandate.port,
+      resources: mandate.resources.map((r) => ({
+        type: r.type,
+        required: r.required,
+      })),
+      reward: mandate.reward,
+      totalItems: mandate.resources.reduce((s, r) => s + r.required, 0),
+      isProductOrder: false,
+      isMandate: true,
+    });
+    const need = mandate.resources
+      .map((r) => `${ICONS[r.type]}${r.type}×${r.required}`)
+      .join(" + ");
+    logs.push(
+      `📜 Imperial Mandate at ${mandate.port}: ${need} for ${mandate.reward} Gold. The Emperor's commission is exempt from VAT.`,
+    );
+  }
 }
 
 export function completePhase2(state: GameState, logs: string[]) {
@@ -1328,7 +1402,20 @@ export function startPhase3(state: GameState, logs: string[]) {
 export function resolvePirateAttack(state: GameState, logs: string[]) {
   if (state.pirateAttackResolved) return;
   state.pirateAttackResolved = true;
-  if (Math.random() < PIRATE_ATTACK_CHANCE) {
+  // [DIFFICULTY] Raid chance comes from the room's tier, stepping up past the
+  // midpoint on the harder tiers (see pirateChanceFor). A raid still takes
+  // every coin, so severity is unchanged; only the odds move.
+  const base = pirateChanceFor(
+    state.difficulty,
+    state.currentRound,
+    state.maxRounds,
+  );
+  // A corrupt broker's leak (see purchaseIntel) adds a one-time bump on top.
+  const leak = state.brokerTippedPirates
+    ? difficultyConfig(state.difficulty).brokerCorruptionRisk
+    : 0;
+  const chance = Math.min(1, base + leak);
+  if (Math.random() < chance) {
     const lost = state.money;
     state.money = 0;
     logs.push(`🏴‍☠️ Pirates raided your hold! Lost all ${lost} Gold.`);
@@ -1346,7 +1433,7 @@ export function hireEscort(state: GameState, logs: string[]) {
     logs.push("❌ Too late, this round's waters are already resolved");
     return;
   }
-  const cost = Math.floor(state.money * ESCORT_COST_RATE);
+  const cost = Math.floor(state.money * escortRateFor(state.difficulty));
   state.money -= cost;
   state.escortHired = true;
   state.pirateAttackResolved = true;
@@ -1560,11 +1647,13 @@ export function restartGame(
   startingGoldBonus: number = 0,
   renownLevel: number = 1,
   voyageEpoch: number = 0,
+  difficulty: Difficulty = DEFAULT_DIFFICULTY,
 ) {
   const fresh = createInitialGameState(
     startingGoldBonus,
     renownLevel,
     voyageEpoch,
+    difficulty,
   );
   Object.assign(state, fresh);
   logs.length = 0;

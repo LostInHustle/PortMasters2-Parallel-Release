@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/api-auth";
 import {
   DEFAULT_LEGACY_SUMMARY,
+  parseStatsByDifficulty,
   type CaptainLegacySummary,
 } from "@/lib/game/legacy";
 import { checkInStatus, utcDayKey } from "@/lib/game/checkin";
@@ -31,6 +32,7 @@ export async function GET() {
         seaMasterCrowns: legacy.seaMasterCrowns,
         bestScore: legacy.bestScore,
         meritIds: merits.map((m) => m.meritId),
+        statsByDifficulty: parseStatsByDifficulty(legacy.statsByDifficulty),
       }
     : DEFAULT_LEGACY_SUMMARY;
 

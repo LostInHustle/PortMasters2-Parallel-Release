@@ -9,6 +9,7 @@ import { getCurrentUser } from "@/lib/api-auth";
 import {
   DEFAULT_LEGACY_SUMMARY,
   levelForRenownXP,
+  parseStatsByDifficulty,
   type CaptainLegacySummary,
 } from "@/lib/game/legacy";
 import {
@@ -24,6 +25,7 @@ type LegacyRow = {
   voyagesCompleted: number;
   seaMasterCrowns: number;
   bestScore: number;
+  statsByDifficulty: string;
   checkInCount: number;
   lastCheckInDate: string | null;
 };
@@ -43,6 +45,7 @@ function toSummary(
     seaMasterCrowns: row.seaMasterCrowns,
     bestScore: row.bestScore,
     meritIds,
+    statsByDifficulty: parseStatsByDifficulty(row.statsByDifficulty),
   };
 }
 

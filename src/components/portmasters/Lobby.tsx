@@ -9,6 +9,12 @@ import {
   type RoomSummary,
 } from "@/lib/api";
 import { useRealtime } from "@/lib/use-realtime";
+import {
+  DIFFICULTIES,
+  DIFFICULTY_ORDER,
+  difficultyConfig,
+  type Difficulty,
+} from "@/lib/game/difficulty";
 import { Avatar, OnlineDot, Pill } from "./shared";
 import { ChatPanel } from "./ChatPanel";
 import { CaptainLegacyCard } from "./CaptainLegacyCard";
@@ -69,6 +75,9 @@ export function Lobby({
   const [loadingRooms, setLoadingRooms] = useState(true);
   const [newName, setNewName] = useState("");
   const [isPublic, setIsPublic] = useState(true);
+  // The host picks one tier for the whole harbor (see src/lib/game/difficulty.ts).
+  // It is fixed at creation; changing it afterwards means restarting the voyage.
+  const [difficulty, setDifficulty] = useState<Difficulty>("fair_winds");
   const [joinCode, setJoinCode] = useState("");
   const [joining, setJoining] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -92,9 +101,17 @@ export function Lobby({
   }, []);
 
   useEffect(() => {
-    refreshRooms();
+    // Kicked off on a timer rather than called straight from the effect body,
+    // so the first refresh's setLoadingRooms(true) isn't a synchronous setState
+    // inside an effect (react-hooks/set-state-in-effect). Nothing changes
+    // visually: loadingRooms already starts true, so that first set was a no-op
+    // anyway, and the interval's later calls were never inside an effect body.
+    const kickoff = setTimeout(refreshRooms, 0);
     const t = setInterval(refreshRooms, 8000);
-    return () => clearInterval(t);
+    return () => {
+      clearTimeout(kickoff);
+      clearInterval(t);
+    };
   }, [refreshRooms]);
 
   // A captain's Renown only ever changes when a voyage concludes (see
@@ -184,7 +201,11 @@ export function Lobby({
     setBusy(true);
     setError(null);
     try {
-      const { room } = await api.createRoom({ name: newName.trim(), isPublic });
+      const { room } = await api.createRoom({
+        name: newName.trim(),
+        isPublic,
+        difficulty,
+      });
       setNewName("");
       onEnterRoom(room);
     } catch (e) {
@@ -244,7 +265,10 @@ export function Lobby({
   useEffect(() => {
     if (!dmTarget) return;
     let alive = true;
-    setDmLoading(true);
+    // No setDmLoading(true) here: the only thing that ever sets a target is
+    // openDm, which raises the flag before this effect can run. Setting it
+    // again synchronously in the effect body only cost a cascading render
+    // (react-hooks/set-state-in-effect).
     api
       .getDmHistory(dmTarget.id)
       .then(({ messages }) => {
@@ -409,6 +433,54 @@ export function Lobby({
                     )}
                   </Button>
                 </div>
+
+                <div className="mt-3">
+                  <Label className="text-xs text-muted-foreground">
+                    Waters
+                  </Label>
+                  <div className="mt-1.5 grid grid-cols-3 gap-1 rounded-full bg-background/60 p-1">
+                    {DIFFICULTY_ORDER.map((key) => {
+                      const cfg = DIFFICULTIES[key];
+                      const active = difficulty === key;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => setDifficulty(key)}
+                          aria-pressed={active}
+                          className="relative cursor-pointer rounded-full px-2 py-1.5 text-xs font-medium"
+                        >
+                          {active && (
+                            <motion.span
+                              layoutId="difficultyThumb"
+                              className="pm-grad-primary absolute inset-0 rounded-full"
+                              transition={{
+                                type: "spring",
+                                stiffness: 380,
+                                damping: 32,
+                              }}
+                            />
+                          )}
+                          <span
+                            className={cn(
+                              "relative z-10 flex items-center justify-center gap-1.5",
+                              active ? "text-white" : "text-muted-foreground",
+                            )}
+                          >
+                            <span>{cfg.icon}</span>
+                            <span className="truncate">{cfg.badge}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+                    {DIFFICULTIES[difficulty].tagline}{" "}
+                    <span className="text-foreground/70">
+                      {DIFFICULTIES[difficulty].rounds} rounds.
+                    </span>
+                  </p>
+                </div>
               </div>
 
               {/* Join by code */}
@@ -482,6 +554,10 @@ export function Lobby({
                             <span className="font-medium truncate">
                               {normalizeRoomName(room.name)}
                             </span>
+                            <Pill tone="sea">
+                              {difficultyConfig(room.difficulty).icon}{" "}
+                              {difficultyConfig(room.difficulty).badge}
+                            </Pill>
                             {room.host.id === me.id && (
                               <Pill tone="gold">Host</Pill>
                             )}
