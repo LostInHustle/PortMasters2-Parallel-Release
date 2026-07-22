@@ -9,7 +9,12 @@ import {
   type RoomSummary,
 } from "@/lib/api";
 import { useRealtime } from "@/lib/use-realtime";
-import { difficultyConfig } from "@/lib/game/difficulty";
+import {
+  DIFFICULTIES,
+  DIFFICULTY_ORDER,
+  difficultyConfig,
+  type Difficulty,
+} from "@/lib/game/difficulty";
 import { Avatar, OnlineDot, Pill } from "./shared";
 import { ChatPanel } from "./ChatPanel";
 import { CaptainLegacyCard } from "./CaptainLegacyCard";
@@ -70,6 +75,9 @@ export function Lobby({
   const [loadingRooms, setLoadingRooms] = useState(true);
   const [newName, setNewName] = useState("");
   const [isPublic, setIsPublic] = useState(true);
+  // The host picks one tier for the whole harbor (see src/lib/game/difficulty.ts).
+  // It is fixed at creation; changing it afterwards means restarting the voyage.
+  const [difficulty, setDifficulty] = useState<Difficulty>("fair_winds");
   const [joinCode, setJoinCode] = useState("");
   const [joining, setJoining] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -185,7 +193,11 @@ export function Lobby({
     setBusy(true);
     setError(null);
     try {
-      const { room } = await api.createRoom({ name: newName.trim(), isPublic });
+      const { room } = await api.createRoom({
+        name: newName.trim(),
+        isPublic,
+        difficulty,
+      });
       setNewName("");
       onEnterRoom(room);
     } catch (e) {
@@ -409,6 +421,52 @@ export function Lobby({
                       </>
                     )}
                   </Button>
+                </div>
+
+                <div className="mt-3">
+                  <Label className="text-xs text-muted-foreground">Waters</Label>
+                  <div className="mt-1.5 grid grid-cols-3 gap-1 rounded-full bg-background/60 p-1">
+                    {DIFFICULTY_ORDER.map((key) => {
+                      const cfg = DIFFICULTIES[key];
+                      const active = difficulty === key;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => setDifficulty(key)}
+                          aria-pressed={active}
+                          className="relative cursor-pointer rounded-full px-2 py-1.5 text-xs font-medium"
+                        >
+                          {active && (
+                            <motion.span
+                              layoutId="difficultyThumb"
+                              className="pm-grad-primary absolute inset-0 rounded-full"
+                              transition={{
+                                type: "spring",
+                                stiffness: 380,
+                                damping: 32,
+                              }}
+                            />
+                          )}
+                          <span
+                            className={cn(
+                              "relative z-10 flex items-center justify-center gap-1.5",
+                              active ? "text-white" : "text-muted-foreground",
+                            )}
+                          >
+                            <span>{cfg.icon}</span>
+                            <span className="truncate">{cfg.badge}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+                    {DIFFICULTIES[difficulty].tagline}{" "}
+                    <span className="text-foreground/70">
+                      {DIFFICULTIES[difficulty].rounds} rounds.
+                    </span>
+                  </p>
                 </div>
               </div>
 

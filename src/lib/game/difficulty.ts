@@ -159,15 +159,37 @@ export const DIFFICULTY_ORDER: readonly Difficulty[] = [
 // here so the whole tier definition lives in one file.
 export interface MandateTemplate {
   size: "small" | "medium" | "large";
+  port: string;
   resources: { type: string; required: number }[];
   reward: number;
 }
 
+// A mandate is deliberately fixed data with no randomness, so every captain in
+// a room is dealt the identical commission without disturbing their own seeded
+// market. Mandates are also exempt from VAT (they are an imperial commission,
+// not a taxed sale), which is why the engine flags them isProductOrder: false.
 export const MANDATE_TEMPLATES: readonly MandateTemplate[] = [
-  { size: "small", resources: [{ type: "Silk", required: 4 }, { type: "Tea", required: 3 }], reward: 135 },
-  { size: "medium", resources: [{ type: "Brocade", required: 2 }, { type: "Sachet", required: 1 }], reward: 260 },
+  {
+    size: "small",
+    port: "Quanzhou Port",
+    resources: [
+      { type: "Silk", required: 4 },
+      { type: "Tea", required: 3 },
+    ],
+    reward: 135,
+  },
+  {
+    size: "medium",
+    port: "Yangzhou Port",
+    resources: [
+      { type: "Brocade", required: 2 },
+      { type: "Sachet", required: 1 },
+    ],
+    reward: 260,
+  },
   {
     size: "large",
+    port: "Hangzhou Port",
     resources: [
       { type: "Cotton Clothes", required: 2 },
       { type: "Brocade", required: 2 },

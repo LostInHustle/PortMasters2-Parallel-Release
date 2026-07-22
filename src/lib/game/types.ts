@@ -51,6 +51,11 @@ export type OrderCard = {
   // Broker's commission off this order's reward; every other order leaves it
   // undefined and is unaffected.
   isBrokerFavor?: boolean;
+  // Set only on the Emperor's scheduled commission (see the mandate injection
+  // in startPhase2 and MANDATE_TEMPLATES in ./difficulty). Purely a marker for
+  // the trade board's styling; the order settles like any other, except that it
+  // carries isProductOrder: false so no VAT is charged on an imperial levy.
+  isMandate?: boolean;
 };
 
 export type IntelItem = { item: string; port: string };
@@ -150,6 +155,11 @@ export type GameState = {
   // Gold on hand, or a guaranteed-safe escort for 10% of it.
   pirateAttackResolved: boolean;
   escortHired: boolean;
+  // Set when a corrupt broker leaked this captain's position (Monsoon only,
+  // see purchaseIntel). The rumor itself is always delivered and always true;
+  // the leak only raises this round's raid chance, once, and is announced in
+  // the log rather than hidden. Reset every round in startBoonDrafting.
+  brokerTippedPirates: boolean;
   // Loans currently owed to other captains (debts) and by other captains
   // to this one (loansGiven). Settled voluntarily at any time, or forced
   // at the end of Round 8 (see settleOutstandingDebts in engine.ts).
@@ -256,6 +266,7 @@ export function createInitialGameState(
     moduleSwapUsed: false,
     pirateAttackResolved: false,
     escortHired: false,
+    brokerTippedPirates: false,
     debts: [],
     loansGiven: [],
     defaultedDebt: false,

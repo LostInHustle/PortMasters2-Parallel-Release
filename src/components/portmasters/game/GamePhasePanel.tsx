@@ -9,7 +9,6 @@ import {
   BARTER_ITEMS,
   BROKERS_FAVOR_UNLOCK_LEVEL,
   COLORS,
-  ESCORT_COST_RATE,
   ICONS,
   PRODUCTS,
   RECIPES,
@@ -54,6 +53,11 @@ import {
   type PriceBreakdown,
 } from "@/lib/game/engine";
 import type { GameContext, GameState, Worker } from "@/lib/game/types";
+import {
+  difficultyConfig,
+  escortRateFor,
+  pirateChanceFor,
+} from "@/lib/game/difficulty";
 import { cn } from "@/lib/utils";
 import {
   Anchor,
@@ -1326,23 +1330,31 @@ function Orders({
               key={o.id}
               className={cn(
                 "rounded-xl border overflow-hidden flex flex-col",
-                o.isBrokerFavor
-                  ? "border-emerald-500/45 bg-emerald-500/[0.05]"
-                  : matchesIntel
-                    ? "border-amber-500/40 bg-amber-500/[0.04]"
-                    : "border-black/10 dark:border-white/10 bg-background/50",
+                o.isMandate
+                  ? "border-violet-500/45 bg-violet-500/[0.05]"
+                  : o.isBrokerFavor
+                    ? "border-emerald-500/45 bg-emerald-500/[0.05]"
+                    : matchesIntel
+                      ? "border-amber-500/40 bg-amber-500/[0.04]"
+                      : "border-black/10 dark:border-white/10 bg-background/50",
               )}
             >
               <div className="px-3.5 py-2 text-xs font-semibold border-b border-black/5 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] flex items-center justify-between gap-2">
                 <span>
                   📍 {o.demandPort}{" "}
                   <span className="text-muted-foreground">
-                    {o.isProductOrder
-                      ? "· Finished Product Demand"
-                      : "· Raw Material Demand"}
+                    {o.isMandate
+                      ? "· Imperial Commission"
+                      : o.isProductOrder
+                        ? "· Finished Product Demand"
+                        : "· Raw Material Demand"}
                   </span>
                 </span>
-                {o.isBrokerFavor ? (
+                {o.isMandate ? (
+                  <span className="text-violet-600 dark:text-violet-400 shrink-0">
+                    📜 Imperial Mandate
+                  </span>
+                ) : o.isBrokerFavor ? (
                   <span className="text-emerald-600 dark:text-emerald-400 shrink-0">
                     🤝 Broker's Favor
                   </span>
@@ -1480,16 +1492,37 @@ function PirateAttack({
   game: GameState;
   act: (fn: (g: GameState, logs: string[]) => void) => void;
 }) {
-  const escortCost = Math.floor(game.money * ESCORT_COST_RATE);
+  const escortCost = Math.floor(game.money * escortRateFor(game.difficulty));
+  // Both the odds and the escort fee follow the room's tier, and a corrupt
+  // broker's leak (see purchaseIntel) is folded into the number shown rather
+  // than hidden, so what the captain reads is the real chance.
+  const leak = game.brokerTippedPirates
+    ? difficultyConfig(game.difficulty).brokerCorruptionRisk
+    : 0;
+  const raidPct = Math.round(
+    Math.min(
+      1,
+      pirateChanceFor(game.difficulty, game.currentRound, game.maxRounds) + leak,
+    ) * 100,
+  );
   return (
     <div className="max-w-xl mx-auto text-center py-4">
       <div className="text-5xl mb-2">🏴‍☠️</div>
       <div className="text-2xl font-bold mb-1">Pirate Waters Ahead</div>
-      <p className="text-sm text-muted-foreground mb-5">
-        Before this round's bills come due, your ship has to clear open water.
-        There's a 20% chance pirates find you and take every coin in your hold.
-        Hire an escort to sail through safely, or risk it and save the Gold.
-      </p>
+      <div className="mb-5 space-y-2">
+        <p className="text-sm text-muted-foreground">
+          Before this round's bills come due, your ship has to clear open water.
+          There's a {raidPct}% chance pirates find you and take every coin in
+          your hold. Hire an escort to sail through safely, or risk it and save
+          the Gold.
+        </p>
+        {leak > 0 && (
+          <p className="text-sm text-amber-600 dark:text-amber-400">
+            🕵️ A corrupt broker leaked your position this round, so the odds
+            above are already raised.
+          </p>
+        )}
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md mx-auto">
         <Button
           size="lg"

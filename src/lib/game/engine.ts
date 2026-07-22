@@ -51,7 +51,10 @@ import {
 } from "./types";
 import {
   DEFAULT_DIFFICULTY,
+  MANDATE_TEMPLATES,
+  difficultyConfig,
   escortRateFor,
+  mandateIndexFor,
   marketCountsFor,
   pirateChanceFor,
   type Difficulty,
@@ -1023,6 +1026,22 @@ export function purchaseIntel(state: GameState, logs: string[]) {
       `🗣️ Broker's Whisper: 'Word from ${port}: High demand for ${item}!'`,
     );
     state.money -= state.intelCost;
+    // [DIFFICULTY] Corrupt broker (Monsoon only). The rumor above is always
+    // delivered and always true, on every tier: the intel guarantee is never
+    // touched. What a corrupt broker does instead is also sell word of this
+    // hold to the pirates, raising the round's raid chance once. Announced
+    // plainly here rather than hidden, so the captain can price the risk.
+    const cfg = difficultyConfig(state.difficulty);
+    if (
+      cfg.brokerCorruption &&
+      !state.brokerTippedPirates &&
+      Math.random() < cfg.brokerCorruptionChance
+    ) {
+      state.brokerTippedPirates = true;
+      logs.push(
+        `🕵️ That broker was corrupt. The word is good, but your position leaked: raid risk is up ${Math.round(cfg.brokerCorruptionRisk * 100)} points this round.`,
+      );
+    }
   }
 }
 
@@ -1084,6 +1103,7 @@ export function startBoonDrafting(state: GameState, logs: string[]) {
   state.boonChoices = draftBoons(state);
   state.pirateAttackResolved = false;
   state.escortHired = false;
+  state.brokerTippedPirates = false;
   logs.push("\n🧭=== The Navigator's Compass ===");
   logs.push("Choose a Boon to bend the rules of the upcoming voyage...");
 }
@@ -1318,6 +1338,36 @@ export function startPhase2(
       : genProductOrder(localRng, intel.item);
     state.customerCards[i] = { id: state.customerCards[i].id, ...guaranteed };
   }
+  // [DIFFICULTY] Imperial mandate: on the rounds this tier schedules one, the
+  // Emperor commissions a single large order. Fixed template data with no rng,
+  // appended after the shared draw, so every captain in the room is dealt the
+  // identical mandate and nobody's seeded market shifts. Flagged
+  // isProductOrder: false, since an imperial levy is never charged VAT.
+  const mandateIdx = mandateIndexFor(state.difficulty, state.currentRound);
+  const mandate =
+    mandateIdx === undefined ? undefined : MANDATE_TEMPLATES[mandateIdx];
+  if (mandate) {
+    const nextId =
+      state.customerCards.reduce((m, c) => Math.max(m, c.id), -1) + 1;
+    state.customerCards.push({
+      id: nextId,
+      demandPort: mandate.port,
+      resources: mandate.resources.map((r) => ({
+        type: r.type,
+        required: r.required,
+      })),
+      reward: mandate.reward,
+      totalItems: mandate.resources.reduce((s, r) => s + r.required, 0),
+      isProductOrder: false,
+      isMandate: true,
+    });
+    const need = mandate.resources
+      .map((r) => `${ICONS[r.type]}${r.type}×${r.required}`)
+      .join(" + ");
+    logs.push(
+      `📜 Imperial Mandate at ${mandate.port}: ${need} for ${mandate.reward} Gold. The Emperor's commission is exempt from VAT.`,
+    );
+  }
 }
 
 export function completePhase2(state: GameState, logs: string[]) {
@@ -1343,11 +1393,16 @@ export function resolvePirateAttack(state: GameState, logs: string[]) {
   // [DIFFICULTY] Raid chance comes from the room's tier, stepping up past the
   // midpoint on the harder tiers (see pirateChanceFor). A raid still takes
   // every coin, so severity is unchanged; only the odds move.
-  const chance = pirateChanceFor(
+  const base = pirateChanceFor(
     state.difficulty,
     state.currentRound,
     state.maxRounds,
   );
+  // A corrupt broker's leak (see purchaseIntel) adds a one-time bump on top.
+  const leak = state.brokerTippedPirates
+    ? difficultyConfig(state.difficulty).brokerCorruptionRisk
+    : 0;
+  const chance = Math.min(1, base + leak);
   if (Math.random() < chance) {
     const lost = state.money;
     state.money = 0;

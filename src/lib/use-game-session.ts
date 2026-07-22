@@ -163,6 +163,7 @@ export function useGameSession(
           game.moduleSwapUsed = game.moduleSwapUsed ?? false;
           game.pirateAttackResolved = game.pirateAttackResolved ?? false;
           game.escortHired = game.escortHired ?? false;
+          game.brokerTippedPirates = game.brokerTippedPirates ?? false;
           game.debts = game.debts ?? [];
           game.loansGiven = game.loansGiven ?? [];
           game.defaultedDebt = game.defaultedDebt ?? false;

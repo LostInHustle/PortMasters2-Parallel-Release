@@ -138,7 +138,7 @@ Every dial below is a config field, not a hardcoded branch. Recommended launch v
 |Pirate model|wipe all|wipe all|wipe all|
 |Escort cost rate|0.10|0.12|0.15|
 |Broker corruption|off|off|on (0.30 chance a rumor is corrupt)|
-|Imperial mandates (rounds)|3, 6|4, 8, 12|6, 12, 16|
+|Imperial mandates (rounds)|None|4, 8, 12|6, 12, 16|
 |Mandate sizes (template index)|0, 1|0, 1, 2|1, 2, 2|
 |Renown XP multiplier|1.0|1.25|1.6|
 |Difficulty merits|none|Open Water Captain|Storm Sovereign, Eye of the Storm|
@@ -153,7 +153,7 @@ Every dial below is a config field, not a hardcoded branch. Recommended launch v
 
 **Adversity (corrupt broker).** Monsoon only, mirroring Hard's `brokerCorruption`, and faithful to the original's core promise: the broker always delivers, and delivered intel is always true. That promise holds on every tier, Monsoon included. A corrupt broker still hands over the correct rumor with its guaranteed matching order; what it also does, on a 0.30 roll per rumor purchase, is leak the captain's position, so this round's raid chance rises by a fixed amount (0.08 at launch, set once per round rather than stacking). The leak is surfaced plainly, not hidden: a log line tells the captain the rumor came through, but word of their hold reached the pirates, so the seas are rougher this round. A conservative variant that signals the danger without printing the exact percentage is available as a copy only toggle, but the default is full disclosure. Wired through the existing `purchaseIntel` (which reveals the true rumor as always, then rolls the leak and sets the risk flag) and `resolvePirateAttack` (which reads the flag). The intel guarantee itself is never touched on any tier.
 
-**Imperial pressure (Emperor's Mandate).** A guaranteed high value order injected on scheduled rounds, reusing the original's small, medium, large template idea with Parallel Release item names. Because the Parallel Release is multiplayer, the mandate leans on the social economy: it demands quantities a lone captain often cannot meet from their own hold, nudging players toward bartering and, when short, financial aid. Launch templates:
+**Imperial pressure (Emperor's Mandate).** A guaranteed high value order injected on scheduled rounds, reusing the original's small, medium, large template idea with Parallel Release item names. Fair Winds carries no mandates at all, deliberately: the entry tier is the existing game preserved exactly, so the mandate is one of the things that makes the two new tiers feel different rather than a change to what players already know. A mandate is fixed data with no randomness, so every captain in a room is dealt the identical commission, and it is exempt from VAT (an imperial commission, not a taxed sale). Because the Parallel Release is multiplayer, the mandate leans on the social economy: it demands quantities a lone captain often cannot meet from their own hold, nudging players toward bartering and, when short, financial aid. Launch templates:
 
 |Index|Size|Demand|Reward|
 |---|---|---|---|
@@ -299,11 +299,11 @@ Determinism note: card *counts* are a pure function of (difficulty, round), whic
 
 The plumbing is separable from the balance, so we ship in de risked slices. Each phase is independently shippable and reversible.
 
-**Phase A: framework and rename (zero gameplay change).** Introduce `difficulty.ts`, the schema migration, and thread `difficulty` through every touch point in Section 4, but ship only Fair Winds with today's exact values under its new name. Every existing room defaults to Fair Winds. This proves the plumbing (room property, per captain threading, UI chip, conclusion multiplier of 1.0) with no balance surface at all. Fully backward compatible.
+**Phase A: framework and rename (zero gameplay change). Implemented.** Introduce `difficulty.ts`, the schema migration, and thread `difficulty` through every touch point in Section 4, but ship only Fair Winds with today's exact values under its new name. Every existing room defaults to Fair Winds. This proves the plumbing (room property, per captain threading, UI chip, conclusion multiplier of 1.0) with no balance surface at all. Fully backward compatible, and verified: Fair Winds resolves to the pre-difficulty constants exactly.
 
-**Phase B: Open Waters.** Turn on the 12 round tier: charter growth to 8 then 10 cards, the pirate step up, higher escort cost, light mandates, and the 1.25 Renown multiplier. Playtest with two to four captains; tune the mandate rewards and the second half pirate chance.
+**Phase B: Open Waters. Implemented.** Turn on the 12 round tier: charter growth to 8 then 10 cards, the pirate step up, higher escort cost, mandates on rounds 4, 8, and 12, and the 1.25 Renown multiplier, plus the host only lobby switch that makes a tier selectable at all. Still to do: playtest with two to four captains and tune the mandate rewards and the second half pirate chance.
 
-**Phase C: Monsoon Season.** The 16 round tier: growth to 11 cards, the steepest raids, the corrupt broker, the largest back loaded mandates, and the difficulty merits. This is the heaviest balance lift and gets the most playtesting.
+**Phase C: Monsoon Season. Gameplay implemented, progression pending.** The 16 round tier: growth to 11 cards, the steepest raids, the corrupt broker leak, and the largest back loaded mandates are all wired. Outstanding for this phase are the difficulty scoped Captain's Merits and the per tier `statsByDifficulty` split (decision 4), plus the heaviest balance playtesting.
 
 **Phase D: polish and telemetry.** Charter and mandate banners, tutorial copy, difficulty badges everywhere, and instrumentation (bankruptcy rate, average final reputation, escort uptake, mandate fill rate per difficulty) to drive a data informed balance retune.
 
