@@ -715,7 +715,10 @@ export function attachRealtime(httpServer: HttpServer): Server {
   // below), and are never written to the database: losing this on a server
   // restart just means one round rolls with a neutral market, which is the
   // same as round 1 every voyage already looks like.
-  const roomPulseTallies = new Map<string, Map<number, Record<string, number>>>();
+  const roomPulseTallies = new Map<
+    string,
+    Map<number, Record<string, number>>
+  >();
 
   function addPulseReport(
     roomId: string,
@@ -1154,7 +1157,10 @@ export function attachRealtime(httpServer: HttpServer): Server {
       const roomId = payload?.roomId ?? s.roomId;
       if (!roomId || roomId !== s.roomId) return;
       if (roomDocksWinners.has(roomId)) return;
-      roomDocksWinners.set(roomId, { userId: s.userId, name: s.user.displayName });
+      roomDocksWinners.set(roomId, {
+        userId: s.userId,
+        name: s.user.displayName,
+      });
       io.to(`room:${roomId}`).emit("docks:won", {
         roomId,
         winnerId: s.userId,
