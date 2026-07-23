@@ -40,6 +40,9 @@ import {
   RESOURCES_TIER2,
   WAGES,
   MERCHANT_RATINGS,
+  WORD_ON_THE_DOCKS_THRESHOLD,
+  WORD_ON_THE_DOCKS_REWARD,
+  TIDEWATCH_SURGE_THRESHOLD,
 } from "../../src/lib/game/constants";
 import {
   calcTransportCost,
@@ -52,10 +55,17 @@ import {
   explainCardPrice,
   merchantRatingForScore,
   hasModule,
+  tallyPurchasesByResource,
+  applyHarborPulse,
+  applyTidewatchSurge,
+  claimWordOnTheDocksReward,
+  completeOrder,
 } from "../../src/lib/game/engine";
 import {
   createInitialGameState,
   type GameState,
+  type OrderCard,
+  type ResourceCard,
 } from "../../src/lib/game/types";
 import {
   xpRequiredForLevel,
@@ -65,6 +75,7 @@ import {
   recordVoyageInStats,
 } from "../../src/lib/game/legacy";
 import { qualifyingMerits } from "../../src/lib/game/merits";
+import { computeHarborPulse, PULSE_CAP } from "../../src/lib/game/harborPulse";
 
 function freshState(
   difficulty: "fair_winds" | "open_waters" | "monsoon" = "fair_winds",
@@ -775,6 +786,279 @@ test("every difficulty's tierUnlock rounds fall within its own voyage length", (
       );
     }
   }
+});
+
+// ---------- Harbor systems (Manifests 01-03) ----------
+// Pure-function coverage for the three room-wide harbor systems merged via
+// PR #12: The Harbor Pulse (price nudge), Word on the Docks (first-to-3
+// race), and Tidewatch Alerts (combined-reputation surge). Each system's
+// authoritative "who won" or "did the room cross the line" arbitration
+// lives server-side in src/server/realtime.ts (roomPulseTallies,
+// roomDocksWinners, roomSurges), which needs a live socket connection to
+// exercise and is out of scope for this framework-free script; what's
+// tested here is every piece of it that's a pure function reachable
+// without one: the pricing formula itself (computeHarborPulse, hoisted out
+// of realtime.ts into src/lib/game/harborPulse.ts for exactly this reason,
+// the same move pools.ts made for difficulty.ts) and every exported engine
+// function these systems added or touched.
+suite("harbor systems (Manifests 01-03)");
+
+function orderCard(
+  overrides: Partial<OrderCard> & { resources: OrderCard["resources"] },
+): OrderCard {
+  return {
+    id: 0,
+    demandPort: "Quanzhou Port",
+    reward: 50,
+    totalItems: overrides.resources.reduce((s, r) => s + (r.required ?? 0), 0),
+    isProductOrder: false,
+    ...overrides,
+  };
+}
+
+// ----- The Harbor Pulse: computeHarborPulse -----
+
+test("computeHarborPulse: no tally (round 1, or nobody reported) is neutral", () => {
+  assertEqual(
+    Object.keys(computeHarborPulse(undefined)).length,
+    0,
+    "undefined tally -> {}",
+  );
+  assertEqual(
+    Object.keys(computeHarborPulse({})).length,
+    0,
+    "empty tally -> {}",
+  );
+});
+
+test("computeHarborPulse: an item bought at exactly an even 1/3 share is untouched", () => {
+  const pulse = computeHarborPulse({ Hemp: 10, Silk: 10, Tea: 10 });
+  assertClose(pulse.Hemp, 0, 1e-9, "Hemp at baseline share");
+  assertClose(pulse.Silk, 0, 1e-9, "Silk at baseline share");
+  assertClose(pulse.Tea, 0, 1e-9, "Tea at baseline share");
+});
+
+test("computeHarborPulse: an item the room leaned into gets a positive nudge, clamped to PULSE_CAP", () => {
+  // Hemp alone: share = 1.0, unclamped nudge = (1 - 1/3) * 0.6 = 0.4, far past
+  // the 0.12 cap, so the clamp is what this test is actually pinning down.
+  const pulse = computeHarborPulse({ Hemp: 100 });
+  assertClose(pulse.Hemp, PULSE_CAP, 1e-9, "clamped to +PULSE_CAP");
+});
+
+test("computeHarborPulse: a reported-but-untouched item still gets a negative nudge, clamped to -PULSE_CAP", () => {
+  // Silk/Tea split the room's buying and Hemp gets none of it: share = 0,
+  // unclamped nudge = (0 - 1/3) * 0.6 = -0.2, past the cap on the low side.
+  // (Filtering a genuinely zero-quantity entry out of the tally entirely is
+  // addPulseReport's job, not this pure function's — see the next test.)
+  const pulse = computeHarborPulse({ Hemp: 0, Silk: 50, Tea: 50 });
+  assertClose(pulse.Hemp, -PULSE_CAP, 1e-9, "clamped to -PULSE_CAP");
+});
+
+test("computeHarborPulse: an underrepresented but present item still clamps at -PULSE_CAP", () => {
+  const pulse = computeHarborPulse({ Hemp: 1, Silk: 495, Tea: 495 });
+  assertClose(pulse.Hemp, -PULSE_CAP, 1e-9, "clamped to -PULSE_CAP");
+});
+
+test("computeHarborPulse: a total of zero (all reported quantities non-positive) is neutral", () => {
+  // addPulseReport already filters non-positive quantities before they ever
+  // reach this function, but the pure function is defensive on its own
+  // terms too: this pins that defensiveness down independently of the
+  // caller that currently guarantees it.
+  const pulse = computeHarborPulse({ Hemp: 0 });
+  assertEqual(Object.keys(pulse).length, 0, "zero total -> {}");
+});
+
+// ----- The Harbor Pulse: tallyPurchasesByResource -----
+
+test("tallyPurchasesByResource: sums only purchased, non-product resource cards", () => {
+  const s = freshState();
+  s.resourceCards = [
+    {
+      id: 0,
+      port: "Quanzhou Port",
+      resources: [{ type: "Hemp", quantity: 2, price: 4 }],
+      totalCost: 8,
+      isProductCard: false,
+    },
+    {
+      id: 1,
+      port: "Hangzhou Port",
+      resources: [{ type: "Silk", quantity: 1, price: 8 }],
+      totalCost: 8,
+      isProductCard: false,
+    },
+    // Purchased but a finished-good card: the pulse is about raw goods, so
+    // this must never contribute, even though it's in purchasedCards below.
+    {
+      id: 2,
+      port: "Guangzhou Port",
+      resources: [{ type: "Sachet", quantity: 1, price: 100 }],
+      totalCost: 100,
+      isProductCard: true,
+    },
+    // On the board but never bought: must not contribute either.
+    {
+      id: 3,
+      port: "Quanzhou Port",
+      resources: [{ type: "Hemp", quantity: 5, price: 4 }],
+      totalCost: 20,
+      isProductCard: false,
+    },
+  ] as ResourceCard[];
+  s.purchasedCards = [0, 1, 2];
+  const tally = tallyPurchasesByResource(s);
+  assertEqual(tally.Hemp, 2, "only the purchased Hemp card counts");
+  assertEqual(tally.Silk, 1, "purchased Silk card counts");
+  assertEqual(
+    tally.Sachet,
+    undefined,
+    "product cards never enter the pulse tally",
+  );
+});
+
+test("tallyPurchasesByResource: sums multiple purchased cards of the same resource", () => {
+  const s = freshState();
+  s.resourceCards = [
+    {
+      id: 0,
+      port: "Quanzhou Port",
+      resources: [{ type: "Hemp", quantity: 2, price: 4 }],
+      totalCost: 8,
+      isProductCard: false,
+    },
+    {
+      id: 1,
+      port: "Ningbo Port",
+      resources: [{ type: "Hemp", quantity: 3, price: 5 }],
+      totalCost: 15,
+      isProductCard: false,
+    },
+  ] as ResourceCard[];
+  s.purchasedCards = [0, 1];
+  assertEqual(tallyPurchasesByResource(s).Hemp, 5, "2 + 3 across two cards");
+});
+
+test("tallyPurchasesByResource: nothing purchased yields an empty tally", () => {
+  const s = freshState();
+  s.resourceCards = [
+    {
+      id: 0,
+      port: "Quanzhou Port",
+      resources: [{ type: "Hemp", quantity: 2, price: 4 }],
+      totalCost: 8,
+      isProductCard: false,
+    },
+  ] as ResourceCard[];
+  s.purchasedCards = [];
+  assertEqual(
+    Object.keys(tallyPurchasesByResource(s)).length,
+    0,
+    "no purchases -> {}",
+  );
+});
+
+// ----- The Harbor Pulse: applyHarborPulse -----
+
+test("applyHarborPulse replaces state.harborPulse wholesale, not a merge", () => {
+  const s = freshState();
+  s.harborPulse = { Silk: 0.05 };
+  applyHarborPulse(s, { Hemp: 0.1 });
+  assertEqual(s.harborPulse.Hemp, 0.1, "new pulse value present");
+  assertEqual(s.harborPulse.Silk, undefined, "prior round's pulse is gone");
+});
+
+// ----- Tidewatch Alerts: applyTidewatchSurge -----
+
+test("applyTidewatchSurge: flips the flag once and logs exactly once", () => {
+  const s = freshState();
+  const logs: string[] = [];
+  applyTidewatchSurge(s, logs);
+  assertEqual(s.tidewatchSurge, true, "flag set");
+  assertEqual(logs.length, 1, "exactly one log line");
+  assert(logs[0].includes("Tidewatch"), "log names the system");
+});
+
+test("applyTidewatchSurge: idempotent once already flipped, never a repeat announcement", () => {
+  const s = freshState();
+  const logs: string[] = [];
+  applyTidewatchSurge(s, logs);
+  applyTidewatchSurge(s, logs);
+  applyTidewatchSurge(s, logs);
+  assertEqual(logs.length, 1, "still exactly one log line after 3 calls");
+  assertEqual(s.tidewatchSurge, true, "flag stays true");
+});
+
+// ----- Word on the Docks: claimWordOnTheDocksReward -----
+
+test("claimWordOnTheDocksReward: pays the reward exactly once per call and logs it", () => {
+  const s = freshState();
+  const before = s.money;
+  const logs: string[] = [];
+  claimWordOnTheDocksReward(s, logs);
+  assertEqual(s.money, before + WORD_ON_THE_DOCKS_REWARD, "reward credited");
+  assertEqual(logs.length, 1, "exactly one log line");
+  assert(logs[0].includes("Word on the Docks"), "log names the system");
+});
+
+// ----- Word on the Docks: completeOrder's one-shot claim signal -----
+
+test("completeOrder: _pendingDocksClaim is unset before the threshold, set exactly at it", () => {
+  const s = freshState();
+  s.inventory.Hemp = 100;
+  s.customerCards = Array.from(
+    { length: WORD_ON_THE_DOCKS_THRESHOLD },
+    (_, i) => orderCard({ id: i, resources: [{ type: "Hemp", required: 1 }] }),
+  );
+  for (let i = 0; i < WORD_ON_THE_DOCKS_THRESHOLD - 1; i++) {
+    completeOrder(s, i, []);
+    assertEqual(
+      s._pendingDocksClaim,
+      undefined,
+      `order ${i + 1}/${WORD_ON_THE_DOCKS_THRESHOLD}: not yet at the threshold`,
+    );
+  }
+  completeOrder(s, WORD_ON_THE_DOCKS_THRESHOLD - 1, []);
+  assertEqual(
+    s._pendingDocksClaim?.total,
+    WORD_ON_THE_DOCKS_THRESHOLD,
+    "claim fires the instant the threshold is crossed",
+  );
+});
+
+test("completeOrder: never re-fires _pendingDocksClaim past the threshold", () => {
+  const s = freshState();
+  s.inventory.Hemp = 100;
+  s.customerCards = Array.from(
+    { length: WORD_ON_THE_DOCKS_THRESHOLD + 1 },
+    (_, i) => orderCard({ id: i, resources: [{ type: "Hemp", required: 1 }] }),
+  );
+  for (let i = 0; i < WORD_ON_THE_DOCKS_THRESHOLD; i++) completeOrder(s, i, []);
+  assertEqual(
+    s._pendingDocksClaim?.total,
+    WORD_ON_THE_DOCKS_THRESHOLD,
+    "sanity: fired at the threshold",
+  );
+  // Simulate GameRoom.tsx relaying and clearing the signal, the same
+  // handshake the real client performs (see GameRoom.tsx's docks:claim
+  // relay) before this captain's very next order completes.
+  delete s._pendingDocksClaim;
+  completeOrder(s, WORD_ON_THE_DOCKS_THRESHOLD, []);
+  assertEqual(
+    s._pendingDocksClaim,
+    undefined,
+    "the === guard is one-shot: a 4th completed order never re-sets the claim",
+  );
+});
+
+// ----- Constant sanity: guards silent balance drift -----
+// These numbers are load-bearing in guideText()/tipsText() copy and in the
+// server's arbitration logic; a change here should be a deliberate design
+// decision, not a typo that silently desyncs the rules text from the code.
+
+test("harbor system constants match the documented design", () => {
+  assertEqual(WORD_ON_THE_DOCKS_THRESHOLD, 3, "first to 3 completed orders");
+  assertEqual(WORD_ON_THE_DOCKS_REWARD, 25, "25 Gold reward");
+  assertEqual(TIDEWATCH_SURGE_THRESHOLD, 250, "combined Reputation past 250");
 });
 
 const ok = summary();
