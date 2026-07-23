@@ -579,6 +579,23 @@ export const WORD_ON_THE_DOCKS_REWARD = 25;
 // in src/server/realtime.ts for where the combined total is actually read.
 export const TIDEWATCH_SURGE_THRESHOLD = 250;
 
+// [MANIFEST 04: Convoy Ventures] A pooled, multi captain investment: gold
+// only (see the ConvoyVenture Prisma model), too large a target for one
+// captain to fund comfortably alone, open to contributions from anyone in
+// the room until its deadline round. Fills the instant contributions reach
+// targetGold, splitting a reward (targetGold times the payout multiplier)
+// across every contributor in exact proportion to what they put in. Missing
+// the deadline instead pays every contributor back only a fraction of their
+// own stake, so joining one is a real wager on the room finishing it, not a
+// free favor with no downside. See src/server/realtime.ts for where a
+// venture is actually posted, contributed to, and resolved.
+export const CONVOY_VENTURE_MIN_TARGET = 150;
+export const CONVOY_VENTURE_MAX_TARGET = 2000;
+export const CONVOY_VENTURE_MIN_ROUNDS_AHEAD = 1;
+export const CONVOY_VENTURE_MAX_ROUNDS_AHEAD = 6;
+export const CONVOY_VENTURE_PAYOUT_MULTIPLIER = 1.5;
+export const CONVOY_VENTURE_FAILURE_REFUND_RATE = 0.5;
+
 // =====================================================================
 // Player-facing copy. The wording is preserved from the original game; the
 // numbers are not baked in any more, because they now depend on the room's
@@ -775,6 +792,13 @@ ${mandates.length ? `\n📜 Imperial Mandates:\n• On voyage${mandates.length =
 • Once everyone in the harbor's own Reputation adds up past ${TIDEWATCH_SURGE_THRESHOLD}, the harbor takes notice of a bustling crew
 • From the next Port Purchase onward, every captain's board gets one extra cargo lot, for the rest of the voyage
 • This never changes your voyage length or which tier's goods you see, only how busy the market gets
+
+⚓ Convoy Ventures:
+• Found on the Dues tab of your captain's rail: any captain can post a venture, a Gold target and a deadline round
+• Anyone in the harbor, including the poster, can chip in Gold toward that target at any time before the deadline
+• Reach the target in time and it fills: every contributor is paid back ${Math.round((CONVOY_VENTURE_PAYOUT_MULTIPLIER - 1) * 100)}% more Gold than they put in, split in exact proportion to their share
+• Miss the deadline and it fails: every contributor only gets back ${Math.round(CONVOY_VENTURE_FAILURE_REFUND_RATE * 100)}% of their own stake, the rest is lost
+• Contributing is a real wager on the rest of the harbor coming through, not a free favor
 
 🆘 Financial Aid:
 • Can't cover this round's wages or maintenance? Ask the harbor for a loan, right on the settlement screen

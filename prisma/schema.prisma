@@ -103,6 +103,7 @@ model Room {
   members     RoomMember[]
   messages    Message[]
   gameStates  GameState[]
+  convoyVentures ConvoyVenture[]
 
   @@index([hostId])
 }
@@ -198,6 +199,51 @@ model CaptainMerit {
 
   @@unique([userId, meritId])
   @@index([userId])
+}
+
+// [MANIFEST 04: Convoy Ventures] A pooled, multi captain investment: too
+// large for any single captain's Gold to fund alone, open to contributions
+// from anyone in the room until a deadline round, split by contribution if
+// it fills, a partial refund to every contributor if it doesn't. Unlike the
+// barter and aid boards (in memory only in src/server/realtime.ts, gone the
+// moment the phase they belong to ends), a venture can sit open across many
+// rounds, so it gets a real table rather than ephemeral server state, the
+// same reasoning GameState itself is persisted rather than kept in memory.
+// Scoped to a voyage (roomId + voyageEpoch), not just a room, so a restart's
+// fresh voyageEpoch (see Room.voyageEpoch) can never resolve against a
+// venture from a voyage that no longer exists.
+model ConvoyVenture {
+  id            String   @id @default(cuid())
+  roomId        String
+  voyageEpoch   Int
+  posterId      String
+  posterName    String
+  targetGold    Int
+  deadlineRound Int
+  // Multiplies targetGold for the reward split among contributors if the
+  // venture fills; see CONVOY_VENTURE_PAYOUT_MULTIPLIER in
+  // src/lib/game/constants.ts for the current value and reasoning.
+  payoutMultiplier Float @default(1.5)
+
+  // JSON map of { [userId]: { name: string, amount: number } }, the pooled
+  // contributions so far. A JSON column rather than a second table: every
+  // read and write here touches the whole map at once (recompute the total,
+  // split a payout, refund everyone), never a single contributor's row in
+  // isolation, so there is no normalization benefit a join table would add,
+  // and this stays the one new table this feature needs.
+  contributions String @default("{}")
+
+  // "open" while still collecting, "filled" once it reached targetGold and
+  // paid out, "failed" once its deadline round passed short of target and
+  // partial refunds went out. Terminal once "filled" or "failed"; nothing
+  // ever moves a venture back to "open".
+  status    String   @default("open")
+  createdAt DateTime @default(now())
+  resolvedAt DateTime?
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, voyageEpoch])
 }
 
 model Message {

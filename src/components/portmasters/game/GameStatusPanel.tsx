@@ -1,6 +1,14 @@
 "use client";
 
-import { COLORS, ICONS } from "@/lib/game/constants";
+import { useState } from "react";
+import {
+  CONVOY_VENTURE_MAX_ROUNDS_AHEAD,
+  CONVOY_VENTURE_MAX_TARGET,
+  CONVOY_VENTURE_MIN_ROUNDS_AHEAD,
+  CONVOY_VENTURE_MIN_TARGET,
+  COLORS,
+  ICONS,
+} from "@/lib/game/constants";
 import { getHireCost } from "@/lib/game/engine";
 import type { GameState } from "@/lib/game/types";
 import { difficultyConfig } from "@/lib/game/difficulty";
@@ -9,11 +17,13 @@ import {
   unlockedResources,
   unlockedWorkerTypes,
 } from "@/lib/game/pools";
+import type { ConvoyVenture } from "@/lib/use-convoy";
 import { cn } from "@/lib/utils";
 import { Term } from "../Term";
 import { priceAwareTermContent } from "./PriceTooltips";
 import { GameLogPanel } from "./GameLogPanel";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 /**
@@ -40,10 +50,23 @@ export function GameStatusPanel({
   game,
   logs,
   onRepayLoan,
+  convoy,
+  myUserId,
 }: {
   game: GameState;
   logs: string[];
   onRepayLoan?: (debtId: string) => void;
+  // [MANIFEST 04: Convoy Ventures] Optional so any other caller of this
+  // panel (there is currently only one, GameRoom.tsx) keeps compiling
+  // unchanged if it doesn't wire the board through.
+  convoy?: {
+    ventures: ConvoyVenture[];
+    error: string | null;
+    clearError: () => void;
+    post: (targetGold: number, deadlineRound: number) => void;
+    contribute: (ventureId: string, amount: number) => void;
+  };
+  myUserId?: string;
 }) {
   const discount = game.shipLevel * 5;
   const showObligations = ![0, 5, "endgame", "bankruptcy"].includes(game.phase);
@@ -342,6 +365,14 @@ export function GameStatusPanel({
               </p>
             </div>
           )}
+
+          {convoy && myUserId && (
+            <ConvoyVenturesSection
+              game={game}
+              convoy={convoy}
+              myUserId={myUserId}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="log" className="min-h-0 flex-1">
@@ -391,6 +422,173 @@ function SubRow({ label, value }: { label: string; value: string }) {
     <div className="flex justify-between py-0.5 pl-3 text-[10px] text-muted-foreground">
       <span>{label}</span>
       <span>{value}</span>
+    </div>
+  );
+}
+
+// [MANIFEST 04: Convoy Ventures] Lives in the Dues tab, right beside
+// Outstanding Loans, since both are peer-to-peer Gold commitments a captain
+// is tracking against the rest of the harbor. Deliberately compact: a two
+// field post form, then one card per open venture with its own progress bar
+// and a one field contribute control, matching the density the rest of this
+// tab already keeps to.
+function ConvoyVenturesSection({
+  game,
+  convoy,
+  myUserId,
+}: {
+  game: GameState;
+  convoy: {
+    ventures: ConvoyVenture[];
+    error: string | null;
+    clearError: () => void;
+    post: (targetGold: number, deadlineRound: number) => void;
+    contribute: (ventureId: string, amount: number) => void;
+  };
+  myUserId: string;
+}) {
+  const [target, setTarget] = useState("");
+  const [roundsAhead, setRoundsAhead] = useState(
+    String(CONVOY_VENTURE_MIN_ROUNDS_AHEAD),
+  );
+  const [contributions, setContributions] = useState<Record<string, string>>(
+    {},
+  );
+
+  function submitPost() {
+    const t = Math.floor(Number(target));
+    const r = Math.floor(Number(roundsAhead));
+    if (!Number.isFinite(t) || !Number.isFinite(r)) return;
+    convoy.post(t, game.currentRound + r);
+    setTarget("");
+    setRoundsAhead(String(CONVOY_VENTURE_MIN_ROUNDS_AHEAD));
+  }
+
+  function submitContribute(ventureId: string) {
+    const raw = contributions[ventureId];
+    const amount = Math.floor(Number(raw));
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    convoy.contribute(ventureId, amount);
+    setContributions((c) => ({ ...c, [ventureId]: "" }));
+  }
+
+  return (
+    <div className="mt-3 border-t border-black/5 pt-2 dark:border-white/10">
+      <div className="mb-1 text-[10px] font-semibold tracking-wide text-muted-foreground/80">
+        ━━ Convoy Ventures ━━
+      </div>
+
+      {convoy.error && (
+        <div className="mb-1.5 rounded bg-rose-500/10 px-2 py-1 text-[10px] text-rose-600 dark:text-rose-300">
+          {convoy.error}
+        </div>
+      )}
+
+      <div className="mb-2 flex items-end gap-1.5">
+        <div className="flex-1">
+          <label className="mb-0.5 block text-[9px] text-muted-foreground/80">
+            Target Gold
+          </label>
+          <Input
+            type="number"
+            min={CONVOY_VENTURE_MIN_TARGET}
+            max={CONVOY_VENTURE_MAX_TARGET}
+            value={target}
+            onChange={(e) => setTarget(e.target.value)}
+            placeholder={`${CONVOY_VENTURE_MIN_TARGET}+`}
+            className="h-7 text-[11px]"
+          />
+        </div>
+        <div className="flex-1">
+          <label className="mb-0.5 block text-[9px] text-muted-foreground/80">
+            Rounds to fill
+          </label>
+          <Input
+            type="number"
+            min={CONVOY_VENTURE_MIN_ROUNDS_AHEAD}
+            max={CONVOY_VENTURE_MAX_ROUNDS_AHEAD}
+            value={roundsAhead}
+            onChange={(e) => setRoundsAhead(e.target.value)}
+            className="h-7 text-[11px]"
+          />
+        </div>
+        <Button
+          size="sm"
+          className="h-7 rounded px-2 text-[10px]"
+          onClick={submitPost}
+        >
+          Post
+        </Button>
+      </div>
+
+      {game.currentRound + Number(roundsAhead || 0) > 0 && (
+        <p className="mb-2 text-[9px] text-muted-foreground/70">
+          Fills by Round {game.currentRound + (Math.floor(Number(roundsAhead)) || 0)}.
+          Miss it and every contributor only gets back a partial refund.
+        </p>
+      )}
+
+      {convoy.ventures.length === 0 ? (
+        <p className="py-1 text-[11px] text-muted-foreground/80">
+          No ventures open right now. Post one, or wait for another captain
+          to.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {convoy.ventures.map((v) => {
+            const pct = Math.min(100, Math.round((v.total / v.targetGold) * 100));
+            const mine = v.contributions.find((c) => c.userId === myUserId);
+            return (
+              <div
+                key={v.id}
+                className="rounded-lg border border-black/5 bg-black/[0.02] p-2 dark:border-white/10 dark:bg-white/[0.03]"
+              >
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-muted-foreground">
+                    {v.posterId === myUserId ? "Your venture" : v.posterName}
+                  </span>
+                  <span className="font-semibold">
+                    {v.total} / {v.targetGold}g
+                  </span>
+                </div>
+                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                  <div
+                    className="h-full rounded-full bg-teal-500"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <div className="mt-1 flex items-center justify-between text-[9px] text-muted-foreground/80">
+                  <span>By Round {v.deadlineRound}</span>
+                  {mine && <span>You've backed {mine.amount}g</span>}
+                </div>
+                <div className="mt-1.5 flex items-center gap-1.5">
+                  <Input
+                    type="number"
+                    min={1}
+                    value={contributions[v.id] ?? ""}
+                    onChange={(e) =>
+                      setContributions((c) => ({
+                        ...c,
+                        [v.id]: e.target.value,
+                      }))
+                    }
+                    placeholder="Gold"
+                    className="h-6 text-[10px]"
+                  />
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="h-6 shrink-0 rounded px-2 text-[10px]"
+                    onClick={() => submitContribute(v.id)}
+                  >
+                    Back it
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

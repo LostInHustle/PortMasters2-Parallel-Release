@@ -119,6 +119,41 @@ Unlike Word on the Docks, this is not a race with one winner, it is a shared mom
 
 ---
 
+## Feature 4: Convoy Ventures
+
+### What it actually does, in plain words
+
+This is the one feature that spans many rounds at once, and the one that puts real Gold at risk, not just Gold you might win. Any captain can post a Convoy Venture: a Gold target too large to comfortably fund alone, and a deadline round by which it needs to be reached. From the moment it is posted, any captain in the harbor, including the one who posted it, can chip in Gold toward that target, at any point before the deadline.
+
+If the pooled total reaches the target in time, the venture fills: every single contributor gets back fifty percent more Gold than they put in, in exact proportion to their own share. If the deadline round passes and the venture still has not reached its target, it fails instead: every contributor only gets back half of what they originally put in. The rest is simply lost. That is what makes contributing a real wager on the rest of the harbor coming through, not a free favor with no downside.
+
+### Where to find it and how to use it
+
+Open your own captain's rail (the panel that normally shows your Gold, Reputation, cargo, and so on) and switch to the Dues tab, the same tab that already shows your outstanding loans. Convoy Ventures live directly underneath the loans section.
+
+To post a venture, fill in a Gold target and how many rounds ahead the deadline should be, then press Post. To back an existing venture, type in how much Gold you want to contribute and press Back It. If the venture is already very close to its target, you might ask to contribute more than it actually still needs; the game will only ever take the amount still required to exactly reach the target, and tells you so immediately, it will never take more from you than the venture can actually use.
+
+### What you will actually see on screen
+
+- Every open venture in your harbor shows a small progress bar: current pooled Gold out of the target, along with the round it needs to be filled by.
+- If you have personally contributed to a venture, you will see your own contribution total called out underneath its progress bar.
+- The moment a venture fills, every contributor sees a green success toast reading "⚓ Convoy Venture filled!" with their own personal share of the payout, and the shared Harbor chat and log panel announces it for the whole room to see.
+- The moment a venture instead misses its deadline, every contributor sees a plainer toast reading "⚓ Convoy Venture missed its deadline" along with their own partial refund, and the shared chat announces that outcome too.
+- A captain who never contributed to a particular venture will not get a personal toast about it either way, though they will still see the shared chat announcement, since that is visible to the whole room regardless of who was involved.
+
+### Step by step: how to confirm it is working
+
+You will need at least two captains for this, and ideally enough patience to actually watch a venture through to one of its two outcomes, since unlike the first three features this one can take several rounds to resolve.
+
+1. Have one captain open the Dues tab and post a venture with a modest Gold target and a short deadline, just a round or two ahead, so you do not have to wait long to see the result.
+2. Have a second captain (or the same captain again) contribute Gold toward it. Confirm the progress bar and the pooled total update for everyone in the room, not just the person who contributed.
+3. To test the successful path, keep contributing, from either captain, until the pooled total reaches the target exactly. Confirm every contributor gets the green success toast, with an amount that reads as fifty percent more than what they personally put in, and confirm the shared chat announces the venture as filled.
+4. To test the overshoot behavior specifically, try contributing more Gold than the venture still needs when it is already close to its target. Confirm the game only actually takes the amount still required, and does not deduct the rest of what you offered.
+5. To test the failure path, post a separate venture, contribute less than its full target, and then simply keep playing rounds without ever reaching the target. Once the room's round moves past the venture's deadline round, confirm every contributor to that venture gets the partial refund toast, reading an amount that is exactly half of what they originally put in, and confirm the shared chat announces it as having missed its deadline instead.
+6. If your voyage ends, or the host restarts it, while a venture is still open and short of its target, that venture is treated exactly the same as a missed deadline: every contributor gets their partial refund rather than the venture staying open forever with nobody left to finish funding it.
+
+---
+
 ## Quick reference: what to watch for, side by side
 
 | Feature           | Who sees it                                                          | Where it shows up                                                                                                                                                     | How often it can happen                                                |
@@ -126,19 +161,36 @@ Unlike Word on the Docks, this is not a race with one winner, it is a shared mom
 | The Harbor Pulse  | Everyone, but silently                                               | Only visible as a subtle price shift on the Port Purchase board, no toast or chat message at all                                                                      | Every round from Round 2 onward, recalculated fresh each time          |
 | Word on the Docks | Everyone, but the winner sees something different from everyone else | A toast for every captain (green and Gold plus 25 for the winner, a plainer one naming the winner for everyone else), plus one shared chat message for the whole room | Once per voyage, whoever gets there first                              |
 | Tidewatch Alerts  | Everyone, identically                                                | A toast for every captain in the room, plus one shared chat message, plus one extra card on the Port Purchase board from then on                                      | Once per voyage, the moment the room's combined Reputation crosses 250 |
+| Convoy Ventures   | Only contributors get a personal toast, but everyone sees the shared chat message either way | A progress bar per open venture in the Dues tab of your captain's rail, a toast on fill or failure for contributors, a shared chat message for the whole room | As many times as captains post them, each one resolves once, by its own deadline round |
 
 ---
 
 ## Status: what exists in the game right now versus what is still planned
 
-This document only covers the three features that actually exist in the game as of this writing. Fifteen more are planned as part of the same larger project but have not been built yet, so please do not go looking for them; if you do not see something described in the broader project plan, it almost certainly just has not been built yet rather than being broken.
+This document only covers the four features that actually exist in the game as of this writing. Fourteen more are planned as part of the same larger project but have not been built yet, so please do not go looking for them; if you do not see something described in the broader project plan, it almost certainly just has not been built yet rather than being broken.
 
 **Built and playable right now:**
 
 1. The Harbor Pulse
 2. Word on the Docks
 3. Tidewatch Alerts
+4. Convoy Ventures
 
-**Planned, not yet built:** 4. Convoy Ventures 5. Backing 6. Partial Sight 7. Bequest Routing 8. Trading Houses 9. House Rally 10. Ages of the Ledger 11. Captain's Rival 12. Voyage Chronicle 13. Ledger Integrity Pass 14. Harbor Watch 15. Bilingual Harbor 16. Colorblind Safe Palette 17. Quick Start Match 18. Fleet Ticker
+**Planned, not yet built:**
 
-As each of the remaining fifteen gets built, this document should grow a matching section for it, written the same way: what it does in plain words, exactly what you will see on screen, and a step by step way to confirm it yourself while actually playing.
+5. Backing
+6. Partial Sight
+7. Bequest Routing
+8. Trading Houses
+9. House Rally
+10. Ages of the Ledger
+11. Captain's Rival
+12. Voyage Chronicle
+13. Ledger Integrity Pass
+14. Harbor Watch
+15. Bilingual Harbor
+16. Colorblind Safe Palette
+17. Quick Start Match
+18. Fleet Ticker
+
+As each of the remaining fourteen gets built, this document should grow a matching section for it, written the same way: what it does in plain words, exactly what you will see on screen, and a step by step way to confirm it yourself while actually playing.

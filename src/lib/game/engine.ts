@@ -1803,6 +1803,50 @@ export function receiveRepayment(
   logs.push(`💰 ${fromName} repaid you ${amount} Gold`);
 }
 
+// [MANIFEST 04: Convoy Ventures] Escrows a contribution immediately, the
+// same moment barter posting escrows an offer (see postBarterOffer) rather
+// than waiting for the venture to actually resolve. The server (see
+// src/server/realtime.ts) is the one authority on whether this contribution
+// actually landed (a venture that filled or expired between the click and
+// the server's response never reaches this call at all), so this only ever
+// runs once the server has already confirmed the contribution was accepted.
+export function contributeToVenture(
+  state: GameState,
+  amount: number,
+  logs: string[],
+) {
+  if (amount <= 0) return;
+  if (state.money < amount) {
+    logs.push(
+      `❌ Need ${amount} Gold to back that Convoy Venture, have ${state.money}`,
+    );
+    return;
+  }
+  state.money -= amount;
+  logs.push(`⚓ Backed a Convoy Venture with ${amount} Gold`);
+}
+
+// [MANIFEST 04: Convoy Ventures] The payout side, for either outcome. Fired
+// once per contributor, by the server, the moment a venture resolves: either
+// filled (amount is this contributor's proportional share of targetGold
+// times CONVOY_VENTURE_PAYOUT_MULTIPLIER) or failed (amount is
+// CONVOY_VENTURE_FAILURE_REFUND_RATE of what they originally put in). The
+// caller (see GameRoom.tsx) is what tells these two apart and writes the
+// right log line; this just applies the Gold either way.
+export function receiveVentureSettlement(
+  state: GameState,
+  amount: number,
+  logs: string[],
+  filled: boolean,
+) {
+  state.money += amount;
+  logs.push(
+    filled
+      ? `⚓ Convoy Venture filled! Your share: ${amount} Gold`
+      : `⚓ Convoy Venture missed its deadline. Partial refund: ${amount} Gold`,
+  );
+}
+
 // Called once, at the true end of Round 8 (see endRound below), never
 // before: any loan a captain hasn't already repaid by then gets forced
 // through, paying whatever can be covered. Falling short of the full
