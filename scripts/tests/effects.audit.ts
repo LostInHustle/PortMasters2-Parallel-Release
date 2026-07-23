@@ -71,7 +71,7 @@ function boon(id: string): Boon {
   const b = BOONS.find((x) => x.id === id);
   if (!b)
     throw new Error(
-      `Boon '${id}' not found in BOONS — was it renamed or removed?`,
+      `Boon '${id}' not found in BOONS, was it renamed or removed?`,
     );
   return b;
 }
@@ -79,7 +79,7 @@ function mod(id: string): Module {
   const m = MODULES.find((x) => x.id === id);
   if (!m)
     throw new Error(
-      `Module '${id}' not found in MODULES — was it renamed or removed?`,
+      `Module '${id}' not found in MODULES, was it renamed or removed?`,
     );
   return m;
 }
@@ -100,7 +100,7 @@ function order(
 // Mirrors completeOrder's real sequencing for a single-item product order:
 // VAT is computed and subtracted from the ORIGINAL reward first, and only
 // then do the percentage reward bonuses (silk_monopoly, charter_order_bonus,
-// bureau_token, exotic_order_bonus) stack on what's left — never the other
+// bureau_token, exotic_order_bonus) stack on what's left, never the other
 // way around. `boosts` are applied in the order completeOrder would apply
 // them. Transport is a separate deduction from state.money, not part of
 // `reward`, so it comes off the total independently at the end. Built on
@@ -629,7 +629,7 @@ test("deep_sea_escort_pact: pirate raid chance halved", () => {
 
 test("merchants_converge: one extra trade order appears on the board", () => {
   // Round 9: tier2 unlocked (opens round 8) but no Imperial Mandate scheduled
-  // (open_waters mandates fall on 4/8/12) — round 8 itself would add a
+  // (open_waters mandates fall on 4/8/12), round 8 itself would add a
   // mandate order on top and throw off the plain "+1" count below.
   const s = freshState("open_waters", 9);
   applyBoon(s, boon("merchants_converge"), []);

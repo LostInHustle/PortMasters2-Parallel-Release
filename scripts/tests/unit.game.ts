@@ -1,5 +1,5 @@
 // =====================================================================
-// Unit tests: pure functions in src/lib/game — difficulty selectors,
+// Unit tests: pure functions in src/lib/game, difficulty selectors,
 // content pools, price/VAT/transport math, legacy XP curve, and merit
 // qualification. No GameState simulation here (see integration.voyage.ts
 // for that); every assertion targets one function in isolation.
@@ -849,7 +849,7 @@ test("computeHarborPulse: a reported-but-untouched item still gets a negative nu
   // Silk/Tea split the room's buying and Hemp gets none of it: share = 0,
   // unclamped nudge = (0 - 1/3) * 0.6 = -0.2, past the cap on the low side.
   // (Filtering a genuinely zero-quantity entry out of the tally entirely is
-  // addPulseReport's job, not this pure function's — see the next test.)
+  // addPulseReport's job, not this pure function's, see the next test.)
   const pulse = computeHarborPulse({ Hemp: 0, Silk: 50, Tea: 50 });
   assertClose(pulse.Hemp, -PULSE_CAP, 1e-9, "clamped to -PULSE_CAP");
 });

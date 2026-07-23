@@ -84,7 +84,7 @@ type VoyageReport = {
 //
 // "aggressive" hires a weaver, keeps only a flat 30 Gold buying reserve, and
 // only escorts once carrying enough Gold that a raid would actually hurt
-// (risking the raid roll otherwise — the tutorial's own tip: "sailing without
+// (risking the raid roll otherwise, the tutorial's own tip: "sailing without
 // one is a fair bet when you have little to lose"). Both draftBoons (which
 // boon of three lands) and the raid roll itself are genuine Math.random,
 // unseeded, so this captain can go bankrupt on real bad luck. Measured
@@ -95,17 +95,17 @@ type VoyageReport = {
 // player in that spot asks another captain in the room for a loan on the
 // settlement screen (see receiveLoan/grantLoan in engine.ts); a lone bot has
 // no one to borrow from, so the tutorial's advice only holds with peers
-// present. That's a property of single-captain simulation, not a balance bug
-// — so the per-tier suites below treat bankruptcy as an honestly-reported
+// present. That's a property of single-captain simulation, not a balance bug,
+// so the per-tier suites below treat bankruptcy as an honestly-reported
 // outcome to verify, not a failure to avoid.
 //
-// "safe" always hires an escort instead — measured far more reliable for a
-// captain with no one to borrow from — and keeps a 50 Gold buffer above
+// "safe" always hires an escort instead, measured far more reliable for a
+// captain with no one to borrow from, and keeps a 50 Gold buffer above
 // Phase 3's cost while stocking both raw and finished-good purchase cards
 // (half of every trade board demands a finished product; a captain who only
 // ever holds raw goods can only ever fill the other half). It exists to show
 // Fair Winds is reliably, not just theoretically, winnable without leaning on
-// the loan system — see the statistical (not absolute) survival bar in the
+// the loan system, see the statistical (not absolute) survival bar in the
 // "fair_winds identity guarantees" suite below.
 function playRound(
   state: GameState,
@@ -136,7 +136,7 @@ function playRound(
   const drawSum = probs.reduce((s, p) => s + p, 0);
 
   // 50 Gold above whatever Phase 3 (maintenance + wages) will cost this
-  // round, not just 50 Gold above zero — tuned empirically to leave enough
+  // round, not just 50 Gold above zero, tuned empirically to leave enough
   // headroom that a single income-less round doesn't immediately starve the
   // next one (see the strategy note above).
   const RESERVE =
@@ -147,7 +147,7 @@ function playRound(
     // every trade board demands a finished product, and a captain who only
     // ever holds raw goods can only ever fill the other half. Skipping
     // product cards left this strategy earning zero trade income on any
-    // round its raw draw didn't match that round's raw orders — a death
+    // round its raw draw didn't match that round's raw orders, a death
     // spiral against the flat maintenance bill and escort tax, not a sign
     // Fair Winds itself is unwinnable.
     if (strategy === "aggressive" && card.isProductCard) continue;
@@ -249,7 +249,7 @@ function runFullVoyageSuite(difficulty: Difficulty) {
   test("voyage never crashed and reached either endgame or an honest bankruptcy", () => {
     assert(
       report.reachedEndgame || report.bankrupt,
-      "voyage neither finished nor bankrupted — it stalled",
+      "voyage neither finished nor bankrupted, it stalled",
     );
   });
 
@@ -442,7 +442,7 @@ test("a corrupt roll leaks position and raises raid risk on Monsoon, and only on
   }
 });
 
-test("the corrupt broker's leak still delivers the true, guaranteed rumor — never withheld", () => {
+test("the corrupt broker's leak still delivers the true, guaranteed rumor, never withheld", () => {
   const s = createInitialGameState(0, 1, 0, "monsoon");
   s.phase2DemandTags = ["Hemp", "Silk"];
   s.money = 100;
@@ -488,7 +488,7 @@ test("snapping to round 9 of an open_waters voyage yields tier2 content, not tie
   );
   const tier2Goods = ["Spices", "Pearls", "Foreign Balm", "Pearl String"];
   // Not a guarantee any tier2 good rolled this particular seed, only that the
-  // pool driving the draw includes them — checked directly.
+  // pool driving the draw includes them, checked directly.
   assert(
     unlockedResources("open_waters", 9).some((r) => tier2Goods.includes(r)) ||
       unlockedProducts("open_waters", 9).some((r) => tier2Goods.includes(r)),

@@ -11,9 +11,9 @@ import { SendHorizontal, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * A self-contained chat surface. Two modes:
- *  - room: messages broadcast to a room channel (socket `chat:room`)
- *  - dm: 1-to-1 messages with another user (socket `chat:dm`)
+ * A self-contained chat surface. Two modes: room, messages broadcast to a
+ * room channel (socket `chat:room`); dm, 1-to-1 messages with another user
+ * (socket `chat:dm`).
  *
  * The socket is passed in (shared singleton). Initial history is fetched
  * via REST; live messages arrive over the socket.
