@@ -41,6 +41,7 @@ import {
   normalizeDifficulty,
   renownMultiplierFor,
 } from "../lib/game/difficulty";
+import { computeHarborPulse } from "../lib/game/harborPulse";
 
 // ---------- Types ----------
 type PublicUser = {
@@ -739,30 +740,6 @@ export function attachRealtime(httpServer: HttpServer): Server {
       existing[item] = (existing[item] ?? 0) + qty;
     }
     byRound.set(round, existing);
-  }
-
-  // Turns a round's raw summed quantities into a small per-item price
-  // multiplier: an item the room leaned into harder than an even three-way
-  // split gets pricier, one nobody touched gets cheaper. PULSE_CAP bounds it
-  // to a lean rather than a shove, and an empty or missing tally (round 1,
-  // or a round nobody reported for) is neutral rather than guessed at.
-  const PULSE_CAP = 0.12;
-  const PULSE_SENSITIVITY = 0.6;
-  function computeHarborPulse(
-    tally: Record<string, number> | undefined,
-  ): Record<string, number> {
-    if (!tally) return {};
-    const items = Object.keys(tally);
-    const total = items.reduce((sum, k) => sum + tally[k], 0);
-    if (total <= 0 || items.length === 0) return {};
-    const baseline = 1 / 3; // Hemp, Silk, Tea: an even split of the harbor's buying
-    const out: Record<string, number> = {};
-    for (const item of items) {
-      const share = tally[item] / total;
-      const nudge = (share - baseline) * PULSE_SENSITIVITY;
-      out[item] = Math.max(-PULSE_CAP, Math.min(PULSE_CAP, nudge));
-    }
-    return out;
   }
 
   // ---------- Word on the Docks ----------
