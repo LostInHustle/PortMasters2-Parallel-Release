@@ -860,25 +860,58 @@ export function attachRealtime(httpServer: HttpServer): Server {
       where: { roomId, voyageEpoch, status: "open" },
       orderBy: { createdAt: "asc" },
     });
+    // [MANIFEST 04 fix] Told to every client alongside the (possibly empty)
+    // open list, so the Dues tab can explain why posting is disabled rather
+    // than just showing an empty board with no reason given.
+    const locked = await hasRoomClaimedVenture(roomId, voyageEpoch);
     io.to(`room:${roomId}`).emit("venture:update", {
       roomId,
       ventures: ventures.map(ventureSummary),
+      locked,
     });
   }
 
-  // Ends a venture one of two ways: "filled", paying each contributor their
-  // own stake times CONVOY_VENTURE_PAYOUT_MULTIPLIER, or "failed", refunding
-  // each contributor only CONVOY_VENTURE_FAILURE_REFUND_RATE of their own
-  // stake. Either way every contributor gets a personal payout figure;
-  // nobody who never contributed to this venture hears anything about it.
+  // [MANIFEST 04 fix] Two captains could otherwise post a venture, both
+  // instantly self fund it, both collect CONVOY_VENTURE_PAYOUT_MULTIPLIER
+  // times their own stake, and repeat that indefinitely: every fill printed
+  // real Gold with no offsetting cost anywhere, so contribution times 1.5
+  // compounded without bound the more times a room repeated it. A single
+  // shared chance per voyage bounds the whole mechanism to at most one
+  // payout event, ever, no matter how many times a room tries it: once any
+  // venture in a room's current voyage has ever reached "filled", nothing
+  // else can. hasRoomClaimedVenture is the one check both venture:post and
+  // venture:contribute run before doing anything else.
+  async function hasRoomClaimedVenture(
+    roomId: string,
+    voyageEpoch: number,
+  ): Promise<boolean> {
+    const filled = await db.convoyVenture.findFirst({
+      where: { roomId, voyageEpoch, status: "filled" },
+      select: { id: true },
+    });
+    return Boolean(filled);
+  }
+
+  // Ends a venture one of three ways: "filled", paying each contributor
+  // their own stake times CONVOY_VENTURE_PAYOUT_MULTIPLIER; "failed",
+  // refunding each contributor only CONVOY_VENTURE_FAILURE_REFUND_RATE of
+  // their own stake, its own deadline round ran out short of target;
+  // "destroyed", refunding each contributor their full stake, untouched,
+  // because a different venture in the same room's voyage reached "filled"
+  // first and claimed the one shared chance before this one got the chance
+  // to. Either way every contributor gets a personal payout figure; nobody
+  // who never contributed to this particular venture hears anything at all.
   async function settleVenture(
     venture: { id: string; roomId: string; contributions: string },
-    filled: boolean,
+    outcome: "filled" | "failed" | "destroyed",
   ) {
     const contributions = parseVentureContributions(venture.contributions);
-    const rate = filled
-      ? CONVOY_VENTURE_PAYOUT_MULTIPLIER
-      : CONVOY_VENTURE_FAILURE_REFUND_RATE;
+    const rate =
+      outcome === "filled"
+        ? CONVOY_VENTURE_PAYOUT_MULTIPLIER
+        : outcome === "failed"
+          ? CONVOY_VENTURE_FAILURE_REFUND_RATE
+          : 1;
     const settlements = Object.entries(contributions).map(([userId, c]) => ({
       userId,
       name: c.name,
@@ -886,22 +919,47 @@ export function attachRealtime(httpServer: HttpServer): Server {
     }));
     await db.convoyVenture.update({
       where: { id: venture.id },
-      data: { status: filled ? "filled" : "failed", resolvedAt: new Date() },
+      data: { status: outcome, resolvedAt: new Date() },
     });
     io.to(`room:${venture.roomId}`).emit("venture:settled", {
       roomId: venture.roomId,
       ventureId: venture.id,
-      filled,
+      outcome,
       settlements,
     });
     if (settlements.length) {
+      const content =
+        outcome === "filled"
+          ? `⚓ A Convoy Venture filled! Every contributor is paid their share, times ${CONVOY_VENTURE_PAYOUT_MULTIPLIER}x. This harbor's one Convoy Venture chance for this voyage has now been used.`
+          : outcome === "failed"
+            ? `⚓ A Convoy Venture missed its deadline. Every contributor gets back a partial refund.`
+            : `⚓ A Convoy Venture was cancelled: another venture in the harbor already claimed this voyage's one chance. Every contributor gets back their full stake.`;
       io.to(`room:${venture.roomId}`).emit("room:system", {
         roomId: venture.roomId,
-        content: filled
-          ? `⚓ A Convoy Venture filled! Every contributor is paid their share, times ${CONVOY_VENTURE_PAYOUT_MULTIPLIER}x.`
-          : `⚓ A Convoy Venture missed its deadline. Every contributor gets back a partial refund.`,
+        content,
       });
     }
+  }
+
+  // [MANIFEST 04 fix] Called once, immediately after any venture is settled
+  // as "filled" (see venture:contribute below): every other still open
+  // venture in that same room and voyage is destroyed on the spot, refunded
+  // in full, rather than left to sit open and silently violate the one
+  // shared chance per voyage rule the moment someone next contributes to it.
+  async function destroyOtherOpenVentures(
+    roomId: string,
+    voyageEpoch: number,
+    exceptVentureId: string,
+  ) {
+    const others = await db.convoyVenture.findMany({
+      where: {
+        roomId,
+        voyageEpoch,
+        status: "open",
+        id: { not: exceptVentureId },
+      },
+    });
+    for (const v of others) await settleVenture(v, "destroyed");
   }
 
   // Checked whenever a room's round advances (see the game:status handler
@@ -921,7 +979,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
     let anyResolved = false;
     for (const v of open) {
       if (forceAll || currentRound > v.deadlineRound) {
-        await settleVenture(v, false);
+        await settleVenture(v, "failed");
         anyResolved = true;
       }
     }
@@ -1381,15 +1439,23 @@ export function attachRealtime(httpServer: HttpServer): Server {
       socket.emit("venture:update", {
         roomId,
         ventures: ventures.map(ventureSummary),
+        locked: await hasRoomClaimedVenture(roomId, room.voyageEpoch),
       });
     });
 
-    // Any captain can post one; there's no cap on how many a room can have
-    // open at once. Validated only for shape and sane bounds, the same way
-    // barter posting only validates structure (see postBarterOffer in
-    // src/lib/game/engine.ts): whether the poster can actually afford to
-    // seed it themselves isn't checked here, since this server has no
-    // visibility into anyone's Gold, only their own client does.
+    // [MANIFEST 04 fix] One filled venture, shared by the whole room, per
+    // voyage. hasRoomClaimedVenture only checks for a "filled" outcome, on
+    // purpose: a venture that legitimately misses its own deadline already
+    // costs its contributors half their stake, there's no exploit in
+    // letting a room try again after a real failure, only in letting a
+    // second venture ever pay out the 1.5x reward. The instant any venture
+    // in this voyage actually fills, this check starts rejecting every
+    // future post, forever, for this voyage. Validated for shape and sane
+    // bounds beyond that, the same way barter posting only validates
+    // structure (see postBarterOffer in src/lib/game/engine.ts): whether
+    // the poster can actually afford to seed it themselves isn't checked
+    // here, since this server has no visibility into anyone's Gold, only
+    // their own client does.
     socket.on(
       "venture:post",
       async (payload: {
@@ -1422,6 +1488,14 @@ export function attachRealtime(httpServer: HttpServer): Server {
           select: { voyageEpoch: true, currentRound: true },
         });
         if (!room) return;
+        if (await hasRoomClaimedVenture(roomId, room.voyageEpoch)) {
+          socket.emit("venture:error", {
+            roomId,
+            error:
+              "This harbor has already used its one Convoy Venture for this voyage.",
+          });
+          return;
+        }
         const minRound = room.currentRound + CONVOY_VENTURE_MIN_ROUNDS_AHEAD;
         const maxRound = room.currentRound + CONVOY_VENTURE_MAX_ROUNDS_AHEAD;
         if (deadlineRound < minRound || deadlineRound > maxRound) {
@@ -1479,10 +1553,28 @@ export function attachRealtime(httpServer: HttpServer): Server {
         const venture = await db.convoyVenture.findUnique({
           where: { id: ventureId },
         });
-        if (!venture || venture.roomId !== roomId || venture.status !== "open") {
+        if (
+          !venture ||
+          venture.roomId !== roomId ||
+          venture.status !== "open"
+        ) {
           socket.emit("venture:error", {
             roomId,
             error: "That venture is no longer open.",
+          });
+          return;
+        }
+        // [MANIFEST 04 fix] Defense in depth: destroyOtherOpenVentures
+        // already cleans up every other open venture the instant one fills,
+        // but this closes the narrow window where a contribution to a
+        // second venture could theoretically be mid-flight at that exact
+        // moment, by refusing it outright rather than letting it briefly
+        // fill a venture that's about to be destroyed anyway.
+        if (await hasRoomClaimedVenture(roomId, venture.voyageEpoch)) {
+          socket.emit("venture:error", {
+            roomId,
+            error:
+              "This harbor has already used its one Convoy Venture for this voyage.",
           });
           return;
         }
@@ -1520,7 +1612,17 @@ export function attachRealtime(httpServer: HttpServer): Server {
         });
         socket.emit("venture:contributed", { roomId, ventureId, accepted });
         if (newTotal >= venture.targetGold) {
-          await settleVenture(updated, true);
+          await settleVenture(updated, "filled");
+          // [MANIFEST 04 fix] The room's one shared chance is spent the
+          // instant this happens: every other venture still open in this
+          // voyage is destroyed right now, refunded in full, rather than
+          // left to sit open and get quietly rejected one contribution at a
+          // time by the guard above.
+          await destroyOtherOpenVentures(
+            roomId,
+            venture.voyageEpoch,
+            venture.id,
+          );
         }
         await broadcastVentures(roomId, venture.voyageEpoch);
       },

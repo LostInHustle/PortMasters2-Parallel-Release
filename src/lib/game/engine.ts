@@ -1826,24 +1826,31 @@ export function contributeToVenture(
   logs.push(`⚓ Backed a Convoy Venture with ${amount} Gold`);
 }
 
-// [MANIFEST 04: Convoy Ventures] The payout side, for either outcome. Fired
-// once per contributor, by the server, the moment a venture resolves: either
-// filled (amount is this contributor's proportional share of targetGold
-// times CONVOY_VENTURE_PAYOUT_MULTIPLIER) or failed (amount is
-// CONVOY_VENTURE_FAILURE_REFUND_RATE of what they originally put in). The
-// caller (see GameRoom.tsx) is what tells these two apart and writes the
-// right log line; this just applies the Gold either way.
+// [MANIFEST 04: Convoy Ventures] The payout side, for any of three outcomes.
+// Fired once per contributor, by the server, the moment a venture resolves:
+// "filled" (amount is this contributor's proportional share of targetGold
+// times CONVOY_VENTURE_PAYOUT_MULTIPLIER), "failed" (amount is
+// CONVOY_VENTURE_FAILURE_REFUND_RATE of what they originally put in, their
+// own venture ran out its own deadline round short of target), or
+// "destroyed" (amount is their full original contribution back, untouched:
+// a different venture in the same harbor reached its target first and
+// claimed this voyage's one shared chance, so this one never got to run its
+// own course and nobody who backed it is penalized for that). Only one
+// venture can ever end "filled" in a single voyage; see venture:post and
+// venture:contribute in src/server/realtime.ts for where that's enforced.
 export function receiveVentureSettlement(
   state: GameState,
   amount: number,
   logs: string[],
-  filled: boolean,
+  outcome: "filled" | "failed" | "destroyed",
 ) {
   state.money += amount;
   logs.push(
-    filled
+    outcome === "filled"
       ? `⚓ Convoy Venture filled! Your share: ${amount} Gold`
-      : `⚓ Convoy Venture missed its deadline. Partial refund: ${amount} Gold`,
+      : outcome === "failed"
+        ? `⚓ Convoy Venture missed its deadline. Partial refund: ${amount} Gold`
+        : `⚓ Convoy Venture cancelled: another venture in the harbor already claimed this voyage's one chance. Full refund: ${amount} Gold`,
   );
 }
 

@@ -21,7 +21,21 @@ export type ConvoyVenture = {
   contributions: VentureContributor[];
 };
 
-export type VentureSettlement = { userId: string; name: string; amount: number };
+export type VentureSettlement = {
+  userId: string;
+  name: string;
+  amount: number;
+};
+
+// [MANIFEST 04 fix] "filled" pays CONVOY_VENTURE_PAYOUT_MULTIPLIER times a
+// contributor's own stake, and is the one outcome that can ever happen once
+// per voyage, room wide (see hasRoomClaimedVenture in
+// src/server/realtime.ts). "failed" refunds only
+// CONVOY_VENTURE_FAILURE_REFUND_RATE after a venture's own deadline round
+// passes short of target. "destroyed" refunds every contributor in full: a
+// different venture in the same room's voyage reached "filled" first and
+// claimed the one shared chance before this one got the chance to.
+export type VentureOutcome = "filled" | "failed" | "destroyed";
 
 /**
  * [MANIFEST 04: Convoy Ventures] The shared, multi round board of open
@@ -41,9 +55,14 @@ export type VentureSettlement = { userId: string; name: string; amount: number }
  * telling it exactly how much of its requested amount actually landed (a
  * venture can be topped up by someone else microseconds earlier, so less
  * may have been needed than was asked to give). `onSettled` fires on every
- * client in the room whenever any venture resolves; the caller filters the
- * settlements list for its own userId to find out whether it was involved
- * at all.
+ * client in the room whenever any venture resolves, for any of the three
+ * outcomes above; the caller filters the settlements list for its own
+ * userId to find out whether it was involved at all.
+ *
+ * `locked` reflects whether this room has already used its one Convoy
+ * Venture chance for the current voyage (see hasRoomClaimedVenture in
+ * src/server/realtime.ts): once true, posting a new venture will always be
+ * rejected, and it only ever goes back to false on a fresh voyage.
  */
 export function useConvoy(
   socket: Socket | null,
@@ -51,11 +70,12 @@ export function useConvoy(
   onContributed: (ventureId: string, accepted: number) => void,
   onSettled: (
     ventureId: string,
-    filled: boolean,
+    outcome: VentureOutcome,
     settlements: VentureSettlement[],
   ) => void,
 ) {
   const [ventures, setVentures] = useState<ConvoyVenture[]>([]);
+  const [locked, setLocked] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const onContributedRef = useRef(onContributed);
@@ -70,9 +90,14 @@ export function useConvoy(
   useEffect(() => {
     if (!socket) return;
 
-    const onUpdate = (data: { roomId: string; ventures: ConvoyVenture[] }) => {
+    const onUpdate = (data: {
+      roomId: string;
+      ventures: ConvoyVenture[];
+      locked: boolean;
+    }) => {
       if (data.roomId !== roomId) return;
       setVentures(data.ventures);
+      setLocked(data.locked);
     };
     const onContributedEvent = (data: {
       roomId: string;
@@ -85,11 +110,11 @@ export function useConvoy(
     const onSettledEvent = (data: {
       roomId: string;
       ventureId: string;
-      filled: boolean;
+      outcome: VentureOutcome;
       settlements: VentureSettlement[];
     }) => {
       if (data.roomId !== roomId) return;
-      onSettledRef.current(data.ventureId, data.filled, data.settlements);
+      onSettledRef.current(data.ventureId, data.outcome, data.settlements);
     };
     const onPostError = (data: { roomId: string; error: string }) => {
       if (data.roomId !== roomId) return;
@@ -129,6 +154,7 @@ export function useConvoy(
 
   return {
     ventures,
+    locked,
     error,
     clearError: () => setError(null),
     post,

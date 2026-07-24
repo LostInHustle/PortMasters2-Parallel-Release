@@ -61,6 +61,10 @@ export function GameStatusPanel({
   // unchanged if it doesn't wire the board through.
   convoy?: {
     ventures: ConvoyVenture[];
+    // [MANIFEST 04 fix] True once this room has already used its one
+    // Convoy Venture chance for the current voyage; posting is disabled
+    // until a fresh voyage, since a second fill is never allowed.
+    locked: boolean;
     error: string | null;
     clearError: () => void;
     post: (targetGold: number, deadlineRound: number) => void;
@@ -440,6 +444,7 @@ function ConvoyVenturesSection({
   game: GameState;
   convoy: {
     ventures: ConvoyVenture[];
+    locked: boolean;
     error: string | null;
     clearError: () => void;
     post: (targetGold: number, deadlineRound: number) => void;
@@ -484,59 +489,79 @@ function ConvoyVenturesSection({
         </div>
       )}
 
-      <div className="mb-2 flex items-end gap-1.5">
-        <div className="flex-1">
-          <label className="mb-0.5 block text-[9px] text-muted-foreground/80">
-            Target Gold
-          </label>
-          <Input
-            type="number"
-            min={CONVOY_VENTURE_MIN_TARGET}
-            max={CONVOY_VENTURE_MAX_TARGET}
-            value={target}
-            onChange={(e) => setTarget(e.target.value)}
-            placeholder={`${CONVOY_VENTURE_MIN_TARGET}+`}
-            className="h-7 text-[11px]"
-          />
-        </div>
-        <div className="flex-1">
-          <label className="mb-0.5 block text-[9px] text-muted-foreground/80">
-            Rounds to fill
-          </label>
-          <Input
-            type="number"
-            min={CONVOY_VENTURE_MIN_ROUNDS_AHEAD}
-            max={CONVOY_VENTURE_MAX_ROUNDS_AHEAD}
-            value={roundsAhead}
-            onChange={(e) => setRoundsAhead(e.target.value)}
-            className="h-7 text-[11px]"
-          />
-        </div>
-        <Button
-          size="sm"
-          className="h-7 rounded px-2 text-[10px]"
-          onClick={submitPost}
-        >
-          Post
-        </Button>
-      </div>
-
-      {game.currentRound + Number(roundsAhead || 0) > 0 && (
-        <p className="mb-2 text-[9px] text-muted-foreground/70">
-          Fills by Round {game.currentRound + (Math.floor(Number(roundsAhead)) || 0)}.
-          Miss it and every contributor only gets back a partial refund.
+      {convoy.locked ? (
+        // [MANIFEST 04 fix] This harbor's one Convoy Venture chance for
+        // this voyage is already spent (a venture somewhere in this room
+        // has already filled). Explaining why, rather than just hiding the
+        // form, is what actually stops a captain from wondering why
+        // posting silently does nothing.
+        <p className="mb-2 rounded bg-black/[0.03] px-2 py-1.5 text-[10px] text-muted-foreground/80 dark:bg-white/[0.04]">
+          This harbor has already used its one Convoy Venture for this
+          voyage. It opens again on a fresh voyage or a restart.
         </p>
+      ) : (
+        <>
+          <div className="mb-2 flex items-end gap-1.5">
+            <div className="flex-1">
+              <label className="mb-0.5 block text-[9px] text-muted-foreground/80">
+                Target Gold
+              </label>
+              <Input
+                type="number"
+                min={CONVOY_VENTURE_MIN_TARGET}
+                max={CONVOY_VENTURE_MAX_TARGET}
+                value={target}
+                onChange={(e) => setTarget(e.target.value)}
+                placeholder={`${CONVOY_VENTURE_MIN_TARGET}+`}
+                className="h-7 text-[11px]"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="mb-0.5 block text-[9px] text-muted-foreground/80">
+                Rounds to fill
+              </label>
+              <Input
+                type="number"
+                min={CONVOY_VENTURE_MIN_ROUNDS_AHEAD}
+                max={CONVOY_VENTURE_MAX_ROUNDS_AHEAD}
+                value={roundsAhead}
+                onChange={(e) => setRoundsAhead(e.target.value)}
+                className="h-7 text-[11px]"
+              />
+            </div>
+            <Button
+              size="sm"
+              className="h-7 rounded px-2 text-[10px]"
+              onClick={submitPost}
+            >
+              Post
+            </Button>
+          </div>
+
+          {game.currentRound + Number(roundsAhead || 0) > 0 && (
+            <p className="mb-2 text-[9px] text-muted-foreground/70">
+              Fills by Round{" "}
+              {game.currentRound + (Math.floor(Number(roundsAhead)) || 0)}.
+              Miss it and every contributor only gets back a partial refund.
+              This harbor only gets one venture per voyage, so make it count.
+            </p>
+          )}
+        </>
       )}
 
       {convoy.ventures.length === 0 ? (
         <p className="py-1 text-[11px] text-muted-foreground/80">
-          No ventures open right now. Post one, or wait for another captain
-          to.
+          {convoy.locked
+            ? "No ventures open. This voyage's one chance has already been used."
+            : "No ventures open right now. Post one, or wait for another captain to."}
         </p>
       ) : (
         <div className="space-y-2">
           {convoy.ventures.map((v) => {
-            const pct = Math.min(100, Math.round((v.total / v.targetGold) * 100));
+            const pct = Math.min(
+              100,
+              Math.round((v.total / v.targetGold) * 100),
+            );
             const mine = v.contributions.find((c) => c.userId === myUserId);
             return (
               <div

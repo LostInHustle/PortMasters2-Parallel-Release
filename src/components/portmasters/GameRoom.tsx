@@ -21,7 +21,11 @@ import {
 } from "@/lib/use-player-detail";
 import { useBarter, type BarterOffer } from "@/lib/use-barter";
 import { useAid, type GrantedLoan, type RepaidLoan } from "@/lib/use-aid";
-import { useConvoy, type VentureSettlement } from "@/lib/use-convoy";
+import {
+  useConvoy,
+  type VentureOutcome,
+  type VentureSettlement,
+} from "@/lib/use-convoy";
 import { useNotificationCenter } from "@/lib/use-notifications";
 import { PlayerDetailModal } from "./game/GameModals";
 import { GameStatusPanel } from "./game/GameStatusPanel";
@@ -196,20 +200,29 @@ export function GameRoom({
     },
     [act],
   );
-  // Fires on every client the moment any venture in the room resolves;
-  // only apply the Gold effect if I actually contributed to this one.
+  // Fires on every client the moment any venture in the room resolves, for
+  // any of the three outcomes; only apply the Gold effect if I actually
+  // contributed to this particular one.
   const onVentureSettled = useCallback(
-    (_ventureId: string, filled: boolean, settlements: VentureSettlement[]) => {
+    (
+      _ventureId: string,
+      outcome: VentureOutcome,
+      settlements: VentureSettlement[],
+    ) => {
       const mine = settlements.find((s) => s.userId === me.id);
       if (!mine) return;
-      act((g, l) => receiveVentureSettlement(g, mine.amount, l, filled));
-      if (filled) {
+      act((g, l) => receiveVentureSettlement(g, mine.amount, l, outcome));
+      if (outcome === "filled") {
         toast.success("⚓ Convoy Venture filled!", {
           description: `Your share: +${mine.amount} Gold.`,
         });
-      } else {
+      } else if (outcome === "failed") {
         toast("⚓ Convoy Venture missed its deadline", {
           description: `Partial refund: +${mine.amount} Gold.`,
+        });
+      } else {
+        toast("⚓ Convoy Venture cancelled", {
+          description: `Another venture in the harbor already claimed this voyage's one chance. Full refund: +${mine.amount} Gold.`,
         });
       }
     },
