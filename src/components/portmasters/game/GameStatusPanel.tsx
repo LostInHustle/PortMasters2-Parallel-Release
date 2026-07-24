@@ -1,6 +1,15 @@
 "use client";
 
-import { COLORS, ICONS } from "@/lib/game/constants";
+import { useState } from "react";
+import {
+  CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE,
+  CONVOY_VENTURE_MAX_ROUNDS_AHEAD,
+  CONVOY_VENTURE_MAX_TARGET,
+  CONVOY_VENTURE_MIN_ROUNDS_AHEAD,
+  CONVOY_VENTURE_MIN_TARGET,
+  COLORS,
+  ICONS,
+} from "@/lib/game/constants";
 import { getHireCost } from "@/lib/game/engine";
 import type { GameState } from "@/lib/game/types";
 import { difficultyConfig } from "@/lib/game/difficulty";
@@ -9,11 +18,13 @@ import {
   unlockedResources,
   unlockedWorkerTypes,
 } from "@/lib/game/pools";
+import type { ConvoyVenture } from "@/lib/use-convoy";
 import { cn } from "@/lib/utils";
 import { Term } from "../Term";
 import { priceAwareTermContent } from "./PriceTooltips";
 import { GameLogPanel } from "./GameLogPanel";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 /**
@@ -40,10 +51,27 @@ export function GameStatusPanel({
   game,
   logs,
   onRepayLoan,
+  convoy,
+  myUserId,
 }: {
   game: GameState;
   logs: string[];
   onRepayLoan?: (debtId: string) => void;
+  // [MANIFEST 04: Convoy Ventures] Optional so any other caller of this
+  // panel (there is currently only one, GameRoom.tsx) keeps compiling
+  // unchanged if it doesn't wire the board through.
+  convoy?: {
+    ventures: ConvoyVenture[];
+    // [MANIFEST 04 fix] True once this room has already used its one
+    // Convoy Venture chance for the current voyage; posting is disabled
+    // until a fresh voyage, since a second fill is never allowed.
+    locked: boolean;
+    error: string | null;
+    clearError: () => void;
+    post: (targetGold: number, deadlineRound: number) => void;
+    contribute: (ventureId: string, amount: number) => void;
+  };
+  myUserId?: string;
 }) {
   const discount = game.shipLevel * 5;
   const showObligations = ![0, 5, "endgame", "bankruptcy"].includes(game.phase);
@@ -342,6 +370,14 @@ export function GameStatusPanel({
               </p>
             </div>
           )}
+
+          {convoy && myUserId && (
+            <ConvoyVenturesSection
+              game={game}
+              convoy={convoy}
+              myUserId={myUserId}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="log" className="min-h-0 flex-1">
@@ -391,6 +427,231 @@ function SubRow({ label, value }: { label: string; value: string }) {
     <div className="flex justify-between py-0.5 pl-3 text-[10px] text-muted-foreground">
       <span>{label}</span>
       <span>{value}</span>
+    </div>
+  );
+}
+
+// [MANIFEST 04: Convoy Ventures] Lives in the Dues tab, right beside
+// Outstanding Loans, since both are peer-to-peer Gold commitments a captain
+// is tracking against the rest of the harbor. Deliberately compact: a two
+// field post form, then one card per open venture with its own progress bar
+// and a one field contribute control, matching the density the rest of this
+// tab already keeps to.
+function ConvoyVenturesSection({
+  game,
+  convoy,
+  myUserId,
+}: {
+  game: GameState;
+  convoy: {
+    ventures: ConvoyVenture[];
+    locked: boolean;
+    error: string | null;
+    clearError: () => void;
+    post: (targetGold: number, deadlineRound: number) => void;
+    contribute: (ventureId: string, amount: number) => void;
+  };
+  myUserId: string;
+}) {
+  const [target, setTarget] = useState("");
+  const [roundsAhead, setRoundsAhead] = useState(
+    String(CONVOY_VENTURE_MIN_ROUNDS_AHEAD),
+  );
+  const [contributions, setContributions] = useState<Record<string, string>>(
+    {},
+  );
+
+  // [MANIFEST 04 fix] Mirrors the server's own cap (see venture:post in
+  // src/server/realtime.ts): the deadline can never land on, or past, this
+  // voyage's actual final round, so whoever contributes always has at
+  // least one full round left to spend whatever they're paid. Computed
+  // client side purely so the form can't even offer an option the server
+  // would reject; the server enforces this for real regardless.
+  const maxRoundsAhead = Math.min(
+    CONVOY_VENTURE_MAX_ROUNDS_AHEAD,
+    game.maxRounds - 1 - game.currentRound,
+  );
+  const tooLateToPost = maxRoundsAhead < CONVOY_VENTURE_MIN_ROUNDS_AHEAD;
+
+  function submitPost() {
+    const t = Math.floor(Number(target));
+    const r = Math.floor(Number(roundsAhead));
+    if (!Number.isFinite(t) || !Number.isFinite(r)) return;
+    convoy.post(t, game.currentRound + r);
+    setTarget("");
+    setRoundsAhead(String(CONVOY_VENTURE_MIN_ROUNDS_AHEAD));
+  }
+
+  function submitContribute(ventureId: string) {
+    const raw = contributions[ventureId];
+    const amount = Math.floor(Number(raw));
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    convoy.contribute(ventureId, amount);
+    setContributions((c) => ({ ...c, [ventureId]: "" }));
+  }
+
+  return (
+    <div className="mt-3 border-t border-black/5 pt-2 dark:border-white/10">
+      <div className="mb-1 text-[10px] font-semibold tracking-wide text-muted-foreground/80">
+        ━━ Convoy Ventures ━━
+      </div>
+
+      {convoy.error && (
+        <div className="mb-1.5 rounded bg-rose-500/10 px-2 py-1 text-[10px] text-rose-600 dark:text-rose-300">
+          {convoy.error}
+        </div>
+      )}
+
+      {convoy.locked ? (
+        // [MANIFEST 04 fix] This harbor's one Convoy Venture chance for
+        // this voyage is already spent (a venture somewhere in this room
+        // has already filled). Explaining why, rather than just hiding the
+        // form, is what actually stops a captain from wondering why
+        // posting silently does nothing.
+        <p className="mb-2 rounded bg-black/[0.03] px-2 py-1.5 text-[10px] text-muted-foreground/80 dark:bg-white/[0.04]">
+          This harbor has already used its one Convoy Venture for this voyage.
+          It opens again on a fresh voyage or a restart.
+        </p>
+      ) : tooLateToPost ? (
+        // [MANIFEST 04 fix] Too close to the voyage's own final round for
+        // any deadline to leave a full round free to spend the reward in.
+        <p className="mb-2 rounded bg-black/[0.03] px-2 py-1.5 text-[10px] text-muted-foreground/80 dark:bg-white/[0.04]">
+          Too late in this voyage to post a new Convoy Venture: there's no round
+          left that would leave time to spend the reward.
+        </p>
+      ) : (
+        <>
+          <div className="mb-2 flex items-end gap-1.5">
+            <div className="flex-1">
+              <label className="mb-0.5 block text-[9px] text-muted-foreground/80">
+                Target Gold
+              </label>
+              <Input
+                type="number"
+                min={CONVOY_VENTURE_MIN_TARGET}
+                max={CONVOY_VENTURE_MAX_TARGET}
+                value={target}
+                onChange={(e) => setTarget(e.target.value)}
+                placeholder={`${CONVOY_VENTURE_MIN_TARGET}+`}
+                className="h-7 text-[11px]"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="mb-0.5 block text-[9px] text-muted-foreground/80">
+                Rounds to fill
+              </label>
+              <Input
+                type="number"
+                min={CONVOY_VENTURE_MIN_ROUNDS_AHEAD}
+                max={maxRoundsAhead}
+                value={roundsAhead}
+                onChange={(e) => setRoundsAhead(e.target.value)}
+                className="h-7 text-[11px]"
+              />
+            </div>
+            <Button
+              size="sm"
+              className="h-7 rounded px-2 text-[10px]"
+              onClick={submitPost}
+            >
+              Post
+            </Button>
+          </div>
+
+          {game.currentRound + Number(roundsAhead || 0) > 0 && (
+            <p className="mb-2 text-[9px] text-muted-foreground/70">
+              Fills by Round{" "}
+              {game.currentRound + (Math.floor(Number(roundsAhead)) || 0)}. Miss
+              it and every contributor only gets back a partial refund. This
+              harbor only gets one venture per voyage, so make it count.
+            </p>
+          )}
+        </>
+      )}
+
+      {convoy.ventures.length === 0 ? (
+        <p className="py-1 text-[11px] text-muted-foreground/80">
+          {convoy.locked
+            ? "No ventures open. This voyage's one chance has already been used."
+            : "No ventures open right now. Post one, or wait for another captain to."}
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {convoy.ventures.map((v) => {
+            const pct = Math.min(
+              100,
+              Math.round((v.total / v.targetGold) * 100),
+            );
+            const mine = v.contributions.find((c) => c.userId === myUserId);
+            // [MANIFEST 04 fix] Mirrors the server's own per contributor cap
+            // (see computeAcceptedContribution in src/lib/game/convoy.ts):
+            // no single captain may ever hold more than
+            // CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE of a venture's target, so
+            // it can never fill from one captain's own Gold alone.
+            const myShareCap = Math.ceil(
+              v.targetGold * CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE,
+            );
+            const myRemainingShare = myShareCap - (mine?.amount ?? 0);
+            const atMyShareCap = myRemainingShare <= 0;
+            return (
+              <div
+                key={v.id}
+                className="rounded-lg border border-black/5 bg-black/[0.02] p-2 dark:border-white/10 dark:bg-white/[0.03]"
+              >
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-muted-foreground">
+                    {v.posterId === myUserId ? "Your venture" : v.posterName}
+                  </span>
+                  <span className="font-semibold">
+                    {v.total} / {v.targetGold}g
+                  </span>
+                </div>
+                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                  <div
+                    className="h-full rounded-full bg-teal-500"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <div className="mt-1 flex items-center justify-between text-[9px] text-muted-foreground/80">
+                  <span>By Round {v.deadlineRound}</span>
+                  {mine && <span>You've backed {mine.amount}g</span>}
+                </div>
+                {atMyShareCap ? (
+                  <p className="mt-1.5 text-[9px] text-muted-foreground/70">
+                    You've backed this as much as any single captain can. It
+                    needs another captain to fund the rest.
+                  </p>
+                ) : (
+                  <div className="mt-1.5 flex items-center gap-1.5">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={myRemainingShare}
+                      value={contributions[v.id] ?? ""}
+                      onChange={(e) =>
+                        setContributions((c) => ({
+                          ...c,
+                          [v.id]: e.target.value,
+                        }))
+                      }
+                      placeholder="Gold"
+                      className="h-6 text-[10px]"
+                    />
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="h-6 shrink-0 rounded px-2 text-[10px]"
+                      onClick={() => submitContribute(v.id)}
+                    >
+                      Back it
+                    </Button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

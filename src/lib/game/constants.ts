@@ -579,6 +579,33 @@ export const WORD_ON_THE_DOCKS_REWARD = 25;
 // in src/server/realtime.ts for where the combined total is actually read.
 export const TIDEWATCH_SURGE_THRESHOLD = 250;
 
+// [MANIFEST 04: Convoy Ventures] A pooled, multi captain investment: gold
+// only (see the ConvoyVenture Prisma model), too large a target for one
+// captain to fund comfortably alone, open to contributions from anyone in
+// the room until its deadline round. Fills the instant contributions reach
+// targetGold, splitting a reward (targetGold times the payout multiplier)
+// across every contributor in exact proportion to what they put in. Missing
+// the deadline instead pays every contributor back only a fraction of their
+// own stake, so joining one is a real wager on the room finishing it, not a
+// free favor with no downside. See src/server/realtime.ts for where a
+// venture is actually posted, contributed to, and resolved.
+export const CONVOY_VENTURE_MIN_TARGET = 150;
+export const CONVOY_VENTURE_MAX_TARGET = 2000;
+export const CONVOY_VENTURE_MIN_ROUNDS_AHEAD = 1;
+export const CONVOY_VENTURE_MAX_ROUNDS_AHEAD = 6;
+export const CONVOY_VENTURE_PAYOUT_MULTIPLIER = 1.5;
+export const CONVOY_VENTURE_FAILURE_REFUND_RATE = 0.5;
+// [MANIFEST 04 fix] No single captain may ever fund more than this share of
+// a venture's own target, on their own. Without this, a captain could post
+// a venture and instantly fill it entirely with their own Gold, alone,
+// which is worse than the original repeat-fill exploit: it still prints a
+// bounded amount of free Gold, and it burns the whole room's one shared
+// chance for the voyage in the process, locking every other captain out
+// for personal gain instead of the room's. Capping each contributor's own
+// share below half is what actually forces at least one other captain to
+// genuinely take part before a venture can ever fill.
+export const CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE = 0.5;
+
 // =====================================================================
 // Player-facing copy. The wording is preserved from the original game; the
 // numbers are not baked in any more, because they now depend on the room's
@@ -754,6 +781,7 @@ Brocade(70-90💰), Sachet(95-120💰)
 • Post what you have and what you want for it; anyone can accept it with one click
 • An offer can't be an item for itself, and both amounts must be whole numbers of at least 1
 • You can never offer more than you currently own, it's set aside the moment you post, and returned to you if you cancel or nobody takes it
+• Want to make sure a specific captain gets your offer, not whoever clicks fastest? Pick their name under "With" when you post: only the two of you will ever see it
 
 🔧 Ship Modules (NEW!):
 • Phase 4: Upgrade your ship to unlock Module Slots
@@ -775,6 +803,16 @@ ${mandates.length ? `\n📜 Imperial Mandates:\n• On voyage${mandates.length =
 • Once everyone in the harbor's own Reputation adds up past ${TIDEWATCH_SURGE_THRESHOLD}, the harbor takes notice of a bustling crew
 • From the next Port Purchase onward, every captain's board gets one extra cargo lot, for the rest of the voyage
 • This never changes your voyage length or which tier's goods you see, only how busy the market gets
+
+⚓ Convoy Ventures:
+• Found on the Dues tab of your captain's rail: any captain can post a venture, a Gold target and a deadline round
+• Anyone in the harbor, including the poster, can chip in Gold toward that target at any time before the deadline
+• Reach the target in time and it fills: every contributor is paid back ${Math.round((CONVOY_VENTURE_PAYOUT_MULTIPLIER - 1) * 100)}% more Gold than they put in, split in exact proportion to their share
+• Miss the deadline and it fails: every contributor only gets back ${Math.round(CONVOY_VENTURE_FAILURE_REFUND_RATE * 100)}% of their own stake, the rest is lost
+• Contributing is a real wager on the rest of the harbor coming through, not a free favor
+• Your whole harbor only ever gets one filled venture per voyage: the moment any venture fills, every other open venture is cancelled and fully refunded, and posting a new one is disabled until the next voyage
+• A deadline can never land on your voyage's final round: it always leaves at least one full round afterward to actually spend whatever you're paid
+• No single captain can ever fund more than ${Math.round(CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE * 100)}% of a venture's target alone: it always needs at least one other captain to fund the rest before it can fill
 
 🆘 Financial Aid:
 • Can't cover this round's wages or maintenance? Ask the harbor for a loan, right on the settlement screen

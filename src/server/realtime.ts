@@ -32,6 +32,12 @@ import {
 } from "../lib/game/legacy";
 import {
   BROKERS_FAVOR_UNLOCK_LEVEL,
+  CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE,
+  CONVOY_VENTURE_MAX_ROUNDS_AHEAD,
+  CONVOY_VENTURE_MAX_TARGET,
+  CONVOY_VENTURE_MIN_ROUNDS_AHEAD,
+  CONVOY_VENTURE_MIN_TARGET,
+  CONVOY_VENTURE_PAYOUT_MULTIPLIER,
   TIDEWATCH_SURGE_THRESHOLD,
   WORD_ON_THE_DOCKS_REWARD,
   WORD_ON_THE_DOCKS_THRESHOLD,
@@ -40,7 +46,17 @@ import { meritById, qualifyingMerits } from "../lib/game/merits";
 import {
   normalizeDifficulty,
   renownMultiplierFor,
+  roundsFor,
 } from "../lib/game/difficulty";
+import {
+  computeAcceptedContribution,
+  computeSettlements,
+  computeVentureDeadlineBounds,
+  parseVentureContributions,
+  ventureAnnouncementFor,
+  ventureTotal,
+  type VentureOutcome,
+} from "../lib/game/convoy";
 import { computeHarborPulse } from "../lib/game/harborPulse";
 
 // ---------- Types ----------
@@ -445,10 +461,23 @@ export function attachRealtime(httpServer: HttpServer): Server {
     // is 1.0, leaving the entry tier exactly as it was.
     const roomForDifficulty = await db.room.findUnique({
       where: { id: roomId },
-      select: { difficulty: true },
+      select: { difficulty: true, voyageEpoch: true },
     });
     const roomDifficulty = normalizeDifficulty(roomForDifficulty?.difficulty);
     const renownMultiplier = renownMultiplierFor(roomDifficulty);
+
+    // [MANIFEST 04: Convoy Ventures] The voyage is genuinely over for
+    // everyone in the room; any venture still open at this point never will
+    // fill, so it resolves as failed right now rather than sitting open
+    // forever with no one left to contribute to it.
+    if (roomForDifficulty) {
+      await resolveExpiredVentures(
+        roomId,
+        roomForDifficulty.voyageEpoch,
+        0,
+        true,
+      );
+    }
 
     const crownable = finished.filter((f) => f.phase === "endgame");
     const winnerId = crownable.length
@@ -616,6 +645,13 @@ export function attachRealtime(httpServer: HttpServer): Server {
   // ever claim a given offer. Ephemeral by design, same as the checkpoint
   // and status maps above: a server restart loses in-flight offers, which
   // is exactly as durable as the ready-vote state already is.
+  // targetUserId/targetName are optional: unset for an ordinary open offer,
+  // anyone in the room can see and accept it. Set for a direct offer to one
+  // specific captain, a safeguard against exactly the failure mode an open
+  // board has, agreeing on a trade with someone in chat and then having a
+  // third captain accept it first. A direct offer is only ever visible to
+  // its poster and its one named target, see visibleBarterOffers below;
+  // everyone else in the room never even learns it exists.
   type BarterOffer = {
     id: string;
     fromUserId: string;
@@ -624,6 +660,8 @@ export function attachRealtime(httpServer: HttpServer): Server {
     offerAmount: number;
     requestItem: string;
     requestAmount: number;
+    targetUserId?: string;
+    targetName?: string;
   };
   const roomBarterOffers = new Map<string, BarterOffer[]>();
 
@@ -631,11 +669,37 @@ export function attachRealtime(httpServer: HttpServer): Server {
     return roomBarterOffers.get(roomId) ?? [];
   }
 
+  // An open offer (no target) is visible to everyone; a direct offer is
+  // visible only to the two captains it actually involves, its poster and
+  // its named target, so the rest of the room never sees, and can never
+  // accept, a trade that was never meant for them.
+  function visibleBarterOffers(
+    offers: BarterOffer[],
+    userId: string,
+  ): BarterOffer[] {
+    return offers.filter(
+      (o) =>
+        !o.targetUserId ||
+        o.targetUserId === userId ||
+        o.fromUserId === userId,
+    );
+  }
+
+  // Personalized per connected socket, unlike every other room-wide
+  // broadcast in this file: a direct offer means two different captains in
+  // the same room can legitimately see two different boards. Iterates the
+  // presence map already kept for onlineUsers()/roomMembers() rather than
+  // asking Socket.IO's own room registry, so this stays a synchronous, in
+  // memory operation like the rest of this file's broadcasts.
   function broadcastBarter(roomId: string) {
-    io.to(`room:${roomId}`).emit("barter:update", {
-      roomId,
-      offers: barterList(roomId),
-    });
+    const offers = barterList(roomId);
+    for (const [sid, state] of sockets.entries()) {
+      if (state.roomId !== roomId) continue;
+      io.to(sid).emit("barter:update", {
+        roomId,
+        offers: visibleBarterOffers(offers, state.userId),
+      });
+    }
   }
 
   // Drops every open offer for a room (phase moved on, or the room
@@ -770,6 +834,157 @@ export function attachRealtime(httpServer: HttpServer): Server {
     let total = 0;
     for (const st of statuses.values()) total += st.reputation ?? 0;
     return total;
+  }
+
+  // ---------- Convoy Ventures ----------
+  // [MANIFEST 04] Persisted through the ConvoyVenture Prisma model rather
+  // than kept in memory like the barter and aid boards: a venture can sit
+  // open across many rounds, not one phase, so losing it to a server
+  // restart would erase real Gold every contributor already put in. Scoped
+  // by (roomId, voyageEpoch), never just roomId, so a host restart's fresh
+  // epoch can never resolve, or even see, a venture from a voyage that no
+  // longer exists.
+  function ventureSummary(v: {
+    id: string;
+    posterId: string;
+    posterName: string;
+    targetGold: number;
+    deadlineRound: number;
+    payoutMultiplier: number;
+    contributions: string;
+    status: string;
+  }) {
+    const contributions = parseVentureContributions(v.contributions);
+    return {
+      id: v.id,
+      posterId: v.posterId,
+      posterName: v.posterName,
+      targetGold: v.targetGold,
+      deadlineRound: v.deadlineRound,
+      payoutMultiplier: v.payoutMultiplier,
+      status: v.status,
+      total: ventureTotal(contributions),
+      contributions: Object.entries(contributions).map(([userId, c]) => ({
+        userId,
+        name: c.name,
+        amount: c.amount,
+      })),
+    };
+  }
+
+  async function broadcastVentures(roomId: string, voyageEpoch: number) {
+    const ventures = await db.convoyVenture.findMany({
+      where: { roomId, voyageEpoch, status: "open" },
+      orderBy: { createdAt: "asc" },
+    });
+    // [MANIFEST 04 fix] Told to every client alongside the (possibly empty)
+    // open list, so the Dues tab can explain why posting is disabled rather
+    // than just showing an empty board with no reason given.
+    const locked = await hasRoomClaimedVenture(roomId, voyageEpoch);
+    io.to(`room:${roomId}`).emit("venture:update", {
+      roomId,
+      ventures: ventures.map(ventureSummary),
+      locked,
+    });
+  }
+
+  // [MANIFEST 04 fix] Two captains could otherwise post a venture, both
+  // instantly self fund it, both collect CONVOY_VENTURE_PAYOUT_MULTIPLIER
+  // times their own stake, and repeat that indefinitely: every fill printed
+  // real Gold with no offsetting cost anywhere, so contribution times 1.5
+  // compounded without bound the more times a room repeated it. A single
+  // shared chance per voyage bounds the whole mechanism to at most one
+  // payout event, ever, no matter how many times a room tries it: once any
+  // venture in a room's current voyage has ever reached "filled", nothing
+  // else can. hasRoomClaimedVenture is the one check both venture:post and
+  // venture:contribute run before doing anything else.
+  async function hasRoomClaimedVenture(
+    roomId: string,
+    voyageEpoch: number,
+  ): Promise<boolean> {
+    const filled = await db.convoyVenture.findFirst({
+      where: { roomId, voyageEpoch, status: "filled" },
+      select: { id: true },
+    });
+    return Boolean(filled);
+  }
+
+  // Ends a venture one of three ways: "filled", paying each contributor
+  // their own stake times CONVOY_VENTURE_PAYOUT_MULTIPLIER; "failed",
+  // refunding each contributor only CONVOY_VENTURE_FAILURE_REFUND_RATE of
+  // their own stake, its own deadline round ran out short of target;
+  // "destroyed", refunding each contributor their full stake, untouched,
+  // because a different venture in the same room's voyage reached "filled"
+  // first and claimed the one shared chance before this one got the chance
+  // to. Either way every contributor gets a personal payout figure; nobody
+  // who never contributed to this particular venture hears anything at all.
+  async function settleVenture(
+    venture: { id: string; roomId: string; contributions: string },
+    outcome: VentureOutcome,
+  ) {
+    const contributions = parseVentureContributions(venture.contributions);
+    const settlements = computeSettlements(contributions, outcome);
+    await db.convoyVenture.update({
+      where: { id: venture.id },
+      data: { status: outcome, resolvedAt: new Date() },
+    });
+    io.to(`room:${venture.roomId}`).emit("venture:settled", {
+      roomId: venture.roomId,
+      ventureId: venture.id,
+      outcome,
+      settlements,
+    });
+    if (settlements.length) {
+      io.to(`room:${venture.roomId}`).emit("room:system", {
+        roomId: venture.roomId,
+        content: ventureAnnouncementFor(outcome),
+      });
+    }
+  }
+
+  // [MANIFEST 04 fix] Called once, immediately after any venture is settled
+  // as "filled" (see venture:contribute below): every other still open
+  // venture in that same room and voyage is destroyed on the spot, refunded
+  // in full, rather than left to sit open and silently violate the one
+  // shared chance per voyage rule the moment someone next contributes to it.
+  async function destroyOtherOpenVentures(
+    roomId: string,
+    voyageEpoch: number,
+    exceptVentureId: string,
+  ) {
+    const others = await db.convoyVenture.findMany({
+      where: {
+        roomId,
+        voyageEpoch,
+        status: "open",
+        id: { not: exceptVentureId },
+      },
+    });
+    for (const v of others) await settleVenture(v, "destroyed");
+  }
+
+  // Checked whenever a room's round advances (see the game:status handler
+  // below) and once more, unconditionally, when a voyage concludes or
+  // restarts, so no venture can ever sit open forever past its own deadline
+  // or past the voyage it belongs to. A venture stays open through its own
+  // deadline round, and only expires once the room's round moves past it.
+  async function resolveExpiredVentures(
+    roomId: string,
+    voyageEpoch: number,
+    currentRound: number,
+    forceAll: boolean,
+  ) {
+    const open = await db.convoyVenture.findMany({
+      where: { roomId, voyageEpoch, status: "open" },
+    });
+    let anyResolved = false;
+    for (const v of open) {
+      if (forceAll || currentRound > v.deadlineRound) {
+        await settleVenture(v, "failed");
+        anyResolved = true;
+      }
+    }
+    if (anyResolved) await broadcastVentures(roomId, voyageEpoch);
   }
 
   // ---------- Helpers ----------
@@ -1049,8 +1264,22 @@ export function attachRealtime(httpServer: HttpServer): Server {
         // in engine.ts), instead of the fresh lobby it should be.
         const room = await db.room.findUnique({
           where: { id: roomId },
-          select: { started: true },
+          select: { started: true, voyageEpoch: true },
         });
+        // [MANIFEST 04: Convoy Ventures] Checked on every status report too,
+        // using whatever round this particular captain just reported: any
+        // open venture whose deadline that round has now passed gets force
+        // resolved as failed. Harmless to check repeatedly, since a venture
+        // already resolved is no longer "open" and resolveExpiredVentures
+        // only ever looks at ones that still are.
+        if (room) {
+          await resolveExpiredVentures(
+            roomId,
+            room.voyageEpoch,
+            broadcast.round,
+            false,
+          );
+        }
         const cp = await getCheckpoint(roomId);
         const phaseStr = String(broadcast.phase);
         const newRank = checkpointRank(broadcast.round, phaseStr);
@@ -1191,6 +1420,257 @@ export function attachRealtime(httpServer: HttpServer): Server {
       });
     });
 
+    // [MANIFEST 04: Convoy Ventures] A fresh snapshot of the room's open
+    // ventures, independent of the broadcasts below, mirroring
+    // "barter:state:request" right underneath this.
+    socket.on("venture:state:request", async (payload: { roomId?: string }) => {
+      const s = requireAuth();
+      if (!s) return;
+      const roomId = payload?.roomId ?? s.roomId;
+      if (!roomId || roomId !== s.roomId) return;
+      const room = await db.room.findUnique({
+        where: { id: roomId },
+        select: { voyageEpoch: true },
+      });
+      if (!room) return;
+      const ventures = await db.convoyVenture.findMany({
+        where: { roomId, voyageEpoch: room.voyageEpoch, status: "open" },
+        orderBy: { createdAt: "asc" },
+      });
+      socket.emit("venture:update", {
+        roomId,
+        ventures: ventures.map(ventureSummary),
+        locked: await hasRoomClaimedVenture(roomId, room.voyageEpoch),
+      });
+    });
+
+    // [MANIFEST 04 fix] One filled venture, shared by the whole room, per
+    // voyage. hasRoomClaimedVenture only checks for a "filled" outcome, on
+    // purpose: a venture that legitimately misses its own deadline already
+    // costs its contributors half their stake, there's no exploit in
+    // letting a room try again after a real failure, only in letting a
+    // second venture ever pay out the 1.5x reward. The instant any venture
+    // in this voyage actually fills, this check starts rejecting every
+    // future post, forever, for this voyage. Validated for shape and sane
+    // bounds beyond that, the same way barter posting only validates
+    // structure (see postBarterOffer in src/lib/game/engine.ts): whether
+    // the poster can actually afford to seed it themselves isn't checked
+    // here, since this server has no visibility into anyone's Gold, only
+    // their own client does.
+    socket.on(
+      "venture:post",
+      async (payload: {
+        roomId?: string;
+        targetGold?: number;
+        deadlineRound?: number;
+      }) => {
+        const s = requireAuth();
+        if (!s) return;
+        const roomId = payload?.roomId ?? s.roomId;
+        if (!roomId || roomId !== s.roomId) return;
+        const targetGold = Math.floor(Number(payload?.targetGold));
+        const deadlineRound = Math.floor(Number(payload?.deadlineRound));
+        if (!Number.isFinite(targetGold) || !Number.isFinite(deadlineRound)) {
+          socket.emit("venture:error", { roomId, error: "Invalid venture." });
+          return;
+        }
+        if (
+          targetGold < CONVOY_VENTURE_MIN_TARGET ||
+          targetGold > CONVOY_VENTURE_MAX_TARGET
+        ) {
+          socket.emit("venture:error", {
+            roomId,
+            error: `Target must be between ${CONVOY_VENTURE_MIN_TARGET} and ${CONVOY_VENTURE_MAX_TARGET} Gold.`,
+          });
+          return;
+        }
+        const room = await db.room.findUnique({
+          where: { id: roomId },
+          select: { voyageEpoch: true, currentRound: true, difficulty: true },
+        });
+        if (!room) return;
+        if (await hasRoomClaimedVenture(roomId, room.voyageEpoch)) {
+          socket.emit("venture:error", {
+            roomId,
+            error:
+              "This harbor has already used its one Convoy Venture for this voyage.",
+          });
+          return;
+        }
+        // [MANIFEST 04 fix] The deadline can never land on, or past, the
+        // voyage's actual final round for this room's tier: a venture that
+        // filled on the very last round would hand its contributors Gold
+        // with no round left in which spending it could still raise their
+        // final Reputation, and a deadline past the voyage's own end would
+        // never really get judged on its own terms at all, it would just
+        // get swept up as "failed" the moment the voyage concludes (see
+        // maybeConcludeVoyage above). Capping one round short guarantees
+        // whoever contributes always has at least one full round left to
+        // actually use whatever they're paid.
+        const voyageRounds = roundsFor(room.difficulty);
+        const bounds = computeVentureDeadlineBounds(
+          room.currentRound,
+          voyageRounds,
+          CONVOY_VENTURE_MIN_ROUNDS_AHEAD,
+          CONVOY_VENTURE_MAX_ROUNDS_AHEAD,
+        );
+        if (!bounds) {
+          socket.emit("venture:error", {
+            roomId,
+            error:
+              "Too late in the voyage to post a new Convoy Venture: there's no round left that would leave time to spend the reward.",
+          });
+          return;
+        }
+        const { minRound, maxRound } = bounds;
+        if (deadlineRound < minRound || deadlineRound > maxRound) {
+          socket.emit("venture:error", {
+            roomId,
+            error: `Deadline must be between round ${minRound} and round ${maxRound}.`,
+          });
+          return;
+        }
+        await db.convoyVenture.create({
+          data: {
+            roomId,
+            voyageEpoch: room.voyageEpoch,
+            posterId: s.userId,
+            posterName: s.user.displayName,
+            targetGold,
+            deadlineRound,
+            payoutMultiplier: CONVOY_VENTURE_PAYOUT_MULTIPLIER,
+          },
+        });
+        await broadcastVentures(roomId, room.voyageEpoch);
+        io.to(`room:${roomId}`).emit("room:system", {
+          roomId,
+          content: `⚓ ${s.user.displayName} posted a Convoy Venture: ${targetGold} Gold needed by Round ${deadlineRound}.`,
+        });
+      },
+    );
+
+    // A contribution is escrowed on the contributor's own client the moment
+    // this server confirms it (see venture:contributed below), the same
+    // escrow-on-post timing barter offers already use. If this contribution
+    // would overshoot the target, only the portion still needed is ever
+    // accepted; venture:contributed tells the contributor exactly how much
+    // actually landed, so their own client never deducts more than that.
+    socket.on(
+      "venture:contribute",
+      async (payload: {
+        roomId?: string;
+        ventureId?: string;
+        amount?: number;
+      }) => {
+        const s = requireAuth();
+        if (!s) return;
+        const roomId = payload?.roomId ?? s.roomId;
+        if (!roomId || roomId !== s.roomId) return;
+        const ventureId = payload?.ventureId;
+        const amount = Math.floor(Number(payload?.amount));
+        if (!ventureId || !Number.isFinite(amount) || amount <= 0) {
+          socket.emit("venture:error", {
+            roomId,
+            error: "Invalid contribution.",
+          });
+          return;
+        }
+        const venture = await db.convoyVenture.findUnique({
+          where: { id: ventureId },
+        });
+        if (
+          !venture ||
+          venture.roomId !== roomId ||
+          venture.status !== "open"
+        ) {
+          socket.emit("venture:error", {
+            roomId,
+            error: "That venture is no longer open.",
+          });
+          return;
+        }
+        // [MANIFEST 04 fix] Defense in depth: destroyOtherOpenVentures
+        // already cleans up every other open venture the instant one fills,
+        // but this closes the narrow window where a contribution to a
+        // second venture could theoretically be mid-flight at that exact
+        // moment, by refusing it outright rather than letting it briefly
+        // fill a venture that's about to be destroyed anyway.
+        if (await hasRoomClaimedVenture(roomId, venture.voyageEpoch)) {
+          socket.emit("venture:error", {
+            roomId,
+            error:
+              "This harbor has already used its one Convoy Venture for this voyage.",
+          });
+          return;
+        }
+        const room = await db.room.findUnique({
+          where: { id: roomId },
+          select: { currentRound: true },
+        });
+        if (room && room.currentRound > venture.deadlineRound) {
+          socket.emit("venture:error", {
+            roomId,
+            error: "That venture's deadline has already passed.",
+          });
+          return;
+        }
+        const contributions = parseVentureContributions(venture.contributions);
+        const currentTotal = ventureTotal(contributions);
+        const existing = contributions[s.userId];
+        const accepted = computeAcceptedContribution(
+          currentTotal,
+          venture.targetGold,
+          amount,
+          existing?.amount ?? 0,
+          CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE,
+        );
+        if (accepted <= 0) {
+          // [MANIFEST 04 fix] Two different reasons a contribution can be
+          // refused outright, told apart so the message actually explains
+          // what's going on: the venture itself has no room left for
+          // anyone, versus this one captain personally has already put in
+          // as much as any single captain is ever allowed to.
+          const atOwnShareCap =
+            currentTotal < venture.targetGold &&
+            (existing?.amount ?? 0) >=
+              Math.ceil(
+                venture.targetGold * CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE,
+              );
+          socket.emit("venture:error", {
+            roomId,
+            error: atOwnShareCap
+              ? "You've already backed this venture as much as any single captain can. It needs another captain to fund the rest."
+              : "That venture is already fully funded.",
+          });
+          return;
+        }
+        contributions[s.userId] = {
+          name: s.user.displayName,
+          amount: (existing?.amount ?? 0) + accepted,
+        };
+        const newTotal = currentTotal + accepted;
+        const updated = await db.convoyVenture.update({
+          where: { id: ventureId },
+          data: { contributions: JSON.stringify(contributions) },
+        });
+        socket.emit("venture:contributed", { roomId, ventureId, accepted });
+        if (newTotal >= venture.targetGold) {
+          await settleVenture(updated, "filled");
+          // [MANIFEST 04 fix] The room's one shared chance is spent the
+          // instant this happens: every other venture still open in this
+          // voyage is destroyed right now, refunded in full, rather than
+          // left to sit open and get quietly rejected one contribution at a
+          // time by the guard above.
+          await destroyOtherOpenVentures(
+            roomId,
+            venture.voyageEpoch,
+            venture.id,
+          );
+        }
+        await broadcastVentures(roomId, venture.voyageEpoch);
+      },
+    );
+
     // ---------- Bartering ----------
     // A fresh snapshot of the room's open offers, independent of the
     // broadcasts below, lets the Bartering phase panel ask for the
@@ -1200,7 +1680,10 @@ export function attachRealtime(httpServer: HttpServer): Server {
       if (!s) return;
       const roomId = payload?.roomId ?? s.roomId;
       if (!roomId || roomId !== s.roomId) return;
-      socket.emit("barter:update", { roomId, offers: barterList(roomId) });
+      socket.emit("barter:update", {
+        roomId,
+        offers: visibleBarterOffers(barterList(roomId), s.userId),
+      });
     });
 
     // Structural validation only (integers, ≥1, the two sides differ).
@@ -1208,15 +1691,25 @@ export function attachRealtime(httpServer: HttpServer): Server {
     // on their own client against their own GameState before this ever
     // fires, see postBarterOffer in src/lib/game/engine.ts, since this
     // server has no visibility into anyone's inventory or gold.
+    //
+    // targetUserId is optional: omitted (or absent), this posts an ordinary
+    // open offer exactly as before. Set, it posts a direct offer visible
+    // only to the poster and that one named captain, a safeguard against a
+    // third captain sniping a trade two people already agreed to elsewhere,
+    // over chat or in person. The target's display name is looked up here,
+    // from the room's own membership, rather than trusted from the client,
+    // the same reason fromName is always s.user.displayName and never
+    // whatever a payload happens to claim.
     socket.on(
       "barter:post",
-      (payload: {
+      async (payload: {
         roomId?: string;
         tempId?: string;
         offerItem?: string;
         offerAmount?: number;
         requestItem?: string;
         requestAmount?: number;
+        targetUserId?: string;
       }) => {
         const s = requireAuth();
         if (!s) return;
@@ -1242,6 +1735,34 @@ export function attachRealtime(httpServer: HttpServer): Server {
           });
           return;
         }
+        let targetUserId: string | undefined;
+        let targetName: string | undefined;
+        if (payload?.targetUserId) {
+          if (payload.targetUserId === s.userId) {
+            socket.emit("barter:error", {
+              roomId,
+              tempId: payload?.tempId,
+              error: "You can't direct an offer to yourself.",
+            });
+            return;
+          }
+          const targetMember = await db.roomMember.findUnique({
+            where: {
+              userId_roomId: { userId: payload.targetUserId, roomId },
+            },
+            include: { user: { select: { displayName: true } } },
+          });
+          if (!targetMember) {
+            socket.emit("barter:error", {
+              roomId,
+              tempId: payload?.tempId,
+              error: "That captain isn't in this harbor.",
+            });
+            return;
+          }
+          targetUserId = payload.targetUserId;
+          targetName = targetMember.user.displayName;
+        }
         const offer: BarterOffer = {
           id: `${roomId}:${s.userId}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
           fromUserId: s.userId,
@@ -1250,6 +1771,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
           offerAmount: offerAmount as number,
           requestItem,
           requestAmount: requestAmount as number,
+          ...(targetUserId ? { targetUserId, targetName } : {}),
         };
         roomBarterOffers.set(roomId, [...barterList(roomId), offer]);
         socket.emit("barter:posted", {
@@ -1306,6 +1828,19 @@ export function attachRealtime(httpServer: HttpServer): Server {
             roomId,
             offerId: payload.offerId,
             reason: "You can't accept your own offer.",
+          });
+          return;
+        }
+        // Defense in depth: a direct offer is never even sent to anyone
+        // but its poster and its named target (see visibleBarterOffers),
+        // so the ordinary UI can't produce an offerId for this to fire on
+        // in the first place. This only catches a raw call that bypasses
+        // that filtering.
+        if (offer.targetUserId && offer.targetUserId !== s.userId) {
+          socket.emit("barter:accept:fail", {
+            roomId,
+            offerId: payload.offerId,
+            reason: "That offer is only open to a specific captain.",
           });
           return;
         }
@@ -1721,7 +2256,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
 
       const room = await db.room.findUnique({
         where: { id: roomId },
-        select: { hostId: true },
+        select: { hostId: true, voyageEpoch: true },
       });
       if (!room) return;
       if (room.hostId !== s.userId) {
@@ -1734,6 +2269,13 @@ export function attachRealtime(httpServer: HttpServer): Server {
 
       restartingRooms.add(roomId);
       try {
+        // [MANIFEST 04: Convoy Ventures] Captured before voyageEpoch bumps
+        // below, since a venture is scoped to the voyage it was posted in:
+        // once the epoch moves, the old one becomes permanently unreachable
+        // to every future query this file makes, so anything still open
+        // under it has to be force resolved right now or never.
+        await resolveExpiredVentures(roomId, room.voyageEpoch, 0, true);
+
         // Bumping voyageEpoch is what makes a restart a brand-new voyage:
         // every captain folds it into their deterministic seed (see
         // src/lib/use-game-session.ts and the engine's seed strings), so the

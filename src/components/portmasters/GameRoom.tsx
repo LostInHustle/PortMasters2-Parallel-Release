@@ -21,6 +21,11 @@ import {
 } from "@/lib/use-player-detail";
 import { useBarter, type BarterOffer } from "@/lib/use-barter";
 import { useAid, type GrantedLoan, type RepaidLoan } from "@/lib/use-aid";
+import {
+  useConvoy,
+  type VentureOutcome,
+  type VentureSettlement,
+} from "@/lib/use-convoy";
 import { useNotificationCenter } from "@/lib/use-notifications";
 import { PlayerDetailModal } from "./game/GameModals";
 import { GameStatusPanel } from "./game/GameStatusPanel";
@@ -57,11 +62,13 @@ import {
   acceptBarterOffer,
   applyTidewatchSurge,
   claimWordOnTheDocksReward,
+  contributeToVenture,
   grantLoan,
   nextPhase,
   purchaseIntel,
   receiveLoan,
   receiveRepayment,
+  receiveVentureSettlement,
   repayLoan,
   settleBarterTrade,
 } from "@/lib/game/engine";
@@ -180,6 +187,53 @@ export function GameRoom({
     [act],
   );
   const aid = useAid(socket, room.id, me.id, onAidGranted, onAidRepaid);
+
+  // [MANIFEST 04: Convoy Ventures] The server already confirmed this
+  // contribution was accepted (see venture:contribute in
+  // src/server/realtime.ts); this is the one place it actually gets
+  // deducted from my own Gold, at exactly the accepted amount, which can be
+  // less than what I asked to give if the venture was topped up moments
+  // earlier by someone else.
+  const onVentureContributed = useCallback(
+    (_ventureId: string, accepted: number) => {
+      act((g, l) => contributeToVenture(g, accepted, l));
+    },
+    [act],
+  );
+  // Fires on every client the moment any venture in the room resolves, for
+  // any of the three outcomes; only apply the Gold effect if I actually
+  // contributed to this particular one.
+  const onVentureSettled = useCallback(
+    (
+      _ventureId: string,
+      outcome: VentureOutcome,
+      settlements: VentureSettlement[],
+    ) => {
+      const mine = settlements.find((s) => s.userId === me.id);
+      if (!mine) return;
+      act((g, l) => receiveVentureSettlement(g, mine.amount, l, outcome));
+      if (outcome === "filled") {
+        toast.success("⚓ Convoy Venture filled!", {
+          description: `Your share: +${mine.amount} Gold.`,
+        });
+      } else if (outcome === "failed") {
+        toast("⚓ Convoy Venture missed its deadline", {
+          description: `Partial refund: +${mine.amount} Gold.`,
+        });
+      } else {
+        toast("⚓ Convoy Venture cancelled", {
+          description: `Another venture in the harbor already claimed this voyage's one chance. Full refund: +${mine.amount} Gold.`,
+        });
+      }
+    },
+    [act, me.id],
+  );
+  const convoy = useConvoy(
+    socket,
+    room.id,
+    onVentureContributed,
+    onVentureSettled,
+  );
 
   // Joins this room's Socket.IO channel, re-run every time `authed` goes
   // back to true, not just on mount. The socket is a singleton (see
@@ -744,6 +798,8 @@ export function GameRoom({
                 game={state.game}
                 logs={state.logs}
                 onRepayLoan={handleRepayLoan}
+                convoy={convoy}
+                myUserId={me.id}
               />
             </div>
           </div>

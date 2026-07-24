@@ -626,6 +626,11 @@ function BarterPhase({
   const [offerAmount, setOfferAmount] = useState(1);
   const [requestItem, setRequestItem] = useState<string>("Gold");
   const [requestAmount, setRequestAmount] = useState(1);
+  // "" means an ordinary open offer, anyone in the harbor can see and
+  // accept it. Any other value is another captain's user id: a direct
+  // offer, visible only to the two of us, a safeguard against a third
+  // captain accepting a trade someone else already agreed to first.
+  const [targetUserId, setTargetUserId] = useState("");
 
   const owned = getOwnedAmount(game, offerItem);
   const sameItem = offerItem === requestItem;
@@ -635,15 +640,23 @@ function BarterPhase({
     Number.isInteger(requestAmount) &&
     requestAmount >= 1;
   const canPost = !sameItem && validAmounts && offerAmount <= owned;
+  const otherMembers = members.filter((m) => m.id !== myUserId);
 
   function submitOffer() {
     if (!canPost) return;
     act((g, l) => {
       postBarterOffer(g, offerItem, offerAmount, requestItem, requestAmount, l);
     });
-    barter.post(offerItem, offerAmount, requestItem, requestAmount);
+    barter.post(
+      offerItem,
+      offerAmount,
+      requestItem,
+      requestAmount,
+      targetUserId || undefined,
+    );
     setOfferAmount(1);
     setRequestAmount(1);
+    setTargetUserId("");
   }
 
   function cancelOffer(o: BarterOffer) {
@@ -722,6 +735,30 @@ function BarterPhase({
             🤝 Post Offer
           </Button>
         </div>
+        <div className="flex flex-wrap items-center justify-center gap-2 text-sm mt-2">
+          <span className="text-muted-foreground">With</span>
+          <select
+            value={targetUserId}
+            onChange={(e) => setTargetUserId(e.target.value)}
+            className={selectClass}
+            aria-label="Direct this offer to a specific captain"
+          >
+            <option value="">🌊 Anyone in the harbor</option>
+            {otherMembers.map((m) => (
+              <option key={m.id} value={m.id}>
+                🔒 {m.displayName} only
+              </option>
+            ))}
+          </select>
+        </div>
+        {targetUserId && (
+          <p className="text-center text-[11px] text-muted-foreground mt-1.5">
+            Only{" "}
+            {otherMembers.find((m) => m.id === targetUserId)?.displayName}{" "}
+            will see this offer. A safeguard so nobody else can take it
+            first.
+          </p>
+        )}
         {sameItem && (
           <p className="text-center text-[11px] text-rose-600 dark:text-rose-400 mt-2">
             Pick two different items to barter.
@@ -757,6 +794,7 @@ function BarterPhase({
               const mine = o.fromUserId === myUserId;
               const canAfford =
                 getOwnedAmount(game, o.requestItem) >= o.requestAmount;
+              const isDirect = Boolean(o.targetUserId);
               return (
                 <div
                   key={o.id}
@@ -764,7 +802,9 @@ function BarterPhase({
                     "flex items-center justify-between rounded-md px-3 py-2 text-xs border gap-2",
                     mine
                       ? "bg-amber-500/[0.06] border-amber-500/20"
-                      : "bg-background/60 border-black/5 dark:border-white/10",
+                      : isDirect
+                        ? "bg-teal-500/[0.06] border-teal-500/25"
+                        : "bg-background/60 border-black/5 dark:border-white/10",
                   )}
                 >
                   <div className="flex items-center gap-1.5 flex-wrap">
@@ -779,6 +819,11 @@ function BarterPhase({
                     <span style={{ color: COLORS[o.requestItem] }}>
                       {ICONS[o.requestItem]} {o.requestAmount} {o.requestItem}
                     </span>
+                    {isDirect && (
+                      <span className="rounded-full bg-teal-500/15 px-1.5 py-0.5 text-[9px] font-medium text-teal-700 dark:text-teal-300">
+                        🔒 {mine ? `Just for ${o.targetName}` : "Just for you"}
+                      </span>
+                    )}
                   </div>
                   {mine ? (
                     <Button

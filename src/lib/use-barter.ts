@@ -11,6 +11,13 @@ export type BarterOffer = {
   offerAmount: number;
   requestItem: string;
   requestAmount: number;
+  // Set only on a direct offer, aimed at one specific captain rather than
+  // the whole room. Unset for an ordinary open offer. The server never
+  // even sends a direct offer to anyone but its poster and this one named
+  // target (see visibleBarterOffers in src/server/realtime.ts), so if this
+  // is set on an offer I can see, it's always either mine or aimed at me.
+  targetUserId?: string;
+  targetName?: string;
 };
 
 export type BarterRefund = { item: string; amount: number };
@@ -106,6 +113,7 @@ export function useBarter(
       offerAmount: number,
       requestItem: string,
       requestAmount: number,
+      targetUserId?: string,
     ) => {
       if (!socket) return;
       socket.emit("barter:post", {
@@ -114,6 +122,7 @@ export function useBarter(
         offerAmount,
         requestItem,
         requestAmount,
+        ...(targetUserId ? { targetUserId } : {}),
       });
     },
     [socket, roomId],
