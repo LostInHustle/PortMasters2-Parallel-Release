@@ -84,6 +84,7 @@ import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import type { usePhaseSync } from "@/lib/use-phase-sync";
 import type { useBarter, BarterOffer } from "@/lib/use-barter";
 import type { useAid } from "@/lib/use-aid";
+import type { useBacking } from "@/lib/use-backing";
 import { ReadyBar } from "./ReadyBar";
 import { Term } from "../Term";
 import { Avatar, MeritIcon } from "../shared";
@@ -162,6 +163,7 @@ function HarborRoster({
 type PhaseSync = ReturnType<typeof usePhaseSync>;
 type Barter = ReturnType<typeof useBarter>;
 type Aid = ReturnType<typeof useAid>;
+type Backing = ReturnType<typeof useBacking>;
 
 type Props = {
   game: GameState;
@@ -173,6 +175,7 @@ type Props = {
   phaseSync: PhaseSync;
   barter: Barter;
   aid: Aid;
+  backing: Backing;
   voyageResult: VoyageCompleteEvent | null;
   myLegacy: CaptainLegacySummary | null;
   onRestart: () => void;
@@ -1475,6 +1478,7 @@ function Settlement({
   game,
   act,
   aid,
+  backing,
   myUserId,
   phaseSync,
   members,
@@ -1482,6 +1486,7 @@ function Settlement({
   game: GameState;
   act: (fn: (g: GameState, logs: string[]) => void) => void;
   aid: Aid;
+  backing: Backing;
   myUserId: string;
   phaseSync: PhaseSync;
   members: PublicUser[];
@@ -1491,6 +1496,7 @@ function Settlement({
     <SettlementBills
       game={game}
       aid={aid}
+      backing={backing}
       myUserId={myUserId}
       phaseSync={phaseSync}
       members={members}
@@ -1566,12 +1572,14 @@ function PirateAttack({
 function SettlementBills({
   game,
   aid,
+  backing,
   myUserId,
   phaseSync,
   members,
 }: {
   game: GameState;
   aid: Aid;
+  backing: Backing;
   myUserId: string;
   phaseSync: PhaseSync;
   members: PublicUser[];
@@ -1594,6 +1602,13 @@ function SettlementBills({
   const otherRequests = aid.requests.filter((r) => r.fromUserId !== myUserId);
   const shortfall = Math.max(1, totalDue - game.money);
   const [requestAmount, setRequestAmount] = useState(shortfall);
+
+  // [MANIFEST 05: Backing] Only a loan neither side of, and not already
+  // backed by someone else, is actually mine to back.
+  const backableLoans = backing.loans.filter(
+    (l) => l.borrowerId !== myUserId && l.lenderId !== myUserId && !l.backerId,
+  );
+  const [backAmounts, setBackAmounts] = useState<Record<string, number>>({});
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -1759,6 +1774,77 @@ function SettlementBills({
               );
             })}
           </div>
+        </div>
+      )}
+
+      {backableLoans.length > 0 && (
+        <div className="rounded-xl border border-black/10 dark:border-white/10 bg-background/50 p-3.5 my-3.5">
+          <h3 className="font-semibold mb-2 text-sm">
+            🛡️ Loans You Could Back
+          </h3>
+          <div className="space-y-1.5">
+            {backableLoans.map((l) => {
+              const pledge = Math.min(
+                backAmounts[l.debtId] ?? l.amount,
+                l.amount,
+              );
+              const canBack = game.money >= pledge && pledge >= 1;
+              return (
+                <div
+                  key={l.debtId}
+                  className="flex flex-wrap items-center justify-between rounded-md px-3 py-2 text-xs border border-black/5 dark:border-white/10 bg-background/60 gap-2"
+                >
+                  <span>
+                    <b>{l.lenderName}</b> lent <b>{l.borrowerName}</b>{" "}
+                    <span className="text-rose-600 dark:text-rose-400 font-semibold">
+                      {l.amount} Gold
+                    </span>
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <QuantityInput
+                      value={pledge}
+                      onCommit={(v) =>
+                        setBackAmounts((prev) => ({
+                          ...prev,
+                          [l.debtId]: Math.min(v, l.amount),
+                        }))
+                      }
+                      min={1}
+                      max={l.amount}
+                      aria-label={`Gold to pledge backing ${l.lenderName}'s loan to ${l.borrowerName}`}
+                      className="w-16 h-7"
+                    />
+                    <Button
+                      size="sm"
+                      className={cn(
+                        "h-7 px-2.5 text-[10px] rounded shrink-0",
+                        canBack && "pm-grad-emerald text-white",
+                      )}
+                      variant={canBack ? "default" : "secondary"}
+                      disabled={!canBack}
+                      onClick={() => backing.offer(l.debtId, pledge)}
+                    >
+                      🛡️ Back {pledge} Gold
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-2">
+            Pledged Gold is escrowed now, only spent if the loan actually
+            defaults, up to what you pledged. Never called on? It all comes
+            back, plus a small Reputation bonus.
+          </p>
+        </div>
+      )}
+
+      {backing.error && (
+        <div className="rounded-lg bg-rose-500/10 border border-rose-500/25 px-3.5 py-2 mb-3.5 text-xs text-rose-600 dark:text-rose-300 flex items-center justify-between">
+          <span>⚠️ {backing.error}</span>
+          <button onClick={backing.clearError}>
+            <X className="h-3.5 w-3.5" />
+          </button>
         </div>
       )}
 
@@ -2291,6 +2377,7 @@ export function GamePhasePanel({
   phaseSync,
   barter,
   aid,
+  backing,
   voyageResult,
   myLegacy,
   onRestart,
@@ -2375,6 +2462,7 @@ export function GamePhasePanel({
           game={game}
           act={act}
           aid={aid}
+          backing={backing}
           myUserId={myUserId}
           phaseSync={phaseSync}
           members={members}

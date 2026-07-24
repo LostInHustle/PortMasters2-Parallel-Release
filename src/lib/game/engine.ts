@@ -23,6 +23,7 @@
 import {
   AID_REPUTATION_PER_GOLD,
   APP_NAME,
+  BACKING_REPUTATION_PER_GOLD,
   BOONS,
   BROKERS_FAVOR_PAYOUT_CAP,
   BROKERS_FAVOR_UNLOCK_LEVEL,
@@ -1801,6 +1802,80 @@ export function receiveRepayment(
   state.loansGiven = state.loansGiven.filter((l) => l.id !== debtId);
   state.money += amount;
   logs.push(`💰 ${fromName} repaid you ${amount} Gold`);
+}
+
+// [MANIFEST 05: Backing] Escrows a pledge immediately, the same escrow on
+// commitment timing every other cross player commitment in this game
+// already uses. The server (see backing:offer in src/server/realtime.ts)
+// is what actually decided how much of the requested pledge a loan still
+// has room for, the same relationship venture contributions have with
+// their own overflow cap, so amount here is always already the correct,
+// server confirmed figure, never the raw request.
+export function pledgeBacking(
+  state: GameState,
+  amount: number,
+  logs: string[],
+) {
+  if (amount <= 0) return;
+  if (state.money < amount) {
+    logs.push(`❌ Need ${amount} Gold to back that loan, have ${state.money}`);
+    return;
+  }
+  state.money -= amount;
+  logs.push(`🛡️ Pledged ${amount} Gold to back a fellow captain's loan`);
+}
+
+// [MANIFEST 05: Backing] The backer's own side of however the loan they
+// backed actually resolved. refundAmount is whatever was never called on
+// and comes back untouched; calledAmount is whatever genuinely went to
+// cover the lender's shortfall and is gone for good. The Reputation bonus
+// only applies when nothing at all was called, since that's the case the
+// backer's own real risk never actually needed catching, see
+// BACKING_REPUTATION_PER_GOLD.
+export function receiveBackingOutcome(
+  state: GameState,
+  refundAmount: number,
+  calledAmount: number,
+  logs: string[],
+) {
+  if (refundAmount > 0) state.money += refundAmount;
+  if (calledAmount <= 0) {
+    const repGain = Math.max(
+      1,
+      Math.floor(refundAmount * BACKING_REPUTATION_PER_GOLD),
+    );
+    state.score += repGain;
+    logs.push(
+      `🛡️ Your backing was never called on. Pledge returned in full: ${refundAmount} Gold. Reputation +${repGain} for the risk paying off.`,
+    );
+  } else if (refundAmount > 0) {
+    logs.push(
+      `🛡️ Your backing partially covered a captain's shortfall: ${calledAmount} Gold spent, ${refundAmount} Gold returned.`,
+    );
+  } else {
+    logs.push(
+      `🛡️ Your backing fully covered a captain's shortfall: all ${calledAmount} Gold pledged was spent helping the lender.`,
+    );
+  }
+}
+
+// [MANIFEST 05: Backing] The lender's side of a called backing pledge,
+// arriving separately from, and in addition to, whatever the borrower
+// themselves managed to pay through the ordinary receiveRepayment above.
+// From the lender's perspective these are two distinct, unrelated
+// captains paying them, so they arrive as two distinct calls rather than
+// one merged figure.
+export function receiveBackedCoverage(
+  state: GameState,
+  amount: number,
+  backerName: string,
+  borrowerName: string,
+  logs: string[],
+) {
+  state.money += amount;
+  logs.push(
+    `🛡️ ${backerName} covered ${amount} Gold of ${borrowerName}'s shortfall as a backer.`,
+  );
 }
 
 // [MANIFEST 04: Convoy Ventures] Escrows a contribution immediately, the
