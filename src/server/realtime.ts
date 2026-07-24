@@ -32,6 +32,7 @@ import {
 } from "../lib/game/legacy";
 import {
   BROKERS_FAVOR_UNLOCK_LEVEL,
+  CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE,
   CONVOY_VENTURE_MAX_ROUNDS_AHEAD,
   CONVOY_VENTURE_MAX_TARGET,
   CONVOY_VENTURE_MIN_ROUNDS_AHEAD,
@@ -1580,19 +1581,34 @@ export function attachRealtime(httpServer: HttpServer): Server {
         }
         const contributions = parseVentureContributions(venture.contributions);
         const currentTotal = ventureTotal(contributions);
+        const existing = contributions[s.userId];
         const accepted = computeAcceptedContribution(
           currentTotal,
           venture.targetGold,
           amount,
+          existing?.amount ?? 0,
+          CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE,
         );
         if (accepted <= 0) {
+          // [MANIFEST 04 fix] Two different reasons a contribution can be
+          // refused outright, told apart so the message actually explains
+          // what's going on: the venture itself has no room left for
+          // anyone, versus this one captain personally has already put in
+          // as much as any single captain is ever allowed to.
+          const atOwnShareCap =
+            currentTotal < venture.targetGold &&
+            (existing?.amount ?? 0) >=
+              Math.ceil(
+                venture.targetGold * CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE,
+              );
           socket.emit("venture:error", {
             roomId,
-            error: "That venture is already fully funded.",
+            error: atOwnShareCap
+              ? "You've already backed this venture as much as any single captain can. It needs another captain to fund the rest."
+              : "That venture is already fully funded.",
           });
           return;
         }
-        const existing = contributions[s.userId];
         contributions[s.userId] = {
           name: s.user.displayName,
           amount: (existing?.amount ?? 0) + accepted,

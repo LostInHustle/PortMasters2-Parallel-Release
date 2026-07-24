@@ -131,6 +131,8 @@ Here is the part that matters most: your whole harbor only ever gets to fill one
 
 One more limit worth knowing: a venture's deadline can never land on your voyage's actual final round, and it can never be posted at all once the voyage is too close to its own end for any valid deadline to remain. Both exist for the same reason, Gold paid out with no round left afterward to spend it on anything that could raise your final Reputation would not really be much of a reward at all, so the game always guarantees at least one full round remains after the latest possible deadline.
 
+And one more limit beyond that: no single captain can ever fund more than half of any venture's target on their own, no matter how much Gold they personally have. This means a venture can never be filled by one captain alone, not even the one who posted it. It genuinely takes at least one other captain choosing to back it before it can ever complete, which is what makes it a real, cooperative wager on the harbor rather than something one captain could quietly claim for themselves and lock everyone else out of.
+
 ### Where to find it and how to use it
 
 Open your own captain's rail (the panel that normally shows your Gold, Reputation, cargo, and so on) and switch to the Dues tab, the same tab that already shows your outstanding loans. Convoy Ventures live directly underneath the loans section.
@@ -146,6 +148,7 @@ To post a venture, fill in a Gold target and how many rounds ahead the deadline 
 - If a venture instead genuinely misses its own deadline, without any venture in the harbor ever filling, every one of its contributors sees a plainer toast reading "⚓ Convoy Venture missed its deadline" along with their own partial refund, and the shared chat announces that outcome too.
 - Once the harbor's one chance has been used, the Dues tab replaces the post form with a short explanation that this voyage's one venture is already spent, rather than silently doing nothing if you try to post again.
 - A captain who never contributed to a particular venture will not get a personal toast about it either way, though they will still see the shared chat announcement, since that is visible to the whole room regardless of who was involved.
+- Once you have personally backed a venture as much as any single captain is allowed to, that venture's contribution field and button disappear from your own view, replaced by a short note explaining that it needs another captain to fund the rest. Other captains who have not yet hit their own limit can still contribute normally.
 
 ### Step by step: how to confirm it is working
 
@@ -160,6 +163,7 @@ You will need at least two captains for this, and ideally enough patience to act
 7. To test the genuine failure path on its own, with only one venture open in the harbor for the whole test, contribute less than its full target and then simply keep playing rounds without ever reaching the target or posting a second venture. Once the room's round moves past that venture's deadline round, confirm every contributor gets the partial refund toast, reading an amount that is exactly half of what they originally put in.
 8. If your voyage ends, or the host restarts it, while a venture is still open and short of its target, that venture is treated exactly the same as a missed deadline: every contributor gets their partial refund rather than the venture staying open forever with nobody left to finish funding it. Confirm that after a restart, the Dues tab lets you post a venture again, since a fresh voyage gets its own fresh chance.
 9. To confirm the final round limit, wait until your voyage is on its last couple of rounds, then try to post a venture. The "Rounds to fill" field should never let you pick a deadline that lands on the voyage's actual final round, and once you are close enough to the end, the Dues tab should replace the whole post form with a short explanation that it is too late in the voyage to post one at all.
+10. To confirm no single captain can fill a venture alone, post one and immediately try to back it yourself with the entire target amount in one contribution. Confirm you are only credited with roughly half of what you offered, confirm the progress bar stops there rather than reaching the top, and confirm your own contribute field disappears in favor of a note saying it needs another captain. Then have a second captain fund the rest, and confirm it fills normally from there.
 
 ---
 

@@ -59,21 +59,42 @@ export function ventureTotal(contributions: VentureContributions): number {
   return Object.values(contributions).reduce((sum, c) => sum + c.amount, 0);
 }
 
-// [MANIFEST 04 fix] The overflow cap: a contribution can never push a
-// venture's pooled total past its own target. This is what keeps the
-// settlement math exact (a filled venture's contributions always sum to
-// precisely targetGold, so paying each contributor contribution times
-// CONVOY_VENTURE_PAYOUT_MULTIPLIER never needs a proportional share
-// calculation at all) and what stops a captain from being charged more
-// Gold than a venture could actually use.
+// [MANIFEST 04 fix] Two caps stack here, both bounding the same
+// contribution request from above:
+//
+// The overflow cap: a contribution can never push a venture's pooled total
+// past its own target. This is what keeps the settlement math exact (a
+// filled venture's contributions always sum to precisely targetGold, so
+// paying each contributor contribution times CONVOY_VENTURE_PAYOUT_
+// MULTIPLIER never needs a proportional share calculation at all) and what
+// stops a captain from being charged more Gold than a venture could
+// actually use.
+//
+// The per contributor cap: no single captain may hold more than
+// CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE of a venture's own target across
+// every contribution they've made to it. Without this, a captain could
+// post a venture and fill the entire target alone in one contribution,
+// which both prints free Gold and burns the room's one shared chance for
+// personal gain instead of the room's; requiring real headroom to remain
+// for someone else is what actually forces genuine multi-captain
+// participation before a venture can ever fill. Rounded up (not down) so
+// two contributors splitting an odd targetGold in half still have exactly
+// enough combined room to reach it; rounding down would occasionally leave
+// a venture mathematically impossible to ever fill at all.
 export function computeAcceptedContribution(
   currentTotal: number,
   targetGold: number,
   requestedAmount: number,
+  contributorAlreadyContributed: number,
+  maxContributorShare: number,
 ): number {
-  const remaining = targetGold - currentTotal;
-  if (remaining <= 0) return 0;
-  return Math.min(requestedAmount, remaining);
+  const remainingInTarget = targetGold - currentTotal;
+  if (remainingInTarget <= 0) return 0;
+  const maxPerContributor = Math.ceil(targetGold * maxContributorShare);
+  const remainingForContributor =
+    maxPerContributor - contributorAlreadyContributed;
+  if (remainingForContributor <= 0) return 0;
+  return Math.min(requestedAmount, remainingInTarget, remainingForContributor);
 }
 
 // The payout rate for each of the three ways a venture can end. "filled"

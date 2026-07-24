@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import {
+  CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE,
   CONVOY_VENTURE_MAX_ROUNDS_AHEAD,
   CONVOY_VENTURE_MAX_TARGET,
   CONVOY_VENTURE_MIN_ROUNDS_AHEAD,
@@ -582,6 +583,16 @@ function ConvoyVenturesSection({
               Math.round((v.total / v.targetGold) * 100),
             );
             const mine = v.contributions.find((c) => c.userId === myUserId);
+            // [MANIFEST 04 fix] Mirrors the server's own per contributor cap
+            // (see computeAcceptedContribution in src/lib/game/convoy.ts):
+            // no single captain may ever hold more than
+            // CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE of a venture's target, so
+            // it can never fill from one captain's own Gold alone.
+            const myShareCap = Math.ceil(
+              v.targetGold * CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE,
+            );
+            const myRemainingShare = myShareCap - (mine?.amount ?? 0);
+            const atMyShareCap = myRemainingShare <= 0;
             return (
               <div
                 key={v.id}
@@ -605,29 +616,37 @@ function ConvoyVenturesSection({
                   <span>By Round {v.deadlineRound}</span>
                   {mine && <span>You've backed {mine.amount}g</span>}
                 </div>
-                <div className="mt-1.5 flex items-center gap-1.5">
-                  <Input
-                    type="number"
-                    min={1}
-                    value={contributions[v.id] ?? ""}
-                    onChange={(e) =>
-                      setContributions((c) => ({
-                        ...c,
-                        [v.id]: e.target.value,
-                      }))
-                    }
-                    placeholder="Gold"
-                    className="h-6 text-[10px]"
-                  />
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="h-6 shrink-0 rounded px-2 text-[10px]"
-                    onClick={() => submitContribute(v.id)}
-                  >
-                    Back it
-                  </Button>
-                </div>
+                {atMyShareCap ? (
+                  <p className="mt-1.5 text-[9px] text-muted-foreground/70">
+                    You've backed this as much as any single captain can. It
+                    needs another captain to fund the rest.
+                  </p>
+                ) : (
+                  <div className="mt-1.5 flex items-center gap-1.5">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={myRemainingShare}
+                      value={contributions[v.id] ?? ""}
+                      onChange={(e) =>
+                        setContributions((c) => ({
+                          ...c,
+                          [v.id]: e.target.value,
+                        }))
+                      }
+                      placeholder="Gold"
+                      className="h-6 text-[10px]"
+                    />
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="h-6 shrink-0 rounded px-2 text-[10px]"
+                      onClick={() => submitContribute(v.id)}
+                    >
+                      Back it
+                    </Button>
+                  </div>
+                )}
               </div>
             );
           })}

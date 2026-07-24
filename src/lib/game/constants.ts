@@ -595,6 +595,16 @@ export const CONVOY_VENTURE_MIN_ROUNDS_AHEAD = 1;
 export const CONVOY_VENTURE_MAX_ROUNDS_AHEAD = 6;
 export const CONVOY_VENTURE_PAYOUT_MULTIPLIER = 1.5;
 export const CONVOY_VENTURE_FAILURE_REFUND_RATE = 0.5;
+// [MANIFEST 04 fix] No single captain may ever fund more than this share of
+// a venture's own target, on their own. Without this, a captain could post
+// a venture and instantly fill it entirely with their own Gold, alone,
+// which is worse than the original repeat-fill exploit: it still prints a
+// bounded amount of free Gold, and it burns the whole room's one shared
+// chance for the voyage in the process, locking every other captain out
+// for personal gain instead of the room's. Capping each contributor's own
+// share below half is what actually forces at least one other captain to
+// genuinely take part before a venture can ever fill.
+export const CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE = 0.5;
 
 // =====================================================================
 // Player-facing copy. The wording is preserved from the original game; the
@@ -801,6 +811,7 @@ ${mandates.length ? `\n📜 Imperial Mandates:\n• On voyage${mandates.length =
 • Contributing is a real wager on the rest of the harbor coming through, not a free favor
 • Your whole harbor only ever gets one filled venture per voyage: the moment any venture fills, every other open venture is cancelled and fully refunded, and posting a new one is disabled until the next voyage
 • A deadline can never land on your voyage's final round: it always leaves at least one full round afterward to actually spend whatever you're paid
+• No single captain can ever fund more than ${Math.round(CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE * 100)}% of a venture's target alone: it always needs at least one other captain to fund the rest before it can fill
 
 🆘 Financial Aid:
 • Can't cover this round's wages or maintenance? Ask the harbor for a loan, right on the settlement screen
