@@ -645,6 +645,13 @@ export function attachRealtime(httpServer: HttpServer): Server {
   // ever claim a given offer. Ephemeral by design, same as the checkpoint
   // and status maps above: a server restart loses in-flight offers, which
   // is exactly as durable as the ready-vote state already is.
+  // targetUserId/targetName are optional: unset for an ordinary open offer,
+  // anyone in the room can see and accept it. Set for a direct offer to one
+  // specific captain, a safeguard against exactly the failure mode an open
+  // board has, agreeing on a trade with someone in chat and then having a
+  // third captain accept it first. A direct offer is only ever visible to
+  // its poster and its one named target, see visibleBarterOffers below;
+  // everyone else in the room never even learns it exists.
   type BarterOffer = {
     id: string;
     fromUserId: string;
@@ -653,6 +660,8 @@ export function attachRealtime(httpServer: HttpServer): Server {
     offerAmount: number;
     requestItem: string;
     requestAmount: number;
+    targetUserId?: string;
+    targetName?: string;
   };
   const roomBarterOffers = new Map<string, BarterOffer[]>();
 
@@ -660,11 +669,37 @@ export function attachRealtime(httpServer: HttpServer): Server {
     return roomBarterOffers.get(roomId) ?? [];
   }
 
+  // An open offer (no target) is visible to everyone; a direct offer is
+  // visible only to the two captains it actually involves, its poster and
+  // its named target, so the rest of the room never sees, and can never
+  // accept, a trade that was never meant for them.
+  function visibleBarterOffers(
+    offers: BarterOffer[],
+    userId: string,
+  ): BarterOffer[] {
+    return offers.filter(
+      (o) =>
+        !o.targetUserId ||
+        o.targetUserId === userId ||
+        o.fromUserId === userId,
+    );
+  }
+
+  // Personalized per connected socket, unlike every other room-wide
+  // broadcast in this file: a direct offer means two different captains in
+  // the same room can legitimately see two different boards. Iterates the
+  // presence map already kept for onlineUsers()/roomMembers() rather than
+  // asking Socket.IO's own room registry, so this stays a synchronous, in
+  // memory operation like the rest of this file's broadcasts.
   function broadcastBarter(roomId: string) {
-    io.to(`room:${roomId}`).emit("barter:update", {
-      roomId,
-      offers: barterList(roomId),
-    });
+    const offers = barterList(roomId);
+    for (const [sid, state] of sockets.entries()) {
+      if (state.roomId !== roomId) continue;
+      io.to(sid).emit("barter:update", {
+        roomId,
+        offers: visibleBarterOffers(offers, state.userId),
+      });
+    }
   }
 
   // Drops every open offer for a room (phase moved on, or the room
@@ -1645,7 +1680,10 @@ export function attachRealtime(httpServer: HttpServer): Server {
       if (!s) return;
       const roomId = payload?.roomId ?? s.roomId;
       if (!roomId || roomId !== s.roomId) return;
-      socket.emit("barter:update", { roomId, offers: barterList(roomId) });
+      socket.emit("barter:update", {
+        roomId,
+        offers: visibleBarterOffers(barterList(roomId), s.userId),
+      });
     });
 
     // Structural validation only (integers, ≥1, the two sides differ).
@@ -1653,15 +1691,25 @@ export function attachRealtime(httpServer: HttpServer): Server {
     // on their own client against their own GameState before this ever
     // fires, see postBarterOffer in src/lib/game/engine.ts, since this
     // server has no visibility into anyone's inventory or gold.
+    //
+    // targetUserId is optional: omitted (or absent), this posts an ordinary
+    // open offer exactly as before. Set, it posts a direct offer visible
+    // only to the poster and that one named captain, a safeguard against a
+    // third captain sniping a trade two people already agreed to elsewhere,
+    // over chat or in person. The target's display name is looked up here,
+    // from the room's own membership, rather than trusted from the client,
+    // the same reason fromName is always s.user.displayName and never
+    // whatever a payload happens to claim.
     socket.on(
       "barter:post",
-      (payload: {
+      async (payload: {
         roomId?: string;
         tempId?: string;
         offerItem?: string;
         offerAmount?: number;
         requestItem?: string;
         requestAmount?: number;
+        targetUserId?: string;
       }) => {
         const s = requireAuth();
         if (!s) return;
@@ -1687,6 +1735,34 @@ export function attachRealtime(httpServer: HttpServer): Server {
           });
           return;
         }
+        let targetUserId: string | undefined;
+        let targetName: string | undefined;
+        if (payload?.targetUserId) {
+          if (payload.targetUserId === s.userId) {
+            socket.emit("barter:error", {
+              roomId,
+              tempId: payload?.tempId,
+              error: "You can't direct an offer to yourself.",
+            });
+            return;
+          }
+          const targetMember = await db.roomMember.findUnique({
+            where: {
+              userId_roomId: { userId: payload.targetUserId, roomId },
+            },
+            include: { user: { select: { displayName: true } } },
+          });
+          if (!targetMember) {
+            socket.emit("barter:error", {
+              roomId,
+              tempId: payload?.tempId,
+              error: "That captain isn't in this harbor.",
+            });
+            return;
+          }
+          targetUserId = payload.targetUserId;
+          targetName = targetMember.user.displayName;
+        }
         const offer: BarterOffer = {
           id: `${roomId}:${s.userId}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
           fromUserId: s.userId,
@@ -1695,6 +1771,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
           offerAmount: offerAmount as number,
           requestItem,
           requestAmount: requestAmount as number,
+          ...(targetUserId ? { targetUserId, targetName } : {}),
         };
         roomBarterOffers.set(roomId, [...barterList(roomId), offer]);
         socket.emit("barter:posted", {
@@ -1751,6 +1828,19 @@ export function attachRealtime(httpServer: HttpServer): Server {
             roomId,
             offerId: payload.offerId,
             reason: "You can't accept your own offer.",
+          });
+          return;
+        }
+        // Defense in depth: a direct offer is never even sent to anyone
+        // but its poster and its named target (see visibleBarterOffers),
+        // so the ordinary UI can't produce an offerId for this to fire on
+        // in the first place. This only catches a raw call that bypasses
+        // that filtering.
+        if (offer.targetUserId && offer.targetUserId !== s.userId) {
+          socket.emit("barter:accept:fail", {
+            roomId,
+            offerId: payload.offerId,
+            reason: "That offer is only open to a specific captain.",
           });
           return;
         }

@@ -781,6 +781,7 @@ Brocade(70-90💰), Sachet(95-120💰)
 • Post what you have and what you want for it; anyone can accept it with one click
 • An offer can't be an item for itself, and both amounts must be whole numbers of at least 1
 • You can never offer more than you currently own, it's set aside the moment you post, and returned to you if you cancel or nobody takes it
+• Want to make sure a specific captain gets your offer, not whoever clicks fastest? Pick their name under "With" when you post: only the two of you will ever see it
 
 🔧 Ship Modules (NEW!):
 • Phase 4: Upgrade your ship to unlock Module Slots

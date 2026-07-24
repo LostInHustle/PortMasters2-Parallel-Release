@@ -167,6 +167,34 @@ You will need at least two captains for this, and ideally enough patience to act
 
 ---
 
+## Also new: Direct Barter Offers
+
+This one is not part of the numbered eighteen, it is a small addition to the Bartering system the game already had. It is worth knowing about anyway, since it fixes a real, easy to run into problem: the original Bartering board is open to the whole harbor, so if you and a friend agree in chat to make a specific trade, there was nothing stopping a third captain from seeing that same offer on the board and accepting it themselves, a moment before your friend got to it.
+
+### What it actually does, in plain words
+
+When you post a barter offer, you can now choose who it is for. Leave it as "Anyone in the harbor" and it behaves exactly as it always has, visible to, and acceptable by, everyone in the room. Choose a specific captain's name instead, and the offer becomes theirs alone: nobody else in the harbor will ever see it exists, and nobody else can accept it, not even by clicking quickly.
+
+### Where to find it and how to use it
+
+It lives right in the existing "Post an Offer" panel during the Bartering window, underneath the usual item and amount fields. A new "With" dropdown defaults to "Anyone in the harbor"; change it to a specific captain's name before posting to make that offer theirs alone.
+
+### What you will actually see on screen
+
+- A direct offer you posted, or one aimed at you, shows a small lock badge reading "Just for [name]" right on the offer itself, so it is easy to tell apart from the ordinary open ones.
+- If an offer was not posted for you and was not posted by you, you will simply never see it on your own board at all, it does not appear as greyed out or unavailable, it is not there.
+
+### Step by step: how to confirm it is working
+
+You will need three captains for the most convincing version of this test, though two is enough to confirm the basic behavior.
+
+1. With three captains in the harbor, have one post an offer and choose a second captain's name under "With" instead of leaving it on "Anyone."
+2. Confirm the named captain sees the offer on their own board, with the lock badge. Confirm the third, uninvolved captain sees nothing new on their board at all.
+3. Have the named captain accept it. Confirm the trade completes normally for both sides, exactly like an ordinary open offer would.
+4. Confirm an ordinary offer posted with "Anyone in the harbor" still shows up for every captain in the room, unaffected by any of the above.
+
+---
+
 ## Quick reference: what to watch for, side by side
 
 | Feature           | Who sees it                                                                                  | Where it shows up                                                                                                                                                                                                                               | How often it can happen                                                                                                                                    |
