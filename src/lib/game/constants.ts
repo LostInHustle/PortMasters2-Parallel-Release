@@ -800,6 +800,7 @@ ${mandates.length ? `\n📜 Imperial Mandates:\n• On voyage${mandates.length =
 • Miss the deadline and it fails: every contributor only gets back ${Math.round(CONVOY_VENTURE_FAILURE_REFUND_RATE * 100)}% of their own stake, the rest is lost
 • Contributing is a real wager on the rest of the harbor coming through, not a free favor
 • Your whole harbor only ever gets one filled venture per voyage: the moment any venture fills, every other open venture is cancelled and fully refunded, and posting a new one is disabled until the next voyage
+• A deadline can never land on your voyage's final round: it always leaves at least one full round afterward to actually spend whatever you're paid
 
 🆘 Financial Aid:
 • Can't cover this round's wages or maintenance? Ask the harbor for a loan, right on the settlement screen

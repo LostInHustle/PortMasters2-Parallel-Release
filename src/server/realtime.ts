@@ -46,6 +46,7 @@ import { meritById, qualifyingMerits } from "../lib/game/merits";
 import {
   normalizeDifficulty,
   renownMultiplierFor,
+  roundsFor,
 } from "../lib/game/difficulty";
 import { computeHarborPulse } from "../lib/game/harborPulse";
 
@@ -1485,7 +1486,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         }
         const room = await db.room.findUnique({
           where: { id: roomId },
-          select: { voyageEpoch: true, currentRound: true },
+          select: { voyageEpoch: true, currentRound: true, difficulty: true },
         });
         if (!room) return;
         if (await hasRoomClaimedVenture(roomId, room.voyageEpoch)) {
@@ -1496,8 +1497,30 @@ export function attachRealtime(httpServer: HttpServer): Server {
           });
           return;
         }
+        // [MANIFEST 04 fix] The deadline can never land on, or past, the
+        // voyage's actual final round for this room's tier: a venture that
+        // filled on the very last round would hand its contributors Gold
+        // with no round left in which spending it could still raise their
+        // final Reputation, and a deadline past the voyage's own end would
+        // never really get judged on its own terms at all, it would just
+        // get swept up as "failed" the moment the voyage concludes (see
+        // maybeConcludeVoyage above). Capping one round short guarantees
+        // whoever contributes always has at least one full round left to
+        // actually use whatever they're paid.
+        const voyageRounds = roundsFor(room.difficulty);
         const minRound = room.currentRound + CONVOY_VENTURE_MIN_ROUNDS_AHEAD;
-        const maxRound = room.currentRound + CONVOY_VENTURE_MAX_ROUNDS_AHEAD;
+        const maxRound = Math.min(
+          room.currentRound + CONVOY_VENTURE_MAX_ROUNDS_AHEAD,
+          voyageRounds - 1,
+        );
+        if (minRound > maxRound) {
+          socket.emit("venture:error", {
+            roomId,
+            error:
+              "Too late in the voyage to post a new Convoy Venture: there's no round left that would leave time to spend the reward.",
+          });
+          return;
+        }
         if (deadlineRound < minRound || deadlineRound > maxRound) {
           socket.emit("venture:error", {
             roomId,

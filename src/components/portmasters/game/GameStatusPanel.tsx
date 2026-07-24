@@ -460,6 +460,18 @@ function ConvoyVenturesSection({
     {},
   );
 
+  // [MANIFEST 04 fix] Mirrors the server's own cap (see venture:post in
+  // src/server/realtime.ts): the deadline can never land on, or past, this
+  // voyage's actual final round, so whoever contributes always has at
+  // least one full round left to spend whatever they're paid. Computed
+  // client side purely so the form can't even offer an option the server
+  // would reject; the server enforces this for real regardless.
+  const maxRoundsAhead = Math.min(
+    CONVOY_VENTURE_MAX_ROUNDS_AHEAD,
+    game.maxRounds - 1 - game.currentRound,
+  );
+  const tooLateToPost = maxRoundsAhead < CONVOY_VENTURE_MIN_ROUNDS_AHEAD;
+
   function submitPost() {
     const t = Math.floor(Number(target));
     const r = Math.floor(Number(roundsAhead));
@@ -496,8 +508,15 @@ function ConvoyVenturesSection({
         // form, is what actually stops a captain from wondering why
         // posting silently does nothing.
         <p className="mb-2 rounded bg-black/[0.03] px-2 py-1.5 text-[10px] text-muted-foreground/80 dark:bg-white/[0.04]">
-          This harbor has already used its one Convoy Venture for this
-          voyage. It opens again on a fresh voyage or a restart.
+          This harbor has already used its one Convoy Venture for this voyage.
+          It opens again on a fresh voyage or a restart.
+        </p>
+      ) : tooLateToPost ? (
+        // [MANIFEST 04 fix] Too close to the voyage's own final round for
+        // any deadline to leave a full round free to spend the reward in.
+        <p className="mb-2 rounded bg-black/[0.03] px-2 py-1.5 text-[10px] text-muted-foreground/80 dark:bg-white/[0.04]">
+          Too late in this voyage to post a new Convoy Venture: there's no round
+          left that would leave time to spend the reward.
         </p>
       ) : (
         <>
@@ -523,7 +542,7 @@ function ConvoyVenturesSection({
               <Input
                 type="number"
                 min={CONVOY_VENTURE_MIN_ROUNDS_AHEAD}
-                max={CONVOY_VENTURE_MAX_ROUNDS_AHEAD}
+                max={maxRoundsAhead}
                 value={roundsAhead}
                 onChange={(e) => setRoundsAhead(e.target.value)}
                 className="h-7 text-[11px]"
@@ -541,9 +560,9 @@ function ConvoyVenturesSection({
           {game.currentRound + Number(roundsAhead || 0) > 0 && (
             <p className="mb-2 text-[9px] text-muted-foreground/70">
               Fills by Round{" "}
-              {game.currentRound + (Math.floor(Number(roundsAhead)) || 0)}.
-              Miss it and every contributor only gets back a partial refund.
-              This harbor only gets one venture per voyage, so make it count.
+              {game.currentRound + (Math.floor(Number(roundsAhead)) || 0)}. Miss
+              it and every contributor only gets back a partial refund. This
+              harbor only gets one venture per voyage, so make it count.
             </p>
           )}
         </>
