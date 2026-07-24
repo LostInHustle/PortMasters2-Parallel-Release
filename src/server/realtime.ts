@@ -32,7 +32,6 @@ import {
 } from "../lib/game/legacy";
 import {
   BROKERS_FAVOR_UNLOCK_LEVEL,
-  CONVOY_VENTURE_FAILURE_REFUND_RATE,
   CONVOY_VENTURE_MAX_ROUNDS_AHEAD,
   CONVOY_VENTURE_MAX_TARGET,
   CONVOY_VENTURE_MIN_ROUNDS_AHEAD,
@@ -48,6 +47,15 @@ import {
   renownMultiplierFor,
   roundsFor,
 } from "../lib/game/difficulty";
+import {
+  computeAcceptedContribution,
+  computeSettlements,
+  computeVentureDeadlineBounds,
+  parseVentureContributions,
+  ventureAnnouncementFor,
+  ventureTotal,
+  type VentureOutcome,
+} from "../lib/game/convoy";
 import { computeHarborPulse } from "../lib/game/harborPulse";
 
 // ---------- Types ----------
@@ -800,34 +808,6 @@ export function attachRealtime(httpServer: HttpServer): Server {
   // by (roomId, voyageEpoch), never just roomId, so a host restart's fresh
   // epoch can never resolve, or even see, a venture from a voyage that no
   // longer exists.
-  type VentureContribution = { name: string; amount: number };
-  type VentureContributions = Record<string, VentureContribution>;
-
-  function parseVentureContributions(raw: string): VentureContributions {
-    try {
-      const parsed: unknown = JSON.parse(raw);
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
-        return {};
-      const out: VentureContributions = {};
-      for (const [userId, value] of Object.entries(
-        parsed as Record<string, unknown>,
-      )) {
-        if (!value || typeof value !== "object") continue;
-        const v = value as { name?: unknown; amount?: unknown };
-        if (typeof v.name !== "string" || typeof v.amount !== "number")
-          continue;
-        out[userId] = { name: v.name, amount: v.amount };
-      }
-      return out;
-    } catch {
-      return {};
-    }
-  }
-
-  function ventureTotal(contributions: VentureContributions): number {
-    return Object.values(contributions).reduce((sum, c) => sum + c.amount, 0);
-  }
-
   function ventureSummary(v: {
     id: string;
     posterId: string;
@@ -904,20 +884,10 @@ export function attachRealtime(httpServer: HttpServer): Server {
   // who never contributed to this particular venture hears anything at all.
   async function settleVenture(
     venture: { id: string; roomId: string; contributions: string },
-    outcome: "filled" | "failed" | "destroyed",
+    outcome: VentureOutcome,
   ) {
     const contributions = parseVentureContributions(venture.contributions);
-    const rate =
-      outcome === "filled"
-        ? CONVOY_VENTURE_PAYOUT_MULTIPLIER
-        : outcome === "failed"
-          ? CONVOY_VENTURE_FAILURE_REFUND_RATE
-          : 1;
-    const settlements = Object.entries(contributions).map(([userId, c]) => ({
-      userId,
-      name: c.name,
-      amount: Math.round(c.amount * rate),
-    }));
+    const settlements = computeSettlements(contributions, outcome);
     await db.convoyVenture.update({
       where: { id: venture.id },
       data: { status: outcome, resolvedAt: new Date() },
@@ -929,15 +899,9 @@ export function attachRealtime(httpServer: HttpServer): Server {
       settlements,
     });
     if (settlements.length) {
-      const content =
-        outcome === "filled"
-          ? `⚓ A Convoy Venture filled! Every contributor is paid their share, times ${CONVOY_VENTURE_PAYOUT_MULTIPLIER}x. This harbor's one Convoy Venture chance for this voyage has now been used.`
-          : outcome === "failed"
-            ? `⚓ A Convoy Venture missed its deadline. Every contributor gets back a partial refund.`
-            : `⚓ A Convoy Venture was cancelled: another venture in the harbor already claimed this voyage's one chance. Every contributor gets back their full stake.`;
       io.to(`room:${venture.roomId}`).emit("room:system", {
         roomId: venture.roomId,
-        content,
+        content: ventureAnnouncementFor(outcome),
       });
     }
   }
@@ -1508,12 +1472,13 @@ export function attachRealtime(httpServer: HttpServer): Server {
         // whoever contributes always has at least one full round left to
         // actually use whatever they're paid.
         const voyageRounds = roundsFor(room.difficulty);
-        const minRound = room.currentRound + CONVOY_VENTURE_MIN_ROUNDS_AHEAD;
-        const maxRound = Math.min(
-          room.currentRound + CONVOY_VENTURE_MAX_ROUNDS_AHEAD,
-          voyageRounds - 1,
+        const bounds = computeVentureDeadlineBounds(
+          room.currentRound,
+          voyageRounds,
+          CONVOY_VENTURE_MIN_ROUNDS_AHEAD,
+          CONVOY_VENTURE_MAX_ROUNDS_AHEAD,
         );
-        if (minRound > maxRound) {
+        if (!bounds) {
           socket.emit("venture:error", {
             roomId,
             error:
@@ -1521,6 +1486,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
           });
           return;
         }
+        const { minRound, maxRound } = bounds;
         if (deadlineRound < minRound || deadlineRound > maxRound) {
           socket.emit("venture:error", {
             roomId,
@@ -1614,15 +1580,18 @@ export function attachRealtime(httpServer: HttpServer): Server {
         }
         const contributions = parseVentureContributions(venture.contributions);
         const currentTotal = ventureTotal(contributions);
-        const remaining = venture.targetGold - currentTotal;
-        if (remaining <= 0) {
+        const accepted = computeAcceptedContribution(
+          currentTotal,
+          venture.targetGold,
+          amount,
+        );
+        if (accepted <= 0) {
           socket.emit("venture:error", {
             roomId,
             error: "That venture is already fully funded.",
           });
           return;
         }
-        const accepted = Math.min(amount, remaining);
         const existing = contributions[s.userId];
         contributions[s.userId] = {
           name: s.user.displayName,
