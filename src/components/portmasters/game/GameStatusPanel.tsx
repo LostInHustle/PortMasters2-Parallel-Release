@@ -8,7 +8,6 @@ import {
   CONVOY_VENTURE_MIN_ROUNDS_AHEAD,
   CONVOY_VENTURE_MIN_TARGET,
   COLORS,
-  ICONS,
 } from "@/lib/game/constants";
 import { getHireCost } from "@/lib/game/engine";
 import type { GameState } from "@/lib/game/types";
@@ -26,6 +25,7 @@ import { GameLogPanel } from "./GameLogPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ItemIcon } from "../shared";
 
 /**
  * The captain's own rail.
@@ -177,7 +177,7 @@ export function GameStatusPanel({
           {unlockedResources(game.difficulty, game.currentRound).map((r) => (
             <InvItem
               key={r}
-              icon={ICONS[r]}
+              icon={<ItemIcon item={r} className="h-3.5 w-3.5" />}
               name={r}
               color={COLORS[r]}
               count={game.inventory[r] || 0}
@@ -190,7 +190,7 @@ export function GameStatusPanel({
           {unlockedProducts(game.difficulty, game.currentRound).map((r) => (
             <InvItem
               key={r}
-              icon={ICONS[r]}
+              icon={<ItemIcon item={r} className="h-3.5 w-3.5" />}
               name={r}
               color={COLORS[r]}
               count={game.inventory[r] || 0}
@@ -666,7 +666,7 @@ function InvItem({
   skilled,
   priceContent,
 }: {
-  icon: string;
+  icon: React.ReactNode;
   name: string;
   term?: string;
   color?: string;
@@ -680,7 +680,9 @@ function InvItem({
 }) {
   return (
     <div className="flex items-center py-0.5 text-[11px]">
-      <span className="mr-1.5 text-[14px]">{icon}</span>
+      <span className="mr-1.5 inline-flex items-center text-[14px]">
+        {icon}
+      </span>
       <span className="flex-1" style={{ color: muted ? undefined : color }}>
         <Term term={term ?? name} content={priceContent}>
           {name}

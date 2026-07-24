@@ -18,7 +18,6 @@ import {
   tutorialSteps,
   RESOURCES,
   PRODUCTS,
-  ICONS,
   COLORS,
   WORKER_TYPES,
 } from "@/lib/game/constants";
@@ -34,7 +33,7 @@ import type { PlayerDetailData } from "@/lib/use-player-detail";
 import type { PublicUser } from "@/lib/api";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import { cn } from "@/lib/utils";
-import { Avatar, Pill } from "../shared";
+import { Avatar, Pill, ItemIcon } from "../shared";
 import { CaptainLegacyCard } from "../CaptainLegacyCard";
 import {
   Sparkles,
@@ -589,7 +588,7 @@ export function PlayerDetailModal({
                           key={r}
                           className="flex items-center text-[12px] py-0.5"
                         >
-                          <span className="mr-1.5">{ICONS[r]}</span>
+                          <ItemIcon item={r} className="mr-1.5 h-3.5 w-3.5" />
                           <span className="flex-1" style={{ color: COLORS[r] }}>
                             {r}
                           </span>
@@ -608,7 +607,7 @@ export function PlayerDetailModal({
                           key={r}
                           className="flex items-center text-[12px] py-0.5"
                         >
-                          <span className="mr-1.5">{ICONS[r]}</span>
+                          <ItemIcon item={r} className="mr-1.5 h-3.5 w-3.5" />
                           <span className="flex-1" style={{ color: COLORS[r] }}>
                             {r}
                           </span>

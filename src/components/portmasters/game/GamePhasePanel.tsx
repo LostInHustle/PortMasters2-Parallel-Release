@@ -87,7 +87,7 @@ import type { useAid } from "@/lib/use-aid";
 import type { useBacking } from "@/lib/use-backing";
 import { ReadyBar } from "./ReadyBar";
 import { Term } from "../Term";
-import { Avatar, MeritIcon } from "../shared";
+import { Avatar, MeritIcon, ItemIcon } from "../shared";
 import { CaptainLegacyCard } from "../CaptainLegacyCard";
 import {
   PriceBreakdownTooltip,
@@ -115,7 +115,7 @@ function MarketPriceReference({ game }: { game: GameState }) {
             }
           >
             <span className="text-[11px]" style={{ color: COLORS[item] }}>
-              {ICONS[item]} {item}
+              <ItemIcon item={item} className="h-3 w-3" /> {item}
             </span>
           </Term>
         ))}
@@ -507,7 +507,8 @@ function Purchase({
           {game.revealedIntel.map((i, idx) => (
             <span key={idx}>
               {idx > 0 && ", "}
-              {ICONS[i.item] ?? ""} {i.item} ({i.port})
+              <ItemIcon item={i.item} className="h-3.5 w-3.5" /> {i.item} (
+              {i.port})
             </span>
           ))}
           <span className="text-muted-foreground">
@@ -542,7 +543,7 @@ function Purchase({
               <div className="p-3.5 flex-1 space-y-1.5">
                 {c.resources.map((r, i) => (
                   <div key={i} className="flex items-center text-[12px]">
-                    <span className="mr-1.5 text-base">{ICONS[r.type]}</span>
+                    <ItemIcon item={r.type} className="mr-1.5 h-4 w-4" />
                     <Term
                       term={r.type}
                       content={priceAwareTermContent(game, r.type)}
@@ -814,11 +815,13 @@ function BarterPhase({
                     </span>
                     <span className="text-muted-foreground">offer</span>
                     <span style={{ color: COLORS[o.offerItem] }}>
-                      {ICONS[o.offerItem]} {o.offerAmount} {o.offerItem}
+                      <ItemIcon item={o.offerItem} className="h-3.5 w-3.5" />{" "}
+                      {o.offerAmount} {o.offerItem}
                     </span>
                     <span className="text-muted-foreground">for</span>
                     <span style={{ color: COLORS[o.requestItem] }}>
-                      {ICONS[o.requestItem]} {o.requestAmount} {o.requestItem}
+                      <ItemIcon item={o.requestItem} className="h-3.5 w-3.5" />{" "}
+                      {o.requestAmount} {o.requestItem}
                     </span>
                     {isDirect && (
                       <span className="rounded-full bg-teal-500/15 px-1.5 py-0.5 text-[9px] font-medium text-teal-700 dark:text-teal-300">
@@ -960,7 +963,7 @@ function WorkerMgmt({
             </strong>
             {unlockedResources(game.difficulty, game.currentRound).map((r) => (
               <div key={r} className="flex items-center text-[11px] py-0.5">
-                <span className="mr-1.5">{ICONS[r]}</span>
+                <ItemIcon item={r} className="mr-1.5 h-3.5 w-3.5" />
                 <span className="flex-1" style={{ color: COLORS[r] }}>
                   {r}
                 </span>
@@ -974,7 +977,7 @@ function WorkerMgmt({
             </strong>
             {openProducts.map((r) => (
               <div key={r} className="flex items-center text-[11px] py-0.5">
-                <span className="mr-1.5">{ICONS[r]}</span>
+                <ItemIcon item={r} className="mr-1.5 h-3.5 w-3.5" />
                 <span className="flex-1" style={{ color: COLORS[r] }}>
                   {r}
                 </span>
@@ -1184,7 +1187,8 @@ function Orders({
           {game.revealedIntel.map((i, idx) => (
             <span key={idx}>
               {idx > 0 && ", "}
-              {ICONS[i.item] ?? ""} {i.item} ({i.port})
+              <ItemIcon item={i.item} className="h-3.5 w-3.5" /> {i.item} (
+              {i.port})
             </span>
           ))}
           <span className="text-muted-foreground">
@@ -1235,7 +1239,8 @@ function Orders({
                         setFavorQty(game.inventory[it] || 1);
                       }}
                     >
-                      {ICONS[it]} {it} ({game.inventory[it]})
+                      <ItemIcon item={it} className="h-3.5 w-3.5" /> {it} (
+                      {game.inventory[it]})
                     </Button>
                   ))}
                 </div>
@@ -1257,7 +1262,8 @@ function Orders({
           ) : (
             <div className="space-y-2">
               <div className="font-semibold">
-                {ICONS[favorItem]} How much {favorItem} should the Broker sell?
+                <ItemIcon item={favorItem} className="h-4 w-4" /> How much{" "}
+                {favorItem} should the Broker sell?
               </div>
               <div className="flex items-center gap-2">
                 <QuantityInput
@@ -1388,7 +1394,7 @@ function Orders({
                   return (
                     <div key={i} className="flex items-center text-[12px]">
                       <span className="mr-1.5">{has ? "✅" : "❌"}</span>
-                      <span className="mr-1.5 text-base">{ICONS[r.type]}</span>
+                      <ItemIcon item={r.type} className="mr-1.5 h-4 w-4" />
                       <Term term={r.type}>
                         <span
                           className="font-medium"
