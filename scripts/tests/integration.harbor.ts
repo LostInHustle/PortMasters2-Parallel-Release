@@ -370,9 +370,11 @@ test("across independent trials, a claim (when it fires) always fires at exactly
       );
     }
   }
-  // A "safe" captain reliably completes at least 3 orders over an 8-round Fair
-  // Winds voyage; if this ever drops near zero it means the trade board or
-  // this strategy stopped generating fulfillable orders, which would make
+  // A "safe" captain reliably completes at least WORD_ON_THE_DOCKS_THRESHOLD
+  // orders over an 8-round Fair Winds voyage; if this ever drops near zero
+  // it means the trade board or this strategy stopped generating
+  // fulfillable orders (or the threshold has been tuned up past what a
+  // safe playstyle can reliably reach in one voyage), which would make
   // every assertion above vacuously true instead of actually exercising the
   // threshold crossing.
   assert(

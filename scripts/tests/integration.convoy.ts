@@ -221,10 +221,17 @@ test("the reported repro, closed: two captains funding a venture together still 
     CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE,
   );
   total += acceptedB;
-  assertEqual(total, target, "together, two genuinely different captains still reach the target exactly");
+  assertEqual(
+    total,
+    target,
+    "together, two genuinely different captains still reach the target exactly",
+  );
   assert(acceptedA < target, "captain A alone never reached the full target");
   assert(acceptedB < target, "captain B alone never reached the full target");
-  assert(acceptedA > 0 && acceptedB > 0, "both captains genuinely contributed something real, this wasn't one captain funding it and a token amount from the other");
+  assert(
+    acceptedA > 0 && acceptedB > 0,
+    "both captains genuinely contributed something real, this wasn't one captain funding it and a token amount from the other",
+  );
 });
 
 // ---------- computeSettlements / settlementRateFor: the exploit fix ----------
@@ -288,14 +295,34 @@ test("destroyed refunds every contributor their full original stake, untouched",
 test("a solo funded fill is now impossible end to end: the per contributor cap alone guarantees a filled venture always has at least two distinct contributors", () => {
   const target = 200;
   const capA = Math.ceil(target * CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE);
-  const acceptedA = computeAcceptedContribution(0, target, target, 0, CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE);
-  const acceptedB = computeAcceptedContribution(acceptedA, target, target - acceptedA, 0, CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE);
+  const acceptedA = computeAcceptedContribution(
+    0,
+    target,
+    target,
+    0,
+    CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE,
+  );
+  const acceptedB = computeAcceptedContribution(
+    acceptedA,
+    target,
+    target - acceptedA,
+    0,
+    CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE,
+  );
   const contributions: VentureContributions = {
     a: { name: "A", amount: acceptedA },
     b: { name: "B", amount: acceptedB },
   };
-  assertEqual(ventureTotal(contributions), target, "the venture reaches its target");
-  assertEqual(Object.keys(contributions).length, 2, "it took two distinct contributors to get there, never one");
+  assertEqual(
+    ventureTotal(contributions),
+    target,
+    "the venture reaches its target",
+  );
+  assertEqual(
+    Object.keys(contributions).length,
+    2,
+    "it took two distinct contributors to get there, never one",
+  );
   const settlements = computeSettlements(contributions, "filled");
   const totalPaidOut = settlements.reduce((sum, s) => sum + s.amount, 0);
   assertEqual(
@@ -320,8 +347,15 @@ test("at round 1 of an 8 round Fair Winds voyage, the latest allowed deadline is
     CONVOY_VENTURE_MAX_ROUNDS_AHEAD,
   );
   assert(bounds !== null, "a valid window exists at round 1");
-  assertEqual(bounds!.maxRound, 7, "capped at maxRounds - 1, never the true final round");
-  assert(bounds!.maxRound < rounds, "the max round is always strictly before the voyage's final round");
+  assertEqual(
+    bounds!.maxRound,
+    7,
+    "capped at maxRounds - 1, never the true final round",
+  );
+  assert(
+    bounds!.maxRound < rounds,
+    "the max round is always strictly before the voyage's final round",
+  );
 });
 
 test("once too close to a voyage's own end, no valid deadline window remains at all", () => {
@@ -332,7 +366,11 @@ test("once too close to a voyage's own end, no valid deadline window remains at 
     CONVOY_VENTURE_MIN_ROUNDS_AHEAD,
     CONVOY_VENTURE_MAX_ROUNDS_AHEAD,
   );
-  assertEqual(bounds, null, "at round 7 of an 8 round voyage, minRound (8) would exceed maxRound (7): posting must be refused entirely");
+  assertEqual(
+    bounds,
+    null,
+    "at round 7 of an 8 round voyage, minRound (8) would exceed maxRound (7): posting must be refused entirely",
+  );
 });
 
 test("the cap scales correctly across every difficulty tier's own round count", () => {
@@ -376,11 +414,19 @@ test("contributeToVenture escrows the exact amount, and refuses a contribution t
   const startingGold = state.money;
   const logs: string[] = [];
   contributeToVenture(state, 40, logs);
-  assertEqual(state.money, startingGold - 40, "exactly the contributed amount is deducted");
+  assertEqual(
+    state.money,
+    startingGold - 40,
+    "exactly the contributed amount is deducted",
+  );
 
   const before = state.money;
   contributeToVenture(state, before + 1, logs);
-  assertEqual(state.money, before, "a contribution beyond current Gold is refused, no partial deduction");
+  assertEqual(
+    state.money,
+    before,
+    "a contribution beyond current Gold is refused, no partial deduction",
+  );
 });
 
 test("receiveVentureSettlement credits exactly the settled amount for each of the three outcomes", () => {
@@ -389,7 +435,11 @@ test("receiveVentureSettlement credits exactly the settled amount for each of th
     const before = state.money;
     const logs: string[] = [];
     receiveVentureSettlement(state, 77, logs, outcome);
-    assertEqual(state.money, before + 77, `${outcome}: exactly the settled amount is credited`);
+    assertEqual(
+      state.money,
+      before + 77,
+      `${outcome}: exactly the settled amount is credited`,
+    );
     assert(logs.length > 0, `${outcome}: a log line is written`);
   }
 });

@@ -679,9 +679,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
   ): BarterOffer[] {
     return offers.filter(
       (o) =>
-        !o.targetUserId ||
-        o.targetUserId === userId ||
-        o.fromUserId === userId,
+        !o.targetUserId || o.targetUserId === userId || o.fromUserId === userId,
     );
   }
 

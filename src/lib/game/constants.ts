@@ -564,7 +564,7 @@ export const BROKERS_FAVOR_PAYOUT_CAP = 200;
 // moment it happens. Deliberately tier independent, same reward and same
 // threshold on every difficulty, since the point is a spontaneous race
 // between real captains, not one more dial to retune per tier.
-export const WORD_ON_THE_DOCKS_THRESHOLD = 3;
+export const WORD_ON_THE_DOCKS_THRESHOLD = 5;
 export const WORD_ON_THE_DOCKS_REWARD = 25;
 
 // [MANIFEST 03: Tidewatch Alerts] Deliberately not a difficulty dial: this
@@ -577,7 +577,7 @@ export const WORD_ON_THE_DOCKS_REWARD = 25;
 // additive on top of whatever the difficulty tier's own charter schedule is
 // already doing, and never subtracted back out. See the game:status handler
 // in src/server/realtime.ts for where the combined total is actually read.
-export const TIDEWATCH_SURGE_THRESHOLD = 250;
+export const TIDEWATCH_SURGE_THRESHOLD = 500;
 
 // [MANIFEST 04: Convoy Ventures] A pooled, multi captain investment: gold
 // only (see the ConvoyVenture Prisma model), too large a target for one

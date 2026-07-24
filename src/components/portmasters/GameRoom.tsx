@@ -10,7 +10,10 @@ import {
 } from "@/lib/api";
 import type { VoyageCompleteEvent } from "@/lib/realtime";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
-import { BROKERS_FAVOR_UNLOCK_LEVEL } from "@/lib/game/constants";
+import {
+  BROKERS_FAVOR_UNLOCK_LEVEL,
+  WORD_ON_THE_DOCKS_THRESHOLD,
+} from "@/lib/game/constants";
 import { meritById } from "@/lib/game/merits";
 import { useRealtime } from "@/lib/use-realtime";
 import { useGameSession } from "@/lib/use-game-session";
@@ -349,11 +352,11 @@ export function GameRoom({
       if (data.winnerId === me.id) {
         act((g, l) => claimWordOnTheDocksReward(g, l));
         toast.success("📣 Word on the Docks!", {
-          description: `First to complete 3 trade orders this voyage. +${data.reward} Gold.`,
+          description: `First to complete ${WORD_ON_THE_DOCKS_THRESHOLD} trade orders this voyage. +${data.reward} Gold.`,
         });
       } else {
         toast("📣 Word on the Docks", {
-          description: `${data.winnerName} was first to complete 3 trade orders this voyage.`,
+          description: `${data.winnerName} was first to complete ${WORD_ON_THE_DOCKS_THRESHOLD} trade orders this voyage.`,
         });
       }
     };

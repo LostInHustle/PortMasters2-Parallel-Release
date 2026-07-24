@@ -57,7 +57,7 @@ Because there is no on screen label confirming this is active, and because base 
 
 ### What it actually does, in plain words
 
-This is a race between every captain in the harbor. Whoever is the first captain, across the whole room, to complete three trade orders total during this voyage (not three in one round, three total, however many rounds it takes to get there) wins twenty five Gold on the spot, and the entire harbor is told immediately who won.
+This is a race between every captain in the harbor. Whoever is the first captain, across the whole room, to complete five trade orders total during this voyage (not five in one round, five total, however many rounds it takes to get there) wins twenty five Gold on the spot, and the entire harbor is told immediately who won.
 
 It does not matter which round it happens in. It could happen in Round 1 if someone plays fast, or it might not happen until Round 4 if everyone is slow to complete orders. It also only happens once per voyage: the instant one captain wins it, the race is over for everyone else, forever, until the voyage restarts.
 
@@ -67,16 +67,16 @@ There are three different things to watch for, and which ones you personally see
 
 **If you are the captain who won:**
 
-- A green success toast notification appears in the corner of your screen. It reads "📣 Word on the Docks!" with a line underneath saying something like "First to complete 3 trade orders this voyage. +25 Gold."
+- A green success toast notification appears in the corner of your screen. It reads "📣 Word on the Docks!" with a line underneath saying something like "First to complete 5 trade orders this voyage. +25 Gold."
 - Your own Gold total, visible in your status panel, jumps up by exactly 25 immediately, at the same moment the toast appears.
 
 **If someone else won instead:**
 
-- You still get a toast notification, but a plainer one (not the green success style), reading "📣 Word on the Docks" with a line telling you who won, for example "Captain Aaron was first to complete 3 trade orders this voyage."
+- You still get a toast notification, but a plainer one (not the green success style), reading "📣 Word on the Docks" with a line telling you who won, for example "Captain Aaron was first to complete 5 trade orders this voyage."
 
 **Everyone in the harbor, winner and everyone else alike, will also see this:**
 
-- A message appears in the shared Harbor chat and log panel, visible to the whole room, reading something like "📣 Word on the Docks: Captain Aaron was first to complete 3 trade orders this voyage, and pockets 25 Gold for it!"
+- A message appears in the shared Harbor chat and log panel, visible to the whole room, reading something like "📣 Word on the Docks: Captain Aaron was first to complete 5 trade orders this voyage, and pockets 25 Gold for it!"
 
 So if you are testing this with a friend, the winner sees a green toast plus the Gold jump, the loser sees a plainer toast with no Gold change, and both of you should see the same chat message land in the shared log at the same moment.
 
@@ -84,9 +84,9 @@ So if you are testing this with a friend, the winner sees a green toast plus the
 
 1. Start a voyage with at least two captains in the harbor.
 2. Keep track of your own running total of completed trade orders. Every time you successfully complete an order during Phase 2 (Trade Transaction), that counts toward your voyage total, whether it happens in Round 1, Round 2, or later.
-3. Race to be the first captain in the room to hit three completed orders total. It is fine if this takes a few rounds; the race has no deadline, it simply ends the moment anyone reaches three.
-4. The instant one captain's third order is confirmed, watch for the toast on both screens and the chat message in the shared log. Confirm the winner's Gold went up by exactly 25, and confirm the loser's Gold did not change at all from this event.
-5. To specifically test that only one person can ever win, try to arrange for two captains to complete their third order in the very same round, as close together in time as you can manage. Only one of you should get the green success toast and the Gold; the other should get the plainer "someone else won" toast instead, never both.
+3. Race to be the first captain in the room to hit five completed orders total. It is fine if this takes a few rounds; the race has no deadline, it simply ends the moment anyone reaches five.
+4. The instant one captain's fifth order is confirmed, watch for the toast on both screens and the chat message in the shared log. Confirm the winner's Gold went up by exactly 25, and confirm the loser's Gold did not change at all from this event.
+5. To specifically test that only one person can ever win, try to arrange for two captains to complete their fifth order in the very same round, as close together in time as you can manage. Only one of you should get the green success toast and the Gold; the other should get the plainer "someone else won" toast instead, never both.
 6. To confirm it only fires once per voyage, keep playing after the race is decided and complete more orders as either captain. No further "Word on the Docks" toast or chat message should appear again until the host restarts the voyage.
 
 ---
@@ -95,7 +95,7 @@ So if you are testing this with a friend, the winner sees a green toast plus the
 
 ### What it actually does, in plain words
 
-This one is not a race, it is a shared reward for the whole harbor doing well together. The moment everyone currently in the harbor's Reputation, all added up together, reaches 250 or more, the game treats that as "a bustling crew has arrived," and from that point on, every single captain's Port Purchase board permanently shows one extra cargo lot to buy from, every round, for the rest of that voyage.
+This one is not a race, it is a shared reward for the whole harbor doing well together. The moment everyone currently in the harbor's Reputation, all added up together, reaches 500 or more, the game treats that as "a bustling crew has arrived," and from that point on, every single captain's Port Purchase board permanently shows one extra cargo lot to buy from, every round, for the rest of that voyage.
 
 This is deliberately not tied to which difficulty setting the host picked. It never changes how many rounds the voyage lasts, and it never changes which goods are available; it only ever adds exactly one extra card to the board, once triggered, and that extra card stays for good.
 
@@ -111,7 +111,7 @@ Unlike Word on the Docks, this is not a race with one winner, it is a shared mom
 
 1. Start a voyage with at least two captains in the harbor.
 2. Open the Harbor Roster (Members panel) so you can see everyone's live Reputation, not just your own. Add the numbers together in your head as you play, or just watch for the toast, since the game is doing that addition for you automatically every time anyone's status updates.
-3. Play normally, focusing on completing profitable trade orders, since Reputation grows from trading, not from simply holding Gold. Keep playing rounds until the combined total across the whole room reaches 250 or more.
+3. Play normally, focusing on completing profitable trade orders, since Reputation grows from trading, not from simply holding Gold. Keep playing rounds until the combined total across the whole room reaches 500 or more.
 4. The moment that happens, every captain currently in the room should see the toast and the chat message at essentially the same time, not just one person.
 5. On the very next Port Purchase phase that opens after the alert, count your cards. Compare that count to what you saw in earlier rounds; it should be exactly one higher, and it should stay one higher every round after that for the rest of the voyage.
 6. One timing detail worth knowing: if the alert fires in the middle of a round, say, during Trade Transaction or Settlement rather than right at the start of Port Purchase, the board you are already looking at that round will not gain a card retroactively. The extra card only ever shows up starting from the next fresh Port Purchase phase, not the one already in progress when the threshold was crossed.
@@ -201,7 +201,7 @@ You will need three captains for the most convincing version of this test, thoug
 | ----------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | The Harbor Pulse  | Everyone, but silently                                                                       | Only visible as a subtle price shift on the Port Purchase board, no toast or chat message at all                                                                                                                                                | Every round from Round 2 onward, recalculated fresh each time                                                                                              |
 | Word on the Docks | Everyone, but the winner sees something different from everyone else                         | A toast for every captain (green and Gold plus 25 for the winner, a plainer one naming the winner for everyone else), plus one shared chat message for the whole room                                                                           | Once per voyage, whoever gets there first                                                                                                                  |
-| Tidewatch Alerts  | Everyone, identically                                                                        | A toast for every captain in the room, plus one shared chat message, plus one extra card on the Port Purchase board from then on                                                                                                                | Once per voyage, the moment the room's combined Reputation crosses 250                                                                                     |
+| Tidewatch Alerts  | Everyone, identically                                                                        | A toast for every captain in the room, plus one shared chat message, plus one extra card on the Port Purchase board from then on                                                                                                                | Once per voyage, the moment the room's combined Reputation crosses 500                                                                                     |
 | Convoy Ventures   | Only contributors get a personal toast, but everyone sees the shared chat message either way | A progress bar per open venture in the Dues tab of your captain's rail, a toast on fill, failure, or cancellation for contributors, a shared chat message for the whole room, and a locked out post form once the voyage's one venture is spent | Only one venture can ever fill per voyage, room wide; once that happens every other open venture is cancelled and posting is disabled until a fresh voyage |
 
 ---

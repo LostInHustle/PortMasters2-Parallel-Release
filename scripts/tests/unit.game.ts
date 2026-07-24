@@ -1056,9 +1056,9 @@ test("completeOrder: never re-fires _pendingDocksClaim past the threshold", () =
 // decision, not a typo that silently desyncs the rules text from the code.
 
 test("harbor system constants match the documented design", () => {
-  assertEqual(WORD_ON_THE_DOCKS_THRESHOLD, 3, "first to 3 completed orders");
+  assertEqual(WORD_ON_THE_DOCKS_THRESHOLD, 5, "first to 5 completed orders");
   assertEqual(WORD_ON_THE_DOCKS_REWARD, 25, "25 Gold reward");
-  assertEqual(TIDEWATCH_SURGE_THRESHOLD, 250, "combined Reputation past 250");
+  assertEqual(TIDEWATCH_SURGE_THRESHOLD, 500, "combined Reputation past 500");
 });
 
 const ok = summary();

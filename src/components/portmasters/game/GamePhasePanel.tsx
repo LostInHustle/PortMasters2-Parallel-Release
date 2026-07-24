@@ -753,10 +753,8 @@ function BarterPhase({
         </div>
         {targetUserId && (
           <p className="text-center text-[11px] text-muted-foreground mt-1.5">
-            Only{" "}
-            {otherMembers.find((m) => m.id === targetUserId)?.displayName}{" "}
-            will see this offer. A safeguard so nobody else can take it
-            first.
+            Only {otherMembers.find((m) => m.id === targetUserId)?.displayName}{" "}
+            will see this offer. A safeguard so nobody else can take it first.
           </p>
         )}
         {sameItem && (
