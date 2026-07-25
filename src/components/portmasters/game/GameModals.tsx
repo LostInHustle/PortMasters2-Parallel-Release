@@ -16,10 +16,7 @@ import {
   guideText,
   tipsText,
   tutorialSteps,
-  RESOURCES,
-  PRODUCTS,
   COLORS,
-  WORKER_TYPES,
 } from "@/lib/game/constants";
 import type { Difficulty } from "@/lib/game/difficulty";
 import {

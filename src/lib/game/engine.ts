@@ -31,7 +31,6 @@ import {
   ICONS,
   MERCHANT_RATINGS,
   MODULES,
-  PORTS,
   PRODUCT_PRICES,
   PRODUCTS,
   RECIPES,
@@ -1878,6 +1877,7 @@ export function receiveBackedCoverage(
   );
 }
 
+// ---------- Convoy Ventures ----------
 // [MANIFEST 04: Convoy Ventures] Escrows a contribution immediately, the
 // same moment barter posting escrows an offer (see postBarterOffer) rather
 // than waiting for the venture to actually resolve. The server (see

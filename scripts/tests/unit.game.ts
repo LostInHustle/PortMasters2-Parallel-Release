@@ -26,7 +26,6 @@ import {
 } from "../../src/lib/game/difficulty";
 import {
   unlockedResources,
-  unlockedProducts,
   unlockedPorts,
   unlockedBoons,
   unlockedModules,
