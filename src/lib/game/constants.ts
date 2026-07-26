@@ -117,7 +117,6 @@ export const PORTS_TIER0 = [
 ] as const;
 export const PORTS_TIER1 = ["Fuzhou Port", "Goryeo Port"] as const;
 export const PORTS_TIER2 = ["Srivijaya Port", "Dashi Port"] as const;
-export const PORTS = [...PORTS_TIER0, ...PORTS_TIER1, ...PORTS_TIER2] as const;
 
 export const RECIPES: Record<
   string,

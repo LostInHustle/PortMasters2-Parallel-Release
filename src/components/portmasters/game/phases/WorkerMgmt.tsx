@@ -21,30 +21,44 @@ import { Term } from "../../Term";
 import { ItemIcon } from "../../shared";
 import { ReadyFooter, type PhaseSync } from "./PhaseShared";
 
+// The wrapper that carries an artisan type's own hue to everything nested
+// inside it (see the .pm-artisan-* rules in globals.css). Composed from the
+// worker id rather than mapped here, so adding an artisan means adding one
+// hue in the stylesheet and nothing at all in this file.
+function artisanTint(id: string) {
+  return `pm-artisan pm-artisan-${id}`;
+}
+
 function WorkerList({
   type,
+  icon,
   list,
   name,
   tasks,
   act,
 }: {
   type: string;
+  icon: string;
   list: Worker[];
   name: string;
   tasks: string[];
   act: (fn: (g: GameState, logs: string[]) => void) => void;
 }) {
   if (!list.length) return null;
-  const icon = type === "weaver" ? "👩‍🔧" : type === "master" ? "👩‍🎨" : "🌸";
   return (
-    <div className="my-3">
-      <div className="text-xs font-semibold text-teal-700 dark:text-teal-300">
+    <div
+      className={cn(
+        artisanTint(type),
+        "pm-artisan-wash pm-artisan-edge my-2.5 rounded-lg border-l-[3px] px-3 py-2.5",
+      )}
+    >
+      <div className="pm-artisan-ink text-xs font-semibold">
         {icon} {name}s: {list.length}
       </div>
       {list.map((w, i) => (
         <div
           key={i}
-          className="flex items-center justify-between bg-background/60 rounded-md px-3 py-1.5 my-1 text-xs border border-black/5 dark:border-white/10"
+          className="flex items-center justify-between bg-background/70 rounded-md px-3 py-1.5 my-1 text-xs border border-black/5 dark:border-white/10"
         >
           <span>
             {name} {i + 1}:{" "}
@@ -53,10 +67,14 @@ function WorkerList({
               : `Idle${w.isSkilled ? " ⭐ Skilled" : ""}`}
           </span>
           {!w.task && (
+            // Quiet until you reach for it, but still edged so it reads as a
+            // button. Every artisan row used to end in a solid red block,
+            // which made dismissal the loudest thing on a screen that is
+            // otherwise about hiring and assigning.
             <Button
               size="sm"
-              variant="destructive"
-              className="h-6 px-2 text-[10px] rounded"
+              variant="ghost"
+              className="h-6 px-2 text-[10px] rounded border border-rose-500/25 bg-rose-500/5 text-rose-600/90 hover:border-rose-500/40 hover:bg-rose-500/15 hover:text-rose-600 dark:text-rose-400/90 dark:hover:text-rose-300"
               onClick={() => act((g, l) => fireWorker(g, type, i, l))}
             >
               Dismiss ({WAGES[type]}💰)
@@ -75,7 +93,7 @@ function WorkerList({
               key={t}
               size="sm"
               variant="secondary"
-              className="h-7 px-2.5 text-[10px] rounded"
+              className="pm-artisan-chip h-7 px-2.5 text-[10px] rounded border"
               onClick={() => act((g, l) => assignTask(g, type, t, l))}
             >
               Make {t} (Need {mats})
@@ -210,9 +228,16 @@ export function WorkerMgmt({
             {roster
               .filter((r) => r.due > 0)
               .map((r) => (
-                <div key={r.id} className="flex justify-between">
+                <div
+                  key={r.id}
+                  className={cn(artisanTint(r.id), "flex justify-between")}
+                >
                   <span>
-                    {r.icon} {r.list.length}× {r.label} @ {r.cost}g
+                    {r.icon}{" "}
+                    <span className="pm-artisan-ink font-medium">
+                      {r.list.length}× {r.label}
+                    </span>{" "}
+                    @ {r.cost}g
                   </span>
                   <b>{r.due} Gold</b>
                 </div>
@@ -231,8 +256,8 @@ export function WorkerMgmt({
         <h3 className="text-center font-semibold mb-2">🔨 Hire Workers</h3>
         <div className="text-xs space-y-1 mb-3">
           {roster.map((r) => (
-            <div key={r.id}>
-              <strong>
+            <div key={r.id} className={artisanTint(r.id)}>
+              <strong className="pm-artisan-ink">
                 {r.icon} <Term term={r.label}>{r.label}</Term>
               </strong>
               :{" "}
@@ -251,16 +276,20 @@ export function WorkerMgmt({
             </div>
           ))}
         </div>
+        {/* Each hire button wears its own craft's hue. The old three-colour
+            cycle put the same saturated green on the first, fourth and
+            seventh artisan, so a row of seven read as one repeating stripe
+            and the colour told you nothing about which artisan you were
+            about to hire. */}
         <div className="flex flex-wrap justify-center gap-2">
-          {roster.map((r, i) => (
+          {roster.map((r) => (
             <Button
               key={r.id}
               size="sm"
-              variant={i % 3 === 1 ? "secondary" : undefined}
+              variant="secondary"
               className={cn(
-                "rounded-lg",
-                i % 3 === 0 && "pm-grad-emerald text-white",
-                i % 3 === 2 && "pm-grad-amber text-white",
+                artisanTint(r.id),
+                "pm-artisan-chip rounded-lg border font-medium",
               )}
               onClick={() => act((g, l) => hireWorker(g, r.id, l))}
             >
@@ -279,6 +308,7 @@ export function WorkerMgmt({
             <WorkerList
               key={r.id}
               type={r.id}
+              icon={r.icon}
               list={r.list}
               name={r.label}
               tasks={r.tasks}
