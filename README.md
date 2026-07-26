@@ -1,179 +1,251 @@
 # PortMasters 2 Parallel Release
 
-PortMasters 2 Parallel Release is a browser based multiplayer trading game set on the ancient Silk Road. Players register a captain, gather in a shared harbor with other captains, and once at least two people are in the room the host can set sail. From there everyone plays through eight synchronized voyages: buying goods at port, filling trade orders, paying wages and maintenance, upgrading their ship, and occasionally drafting a boon or a ship module that changes how their run plays out. Whoever ends the eighth voyage with the highest score wins the title of Sea Master.
+A browser based multiplayer trading game set on the maritime Silk Road. Captains gather in a shared harbor, and once at least two of them are in the room the host sets sail. Everyone then plays the same voyage in lockstep: draft a boon, buy at port, barter with the other captains, put artisans to work, fill trade orders, settle wages and pirates, refit at the shipyard. Whoever ends the voyage with the highest Reputation is crowned Sea Master.
 
-## What this project actually is
+## Quick start
 
-This is worth spelling out clearly, because the name is easy to confuse with two other things that already exist: **PortMasters2** and **PortMasters2-ReactApp**. This project is neither of those. It's a separate codebase, started by Joe Zhou and Aaron Zhu as a parallel branch off the original PortMasters game, built to try a different approach to taking that single player game online rather than to extend either of the existing PortMasters2 efforts. It shares a common ancestor with them (the original single player prototype, kept for reference at [docs/original-single-player-game.html](docs/original-single-player-game.html)) but from there it goes its own way: its own server architecture, its own realtime layer, its own database schema. Treat it as its own thing, not as a fork that needs to stay in sync with the other two.
+```bash
+npm install      # installs and generates the Prisma client
+npm run db:push  # creates the SQLite tables
+npm run dev      # http://localhost:2232
+```
 
-Because of that lineage, you'll still find the occasional internal reference to the original name in places that are pure implementation detail rather than anything a player or visitor sees: the source folder `src/components/portmasters`, and a couple of `localStorage` keys like `portmasters_tutorial_seen`. Those weren't renamed on purpose. Renaming a source folder means updating every import path that touches it for no actual benefit, since nobody outside the codebase ever sees a folder name, and renaming the `localStorage` keys would just make the tutorial pop up again for anyone who'd already seen it, for the same lack of benefit. Anywhere the name is actually visible, in the page title, the in game banner, log messages, code comments describing what a file is for, the docs, all of that now says PortMasters 2 Parallel Release. The one deliberate exception is [docs/original-single-player-game.html](docs/original-single-player-game.html) itself, which is kept as an unmodified snapshot of the original game on purpose, specifically so it stays useful as a reference for the original wording, prices, and balance. Renaming things inside that file would defeat the point of keeping it around.
+Register a captain and look around. To try the multiplayer side, open a second browser or a private window rather than a second tab, since tabs in the same browser share one cookie jar and one session.
+
+Two things surprise people first: the port is 2232, not 3000, and there is no separate backend to start. `server.ts` is the whole app.
+
+## What this project is, and what it is not
+
+Three separate codebases carry the PortMasters 2 name. This is the third, and it is not a fork of either of the others.
+
+| Project                                                                        | What it is                                                                                                                                                                                                                       |
+| ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [PortMasters2](https://github.com/LostInHustle/PortMasters2)                   | The original successor. A Python WebSocket server with an HTML and JavaScript client, accounts stored in JSON. Two captains per game.                                                                                            |
+| [PortMasters2-ReactApp](https://github.com/LostInHustle/PortMasters2-ReactApp) | A full TypeScript rebuild of that game as an npm workspaces monorepo: a Node WebSocket backend with a React 19 and Vite frontend. Same rules, new engine. Two captains per game.                                                 |
+| **This repo**                                                                  | A separate attempt at taking the original single player game online, started by Joe Zhou and Aaron Zhu. One Next.js process serves the site, the API and the realtime layer. A harbor holds as many captains as want to sail it. |
+
+All three descend from the same single player prototype, kept unmodified at [docs/original-single-player-game.html](docs/original-single-player-game.html) so it stays useful as a reference for the original wording, prices and balance. From that shared ancestor this project goes its own way: its own server architecture, realtime layer, database schema, difficulty tiers and progression systems. Treat it as its own thing rather than a fork that has to stay in sync with the other two.
+
+<details>
+<summary>Why some internal names still say "portmasters"</summary>
+
+The source folder `src/components/portmasters` and a few `localStorage` keys such as `portmasters_tutorial_seen` kept their original names on purpose. Renaming the folder means rewriting every import path that touches it for no benefit, since nobody outside the codebase sees a folder name, and renaming the storage keys would pop the tutorial open again for everyone who had already dismissed it. Everywhere the name is actually visible (page title, in game banner, log messages, docs) it reads PortMasters 2 Parallel Release. The deliberate exception is `docs/original-single-player-game.html`, which is kept as an unmodified snapshot; renaming things inside it would defeat the point of keeping it.
+
+</details>
+
+## The game
+
+### The shape of a round
+
+Every round runs the same seven steps, and every captain in the room moves through them together. Nobody advances until everyone still active has readied up.
+
+| Step                | What happens                                                             |
+| ------------------- | ------------------------------------------------------------------------ |
+| Boon draft          | Draw from a fresh pool of boons that bend the rules for the coming round |
+| Phase 1: Purchase   | Buy raw materials from the port market                                   |
+| Barter              | Trade goods and Gold directly with the other captains                    |
+| Artisan management  | Hire artisans and assign what each of them crafts                        |
+| Phase 2: Orders     | Fill trade orders for Gold and Reputation                                |
+| Phase 3: Settlement | Production lands, wages and maintenance come due, pirates may find you   |
+| Phase 4: Shipyard   | Upgrade the ship, draft and rig modules                                  |
+
+### Difficulty tiers
+
+The host picks a tier when creating the room. It sets the length of the voyage, how much of the content opens up, and how hard the sea pushes back.
+
+| Tier              | Rounds | Charters        | Pirate odds       | Renown | The pitch                                                                                                                         |
+| ----------------- | ------ | --------------- | ----------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| 🌤️ Fair Winds     | 8      | none            | 20%               | 1.0x   | Eight rounds on the founding trade. Room to learn the rhythm before the money runs tight.                                         |
+| 🌊 Open Waters    | 12     | rounds 4 and 8  | 22% rising to 30% | 1.25x  | The charter opens twice and the market swells from six cards to ten, with pirates that bite past the midpoint.                    |
+| ⛈️ Monsoon Season | 16     | rounds 6 and 11 | 28% rising to 38% | 1.6x   | Back loaded and unforgiving. The largest imperial mandates fall late, and a corrupt broker may leak your position to the pirates. |
+
+A charter opens the next tier of goods, ports and artisans mid voyage: porcelain clay and copper ore with their potters and coppersmiths first, then spices and pearls with their perfumers and jewelers. Fair Winds never leaves the founding trade, which is what keeps the entry tier exactly the game it has always been. The full design rationale lives in [docs/DIFFICULTY_MODES_PROPOSAL.md](docs/DIFFICULTY_MODES_PROPOSAL.md).
+
+### Harbor systems
+
+These are the systems that make a harbor different from several people playing solo next to each other. Each one is documented in detail, with steps for confirming it actually works, in [docs/NEW_FEATURES_GUIDE.md](docs/NEW_FEATURES_GUIDE.md).
+
+- **The Harbor Pulse** leans port prices toward whatever the whole harbor bought last round, capped at roughly twelve percent either way. Nobody announces it and nobody controls it; it is simply a consequence of what the room did together.
+- **Word on the Docks** is a race. The first captain in the room to complete five trade orders in a voyage takes 25 Gold on the spot, and the whole harbor is told who won. It fires once per voyage.
+- **Tidewatch Alerts** are the cooperative counterpart. Once the combined Reputation of everyone in the harbor reaches 500, every captain's purchase board gains a permanent extra cargo lot for the rest of the voyage.
+- **Convoy Ventures** pool Gold toward a target by a deadline round. Fill it and every contributor gets back fifty percent more than they put in; miss the deadline and they get back half. A harbor fills exactly one venture per voyage, which cancels the rest with full refunds, and no captain may fund more than half of any target alone, so a venture cannot complete without someone else choosing to back it.
+- **Backing** adds a third role to an aid loan: a captain who is neither lender nor borrower pledges Gold as a safety net. If the loan is repaid the pledge comes back whole, plus a Reputation bonus smaller than the lender's. If the borrower falls short, the pledge covers the gap up to its own size and no further, so it narrows the lender's risk without erasing it.
+- **Direct barter offers** can be addressed to one named captain instead of the whole room. Nobody else sees the offer or can accept it.
+
+### What carries across voyages
+
+A voyage resets everything inside it. Three things survive:
+
+- **Renown.** Reputation earned on a voyage converts to Renown XP, scaled by the tier's multiplier. Levels run from Deckhand to Silk Road Sovereign and buy a small starting Gold bonus of 3 per level, capped at +60 against a starting stake of 90 to 100, so an experienced captain begins a little ahead without trivializing the early rounds.
+- **Merits.** Nine one time badges for firsts and milestones, three of them only reachable on the rougher tiers. They carry bragging rights and nothing else, so the list can grow without touching the voyage economy.
+- **Daily check in.** A seven day cycle of Renown XP rewards (20, 30, 40, 50, 60, 80, then 150) tied to the account rather than any room.
 
 ## How the pieces fit together
 
-The thing that trips people up first is that there is no separate backend service and no separate realtime server. [server.ts](server.ts) is the one and only entry point. It creates a single HTTP server, hands it to Next.js to serve the website and the API routes, and attaches Socket.IO to that same server for presence, chat, and turn synchronization. One process, one port. Locally that port is 2232, chosen specifically so the whole app can go through a single ngrok tunnel if you ever want to share your local instance with someone else.
+**One process, one port.** [server.ts](server.ts) creates a single HTTP server, hands it to Next.js for the site and the API routes, and attaches Socket.IO to that same server for presence, chat and turn synchronization. There is no separate backend service and no separate realtime server. Port 2232 was chosen so the whole app fits through a single ngrok tunnel.
 
-The database is a single SQLite file read and written directly by that same process. There's no separate database server to install, no connection pool to configure, nothing else to bring up alongside it.
+**One SQLite file**, read and written directly by that same process. No database server to install, no pool to configure.
 
-The other detail worth understanding before you touch the code: the server doesn't actually run the game rules. Every client runs the same deterministic simulation in [src/lib/game/engine.ts](src/lib/game/engine.ts), seeded off the room id, so every captain in a room sees identical markets and orders without the server needing to compute anything. What the server (specifically [src/server/realtime.ts](src/server/realtime.ts)) does is much narrower: it tracks who has clicked "ready" for the round and phase the room is currently sitting at, and once everyone who's still active has readied up, it tells every client to advance. It also owns a handful of one-shot, host-only transitions that aren't part of that vote at all: starting the voyage, and restarting it. Both of those are covered in more detail below, since the second one used to be broken in a way that's worth understanding even now that it's fixed.
+**The server does not run the game rules.** Every client runs the same deterministic simulation in [src/lib/game/engine.ts](src/lib/game/engine.ts), seeded off the room id, so every captain sees identical markets and orders without the server computing anything. [src/server/realtime.ts](src/server/realtime.ts) does something much narrower: it tracks who has readied up for the round and phase the room is sitting at, and tells everyone to advance once the active players have all readied. It also owns the host only transitions that are not part of that vote (starting and restarting a voyage) and the harbor systems above, which are genuinely shared state and therefore genuinely the server's business.
+
+That split is the single most useful thing to know before changing anything: ask which side owns the behavior before you touch it.
 
 ## Tech stack
 
-- Next.js 16 (App Router) with React 19 and TypeScript
-- Tailwind CSS v4 with shadcn/ui components (new-york style) built on Radix primitives
-- Prisma 7 as the ORM, backed by SQLite through the `@prisma/adapter-better-sqlite3` driver adapter (Prisma 7's default client engine has no bundled query engine binary; see the database section below)
-- Socket.IO for the realtime layer, wired into a custom server instead of the default Next.js dev/production server
+- Next.js 16 (App Router), React 19, TypeScript
+- Tailwind CSS v4 with shadcn/ui components (new-york style) on Radix primitives, plus framer-motion for phase transitions, lucide-react for icons, sonner for toasts and next-themes for dark mode
+- Prisma 7 backed by SQLite through the `@prisma/adapter-better-sqlite3` driver adapter (Prisma 7's default client engine ships no query engine binary, see [Database and Prisma](#database-and-prisma))
+- Socket.IO, wired into a custom server rather than the default Next.js one
 - Zod for request validation on the API routes
-- tsx to run the TypeScript server directly, in both development and production, with no separate compile step for the server itself
+- tsx to run the TypeScript server directly in both development and production, with no separate compile step for the server
+
+Tailwind v4 is configured entirely in CSS. The theme lives in the `@theme` block in [src/app/globals.css](src/app/globals.css); there is no `tailwind.config.ts`.
 
 ## Project layout
 
-A quick map of where things live:
+| Path                                     | What lives there                                                                                                                                                                                                                                                                                                                           |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `server.ts`                              | The entry point. Everything starts here.                                                                                                                                                                                                                                                                                                   |
+| `src/app`                                | App Router tree. The single page UI is `page.tsx`; REST endpoints are under `src/app/api` (auth, rooms, game state, legacy, check in, direct messages).                                                                                                                                                                                    |
+| `src/components/portmasters`             | The game's own UI: auth screen, lobby, game room shell, chat and member panels.                                                                                                                                                                                                                                                            |
+| `src/components/portmasters/game`        | The room's panels: status sidebar, control bar, log, modals, price tooltips.                                                                                                                                                                                                                                                               |
+| `src/components/portmasters/game/phases` | One module per phase screen, from `Welcome` through `Endgame`, dispatched by `GamePhasePanel`.                                                                                                                                                                                                                                             |
+| `src/components/ui`                      | shadcn generated primitives. Treat as generated code.                                                                                                                                                                                                                                                                                      |
+| `src/lib`                                | `auth.ts` and `api-auth.ts` for passwords and sessions, `db.ts` for the Prisma singleton, `rooms.ts` for what leaving a room means, `api.ts` for the typed fetch wrapper, `realtime.ts` for the client Socket.IO singleton, and the `use-*.ts` hooks (phase sync, game session and autosave, barter, aid, backing, convoy, notifications). |
+| `src/lib/game`                           | The simulation and its rules: `engine.ts`, `constants.ts`, `types.ts`, `rng.ts` for seeded randomness, `difficulty.ts` and `pools.ts` for tiers and what they unlock, `glossary.ts`, and one module per persistent or harbor system (`legacy.ts`, `merits.ts`, `checkin.ts`, `harborPulse.ts`, `convoy.ts`, `backing.ts`).                 |
+| `src/server/realtime.ts`                 | Server side Socket.IO: presence, room channels, the ready check protocol, host only actions, harbor systems.                                                                                                                                                                                                                               |
+| `prisma/schema.prisma`                   | The data model: users, sessions, rooms, membership, per player game state, captain legacy and merits, convoy ventures, messages. `prisma/migrations` holds the history.                                                                                                                                                                    |
+| `prisma.config.ts`                       | Where the Prisma CLI reads its connection string. Prisma 7 moved this out of the schema file.                                                                                                                                                                                                                                              |
+| `generated/prisma`                       | Generated client output. Gitignored, rebuilt by `prisma generate`.                                                                                                                                                                                                                                                                         |
+| `scripts/tests`                          | The test suite, plain `tsx` scripts with no runner.                                                                                                                                                                                                                                                                                        |
+| `docs/`                                  | Deployment guide, harbor feature guide, design proposals, and the original single player snapshot.                                                                                                                                                                                                                                         |
 
-- `server.ts` is the entry point described above. Everything starts here.
-- `src/app` is the Next.js App Router tree: the single page UI lives in `page.tsx`, and the REST endpoints live under `src/app/api` (auth, rooms, game state, direct messages).
-- `src/components/portmasters` holds the game's own UI: the auth screen, the lobby, the game room shell, chat and member panels, and a `game` subfolder with the phase specific panels (purchasing, trading, the status sidebar, modals, and so on). As noted above, the folder name itself is a leftover from before the rename and was left alone on purpose.
-- `src/components/ui` holds the shadcn generated primitives (button, dialog, tabs, etc). Treat these as generated code rather than something to hand edit heavily.
-- `src/lib` is where the actual logic lives: `auth.ts` and `api-auth.ts` handle password hashing and sessions, `db.ts` is the Prisma client singleton, `rooms.ts` centralizes what "leaving a room" means, `api.ts` is a typed fetch wrapper the UI calls into, `realtime.ts` is the client side Socket.IO singleton, `use-phase-sync.ts` is the client half of the ready-check protocol (also where starting and restarting a voyage are triggered from), `use-game-session.ts` owns the actual per-player game state and autosave, and `game/` contains the simulation itself (`engine.ts`, `constants.ts`, `types.ts`, `rng.ts` for the seeded randomness, and `glossary.ts`).
-- `src/server/realtime.ts` is the server side Socket.IO wiring described above: presence, room channels, the ready-check protocol, and the host-only start/restart actions.
-- `prisma/schema.prisma` defines the data model: users, sessions, rooms, room membership, per player game state, and chat messages. `prisma/migrations` holds the actual migration history.
-- `prisma.config.ts`, at the repository root, is where the Prisma CLI (migrate, db push, studio) gets its database connection string from. Prisma 7 moved this out of the schema file itself; see the database section below for why that matters for where the SQLite file actually ends up.
-- `generated/prisma` is where the Prisma client gets generated to. This project points Prisma at a custom output folder instead of the usual `node_modules/@prisma/client`, so the import path stays stable no matter where it's imported from. It's gitignored and gets rebuilt by `prisma generate`.
-- `docs/deployment.md` covers running and deploying in more detail than this file does, particularly around Railway and persisting the SQLite file across deploys.
+## Development
 
-## Before you start
+You need Node 20.19 or newer (`package.json` sets that as the floor; this was built against Node 22) and npm. Stick with npm: there is one `package-lock.json` checked in and no other lockfile.
 
-You'll need a reasonably current Node (Node 20 or newer is a safe bet; this was built and tested against Node 22) and npm. Stick with npm rather than yarn or pnpm here. There's a `package-lock.json` checked in and no other lockfile, so mixing package managers will just leave you with a lockfile that doesn't match what's actually installed.
+`npm install` runs `prisma generate` through the `postinstall` script. If that gets skipped, nothing touching the database will work.
 
-## Running it locally, step by step
+Then run `npm run db:push` once. It is tempting to skip and assume the database will sort itself out, and it half will: SQLite creates an empty file the moment something opens it, but that file has no tables. The app will start, the homepage will load, and registering an account will fail with "no such table: main.User".
 
-1. Get the code onto your machine and open a terminal in the project root.
+### Scripts
 
-2. Install dependencies:
+| Script                | What it does                                                                                                                           |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev`         | `tsx watch server.ts`. Site, API and realtime in one process, restarting on server side changes.                                       |
+| `npm run build`       | `prisma generate` then `next build`.                                                                                                   |
+| `npm run start`       | Applies pending migrations with `prisma migrate deploy`, then serves the production build. Does not build for you.                     |
+| `npm run lint`        | ESLint through the flat config in `eslint.config.mjs`.                                                                                 |
+| `npm test`            | The whole suite, six files in sequence.                                                                                                |
+| `npm run db:push`     | Syncs the schema straight to the database without recording a migration. Fastest way to a working local database.                      |
+| `npm run db:migrate`  | `prisma migrate dev`. The right tool once you have actually changed `schema.prisma` and want the change recorded. Prompts for a name.  |
+| `npm run db:generate` | Regenerates the client into `generated/prisma` without touching the database.                                                          |
+| `npm run db:reset`    | `prisma migrate reset`. Genuinely destructive: drops the database and rebuilds from migrations.                                        |
+| `npm run db:clean`    | Wipes test rooms, memberships, saved states and messages, leaving an empty lobby. Takes `--keep-users` to spare accounts and sessions. |
 
-   ```
-   npm install
-   ```
+### Tests
 
-   This also triggers `prisma generate` automatically through the `postinstall` script, which writes the Prisma client into `generated/prisma`. If that step gets skipped for any reason (more on that below), nothing that touches the database will work.
-
-3. Set up the database. The schema and a real migration history already exist under `prisma/migrations`, so the cleanest way to create the tables is:
-
-   ```
-   npm run db:push
-   ```
-
-   It's tempting to skip this and assume the database will sort itself out the first time the app touches it. It mostly will, but only halfway: SQLite happily creates an empty file the first time something tries to open it, but that empty file has no tables in it yet. If you skip this step, the app will start up and the homepage will load fine, right up until you try to register an account, at which point you'll get a Prisma error along the lines of "no such table: main.User". Running `db:push` once up front avoids that entirely.
-
-4. Start the dev server:
-
-   ```
-   npm run dev
-   ```
-
-   This runs `tsx watch server.ts`, so the same process serves the website, the API, and the realtime layer, and restarts itself whenever server side files change. Once it logs that it's ready, the app is at `http://localhost:2232`. Note that it's not port 3000, since this app deliberately doesn't use the default Next.js port.
-
-5. Register a captain and have a look around. To actually test the multiplayer side of things, see the note about testing with two accounts further down, since it catches almost everyone the first time.
-
-If you ever want to share your local instance with someone else, point a tunnel at the same port, for example `ngrok http 2232`. The `allowedDevOrigins` setting in `next.config.ts` already allowlists ngrok's domains so the dev server doesn't block its own asset requests when accessed through a tunnel.
-
-## Running it the way it runs in production
-
-The `start` script does not build anything for you, it just runs the already built app:
-
+```bash
+npm test              # all six suites
+npm run test:unit     # pure game rules
+npm run test:effects  # audit that every boon and module effect actually fires
+npm run test:integration   # a full voyage end to end
+npm run test:harbor        # harbor pulse, word on the docks, tidewatch
+npm run test:convoy        # convoy venture math and its exploit guards
+npm run test:backing       # backing resolution, escrow and payout
 ```
+
+They are plain `tsx` scripts sharing a small harness, with no test runner, no database and no live server. Everything they touch is pure logic that imports neither Prisma nor React, which is exactly why the Gold math for convoy and backing was pulled out of the socket closures in `src/server/realtime.ts` and into their own modules: a regression there now shows up in a fast deterministic test instead of only in a live room.
+
+### Running the production build locally
+
+```bash
 npm run build
 npm run start
 ```
 
-`build` runs `prisma generate` again (harmless if it's already up to date) and then `next build`. `start` sets `NODE_ENV=production` and runs the same `server.ts` entry point, except this time Next serves the production build instead of running its dev server. If you only ever ran `npm run dev` and then try `npm run start` without building first, you'll either get errors about missing build artifacts or you'll end up serving a stale build from whenever `build` was last run, so always build immediately before you start when you're testing the production path locally.
+`start` does not build for you. Run the two together, or you will serve whatever build happens to be sitting on disk from last time.
 
-One thing to flag if you're on Windows: the `start` script sets `NODE_ENV=production` inline (`NODE_ENV=production tsx server.ts`), which is a Unix shell convention. It works fine in bash, zsh, and on Railway, but it will fail in a plain Windows `cmd.exe` or PowerShell session. WSL or Git Bash sidesteps this; otherwise you'd need to set the environment variable separately before running the command.
+On Windows, `start` sets `NODE_ENV=production` inline, which is a Unix shell convention. It works in bash, zsh and on Railway, but fails in plain `cmd.exe` or PowerShell. Use WSL or Git Bash, or set the variable separately.
 
 ## Environment variables
 
-There's exactly one environment variable this project cares about locally, and it's already checked into `.env`:
+One variable matters locally, and it is already committed in `.env`:
 
 ```
 DATABASE_URL=file:./prisma/dev.db
 ```
 
-That file is committed on purpose. It doesn't hold any secret, just a relative path to a local SQLite file, so there was no reason to make every new clone recreate it by hand. The one thing worth knowing about that path is what it's relative _to_. With Prisma 6 and earlier, a relative `file:` path in `DATABASE_URL` was resolved against `prisma/schema.prisma`'s own directory, so `file:./dev.db` would land at `prisma/dev.db` without you needing to say `prisma/` yourself. Prisma 7 changed that: the connection string now lives in `prisma.config.ts` at the repository root instead of in the schema file (see the database section below), and a relative path resolves against that file's directory, the project root, instead. The `.env` value above spells out `prisma/dev.db` explicitly for exactly that reason. If you ever see a stray `dev.db` show up at the repository root instead of inside `prisma/`, it means something pointed `DATABASE_URL` at a bare `file:./dev.db` again; fix the value rather than moving the file, since the same plain `file:./dev.db` would just reappear at the root again next time something writes to it. It's also worth knowing that a root-level `dev.db` would not be caught by `.gitignore`, which only excludes `*.db` files inside `prisma/`, so getting this path wrong risks accidentally committing a real local database.
+That file is committed on purpose. It holds no secret, just a relative path, so there was no reason to make every clone recreate it.
 
-`PORT` is optional and only matters for deployment. `server.ts` reads `process.env.PORT` and falls back to 2232 if it isn't set. Railway sets this automatically, so you don't need to set it yourself in that environment.
+The path is worth understanding. Under Prisma 6 and earlier, a relative `file:` path resolved against `prisma/schema.prisma`'s own directory, so `file:./dev.db` landed in `prisma/`. Prisma 7 moved the connection string to `prisma.config.ts` at the repository root, and relative paths now resolve against that file's directory instead. Hence the explicit `prisma/` above. If a stray `dev.db` ever appears at the repository root, something pointed `DATABASE_URL` at a bare `file:./dev.db`; fix the value rather than moving the file, or it will reappear. This matters beyond tidiness: `.gitignore` only excludes `*.db` inside `prisma/`, so a root level `dev.db` can be committed by accident.
 
-## The database and the Prisma scripts
+`PORT` is optional and only matters for deployment. `server.ts` falls back to 2232. Railway sets it automatically.
 
-A few scripts in `package.json` deal with the database, and they're not interchangeable:
+## Database and Prisma
 
-- `npm run db:push` syncs the schema straight to the database without recording a migration. It's the quickest way to get a working database locally and is what's used in the steps above.
-- `npm run db:migrate` runs `prisma migrate dev`, which is the right tool when you've actually changed `schema.prisma` and want to record that change as a new migration file under `prisma/migrations`. It will prompt you for a migration name.
-- `npm run db:generate` just regenerates the Prisma client into `generated/prisma` without touching the database. You'd run this if that folder ever goes missing or gets out of sync with the schema.
-- `npm run db:reset` runs `prisma migrate reset`, which drops the database and rebuilds it from the migration history. It is genuinely destructive: it deletes everything currently in your local `dev.db`. Don't reach for this out of habit when something looks wrong; reach for it only when you actually want a clean slate.
+`db:push` and `db:migrate` are not interchangeable. Use `db:push` to get a local database working; use `db:migrate` once you have changed the schema and want that change recorded under `prisma/migrations`. Reach for `db:reset` only when you actually want a clean slate, since it deletes everything in your local `dev.db`.
 
-## Restarting a voyage
-
-The host can restart a room's voyage at any time from the "Restart" button in the main control bar, or from the same button on the endgame screen once a voyage has run its course. Only the host can do it, the same as starting the voyage in the first place, and it asks for confirmation before going through with it, because of what it actually does: every captain currently in the room, not just the host, gets reset back to round one, with their gold, cargo, workers, and ship upgrades all wiped. The room itself reopens, so captains who couldn't join mid voyage can join again.
-
-That reopening is the important part, and it's worth understanding why, because it used to be broken. A room has a `started` flag in the database that the join routes check before letting a new captain in; that's what stops someone slipping into a voyage that's already three rounds in. The flag flips to true the moment the host starts the voyage. The bug was that nothing ever flipped it back. The only restart that existed at the time was a leftover from the single player original: it reset the clicking player's own local game state and nothing else, with no server round trip at all. It didn't touch the `started` flag, didn't tell anyone else in the room anything had happened, and had no way to. So a host could restart, the screen would look like a fresh game, and the room would still reject every new captain trying to join it with "this voyage has already set sail," forever, because nothing had actually told the room it was open again.
-
-The fix was to make restarting an actual server side action instead of a purely local one: a `room:restart` socket event, host only, gated the same way `room:start` is, that flips `started` back to false, resets the room's round and phase, clears out every member's saved game state, and broadcasts to every connected client to reset their own local copy too. The join routes themselves didn't need to change at all, since they were already checking `started` correctly. The bug was entirely that nothing ever reset that flag, not that the check was wrong.
-
-## Common issues and how to deal with them
-
-A handful of problems come up often enough that they're worth knowing about ahead of time, rather than debugging from scratch each time.
-
-**"No such table" errors right after a fresh setup.** This means the database file exists but the schema was never applied to it. Run `npm run db:push` (or `npm run db:migrate` if you'd rather go through the migration history) and try again.
-
-**Errors about the Prisma client, or imports from `generated/prisma` failing to resolve.** That folder is generated, not checked into git, and it's easy to end up without it: deleting `node_modules` and reinstalling with a flag that skips lifecycle scripts, or just deleting the folder by hand while cleaning up, will leave it missing. `npm run db:generate` rebuilds it without needing to touch anything else.
-
-**`PrismaClientConstructorValidationError`, something about engine type "client" needing an adapter.** This means `@prisma/client` and the `prisma` CLI have drifted onto different major versions, or the generator switched to Prisma 7's default client engine without the rest of the setup following along. Prisma 7 doesn't ship a query engine binary for `prisma-client-js` the way Prisma 6 and earlier did; the client talks to the database through a driver adapter instead, which is why `src/lib/db.ts` constructs a `PrismaBetterSqlite3` adapter and passes it into `new PrismaClient({ adapter })` rather than calling that constructor bare. If you're upgrading Prisma yourself, `prisma` and `@prisma/client` need to move together, and `prisma.config.ts` (not `schema.prisma`) is where the CLI's own connection string lives now; Prisma 7 will refuse to start if `datasource.url` is still set inside `schema.prisma`.
-
-**A production build fails deep into `npm run build`, specifically while processing `globals.css`, with something like "Cannot find module '../lightningcss.linux-x64-gnu.node'."** This one is sneaky because it can build fine on your own machine and only fail on Railway or in CI. Tailwind v4's CSS engine (`lightningcss`, and `@tailwindcss/oxide`) ships a separate native binary package per platform, and npm is only supposed to install the one matching whatever machine is running the install. The catch is that `package-lock.json` needs a fully resolved entry for _every_ platform's variant for that to work anywhere other than wherever the lockfile was first generated; if it's missing those entries (which can happen silently, from an old npm version or a lockfile that only ever saw one platform), `npm ci` on a different platform will simply skip the binary it needs with no warning until something tries to actually load it at build time. If you hit this, regenerate the lockfile from a truly clean state, not just `npm install` on top of an existing `node_modules` (which will report "up to date" and change nothing): `rm -rf node_modules package-lock.json && npm install`, then confirm with `grep -c '"node_modules/lightningcss-' package-lock.json`, which should report 11, one per supported platform, not 1.
-
-**The dev server throws `EADDRINUSE` or otherwise refuses to start on port 2232.** Something else, usually a previous `npm run dev` that didn't shut down cleanly, is still holding that port. Find it and stop it before starting a new one. On macOS or Linux, `lsof -i :2232` will show you the process holding the port.
-
-**A cryptic Turbopack panic, often phrased as something like "Next.js package not found" or "Failed to write app endpoint," even though the `next` package is clearly installed.** This almost always means the `.next` folder is stale relative to where the project currently lives on disk. Turbopack keeps a persistent on-disk cache there, and that cache stores absolute file paths. If you ever copy or move this project folder (cloning it to a new location, duplicating it for a parallel branch of work, syncing it through a tool that preserves build output), that cache still points at the old path and Turbopack will fail trying to resolve things through it, while the rest of the app keeps working because most requests don't depend on that cache. The fix is simple: stop the dev server, delete the `.next` folder, and start it again. Turbopack will rebuild a fresh cache rooted at the project's actual current location.
-
-**Running `next dev` or `next start` directly instead of going through npm scripts.** Because the realtime layer is attached inside `server.ts` rather than being part of how Next.js normally boots, calling the Next.js CLI directly will give you a working website with broken multiplayer. The page will load, but presence, chat, and room synchronization will silently do nothing because Socket.IO was never attached to anything. Always go through `npm run dev` or `npm run build` plus `npm run start`.
-
-**Testing multiplayer locally with two accounts and seeing the wrong one logged in.** The session is stored in an httpOnly cookie scoped to the origin, and a browser shares its cookie jar across every tab pointed at that origin. If you log in as one captain in one tab and then log in as a second captain in another tab of the same browser, the second login overwrites the cookie for both tabs, and the first tab will start acting as the second user the next time it makes a request. This isn't a bug in the session logic, it's just how cookies work. To actually test two captains in the same harbor, use two different browsers, or a normal window plus a private/incognito window, so each one gets its own cookie jar.
-
-**"Start Voyage" doesn't seem to do anything, or you get an error about needing more captains.** A room needs at least two members before the host is allowed to start it. This is intentional, since the whole point of the synchronized phases is multiple people playing together; a solo room simply isn't allowed to set sail.
-
-**Restarting feels like a big hammer.** It is, on purpose. It resets everyone in the room, not just whoever clicked it, and there's no undo. That's covered in its own section above; the short version is that anything gentler turned out to either not work or to quietly desync one captain from the rest of the room with no way back.
-
-**A captain who refreshed or briefly lost connection seems to vanish from the room, but only after a delay.** Closing a tab doesn't immediately free that player's seat. There's a thirty second grace period before the server treats them as having actually left, specifically so a refresh or a flaky connection doesn't cost someone their spot in the room. If you're testing departures and joins quickly, that delay is expected, not a bug.
-
-**Sharing your local instance through something other than ngrok and the dev server blocking asset requests.** `next.config.ts` only allowlists ngrok's domains in `allowedDevOrigins`. If you tunnel through something else, add that domain to the same list or you'll see the dev server refuse cross origin requests for its own `/_next` assets.
-
-## Working on this codebase: tracing things to their actual root cause
-
-The restart bug above is a decent case study for how problems tend to hide in this particular codebase, and it's worth internalizing the pattern rather than just the fix, because it'll come up again in some other shape.
-
-**Find out which side of the client/server split actually owns the behavior before you touch anything.** Every captain runs an identical copy of the game engine, so it's tempting to assume a gameplay bug lives entirely in `src/lib/game/engine.ts` and a multiplayer bug lives entirely in `src/server/realtime.ts`. The restart bug lived in neither at first; it lived in the fact that no code anywhere, client or server, ever called the thing that would have fixed it. Before changing a function, ask what's supposed to call it, under what circumstances, and whether anything actually does.
-
-**Look for state that only ever moves in one direction.** `Room.started` is the clearest example: one `db.room.update` sets it to true, and until recently nothing in the entire codebase ever set it back to false. That's a pattern worth specifically checking for whenever a bug report sounds like "X used to work, and now it's stuck." Grep for everywhere a flag gets written, not just everywhere it gets read, and see if the set of writers actually covers every transition the product needs, including the ones that undo an earlier one.
-
-**Don't trust that a button does what its label says.** The old restart button was labeled the same single word in both single player and multiplayer, but it meant something different in each: a full reset in a game with one player, and a no-op-for-everyone-else local reset in a game with several. The fix wasn't to make the join check smarter or to special case anything in the API routes; the join routes were already correct. The fix was to make the button's actual behavior match what its label had always implied, by giving it a real server side counterpart it never had.
-
-**When you do add a new server side action, gate it the same way similar ones are already gated, don't invent a new pattern.** The restart handler in `src/server/realtime.ts` is deliberately structured almost identically to the existing `room:start` handler right above it: same auth check, same host-only check, same in-memory guard against double firing, same broadcast-then-update-checkpoint shape. Consistency here isn't a style preference, it's what makes the next person (including a future you) able to read one handler and immediately understand the others, instead of having to independently verify each one's locking and authorization from scratch.
-
-**Verify multiplayer fixes with more than one connected client, and script it if the UI makes that slow.** A bug like this one is invisible with a single browser tab open, since the whole point is what happens to a second captain. Two browser profiles work, but for a quick sanity check during development, it's faster to script the REST and Socket.IO calls directly against the running dev server (register two or three accounts, create a room, join it, start it, fire the action you're testing, and assert on the response) than to manually choreograph multiple browser windows every time you change a line.
-
-**"It builds on my machine" is not evidence that it builds anywhere else, and this codebase has already proven that the hard way once.** The lightningcss/`@tailwindcss/oxide` lockfile issue described above passed every local check: `npm install` was happy, `npm run dev` worked, `npm run build` worked, because all of that ran on the one platform whose binaries actually made it into `node_modules`. The failure only existed on whatever platform Railway's build runs on, which almost nobody developing this app locally is using day to day. When a change touches dependencies, the lockfile, or anything platform-specific (native modules, binary engines, file paths that assume a particular working directory), local success doesn't tell you much. If you have Docker available, actually building inside a throwaway container for the deploy target's platform (`docker run --rm --platform linux/amd64 -v "$(pwd):/work" -w /work node:22-slim bash -c "npm ci && npm run build"`) catches this class of bug in a couple of minutes, instead of in a Railway deploy log after the fact.
-
-## Linting
-
-```
-npm run lint
-```
-
-This runs ESLint using the Next.js flat config defined in `eslint.config.mjs`.
+Prisma 7 does not ship a query engine binary for `prisma-client-js` the way Prisma 6 did. The client talks to SQLite through a driver adapter, which is why [src/lib/db.ts](src/lib/db.ts) builds a `PrismaBetterSqlite3` adapter and passes it to `new PrismaClient({ adapter })` rather than calling the constructor bare. If you upgrade Prisma, move `prisma` and `@prisma/client` together, and remember that `datasource.url` belongs in `prisma.config.ts` now; Prisma 7 refuses to start if it is still in `schema.prisma`.
 
 ## Deploying
 
-The short version: Railway already has everything it needs through `railway.json`, which tells it to run `npm install && npm run build` to build and `npm run start` to run. Point a new Railway project at this repository and it should work without further configuration.
+Railway has what it needs through `railway.json`: `npm install && npm run build` to build, `npm run start` to run. Point a new Railway project at this repository and it should work.
 
-The one thing that needs manual setup is the database. Railway's filesystem is wiped on every deploy, so the SQLite file needs to live on a volume to survive redeploys. Add a volume to the service, set `DATABASE_URL` to a path on that volume (for example `file:/data/prod.db`), deploy once, and then run the database setup against that same `DATABASE_URL` (using `railway run`, for instance) so the tables actually get created on the volume. After that first deploy, roll out future schema changes with `npx prisma migrate deploy` rather than `db:push`, since it only applies whatever migrations haven't run yet and won't touch existing rows.
+The one manual step is storage. Railway wipes the filesystem on every deploy, so the SQLite file has to live on a volume. Add a volume to the service and set `DATABASE_URL` to a path on it, for example `file:/data/prod.db`. Schema changes roll out on their own after that, since `npm run start` runs `prisma migrate deploy` before booting.
 
-If you'd rather not deal with a volume at all, `prisma/schema.prisma` can have its datasource provider swapped from `sqlite` to `postgresql` and pointed at a managed Postgres instance instead. Everything else about how the app runs stays the same either way. The full walkthrough, with a bit more detail on each step, lives in [docs/deployment.md](docs/deployment.md).
+To skip volumes entirely, `prisma/schema.prisma` can swap its provider from `sqlite` to `postgresql` and point at a managed instance. Nothing else about how the app runs changes. The fuller walkthrough is in [docs/deployment.md](docs/deployment.md).
+
+## Troubleshooting
+
+**"No such table" right after setup.** The database file exists but the schema was never applied. Run `npm run db:push`.
+
+**Imports from `generated/prisma` fail to resolve.** That folder is generated and gitignored, and it is easy to lose by deleting `node_modules` or reinstalling with lifecycle scripts skipped. `npm run db:generate` rebuilds it.
+
+**`PrismaClientConstructorValidationError` about engine type "client" needing an adapter.** `prisma` and `@prisma/client` have drifted onto different majors, or the generator moved to Prisma 7's client engine without the rest following. See [Database and Prisma](#database-and-prisma).
+
+**The build fails on `globals.css` with "Cannot find module '../lightningcss.linux-x64-gnu.node'".** Sneaky, because it builds fine locally and only fails in CI. Tailwind v4's CSS engine ships a separate native binary per platform, and `package-lock.json` needs a resolved entry for every platform's variant for that to work anywhere other than where the lockfile was generated. Regenerate from a truly clean state, since `npm install` on top of an existing `node_modules` will report "up to date" and change nothing:
+
+```bash
+rm -rf node_modules package-lock.json && npm install
+grep -c '"node_modules/lightningcss-' package-lock.json   # expect 11, not 1
+```
+
+**`EADDRINUSE` on 2232.** Usually a previous `npm run dev` that never shut down. `lsof -i :2232` will find it.
+
+**A Turbopack panic such as "Next.js package not found" or "Failed to write app endpoint".** The `.next` cache stores absolute paths and has gone stale relative to where the project now lives, which happens whenever the folder is copied, moved or synced. Stop the dev server, delete `.next`, start again.
+
+**Running `next dev` or `next start` directly.** You get a working website with silently broken multiplayer: Socket.IO is attached inside `server.ts`, which the Next.js CLI never runs, so presence, chat and room synchronization quietly do nothing. Always go through the npm scripts.
+
+**Two accounts, wrong one logged in.** The session cookie is scoped to the origin and shared across every tab in a browser, so the second login overwrites the first. Use two browsers, or one normal and one private window.
+
+**"Start Voyage" does nothing.** A room needs at least two captains. A solo room is not allowed to set sail, since synchronized phases are the entire point.
+
+**A captain who refreshed seems to linger.** Closing a tab does not free the seat immediately. There is a thirty second grace period so a refresh or a flaky connection does not cost someone their spot.
+
+**Restarting feels like a big hammer.** It is, deliberately. Only the host can do it, it asks for confirmation, and it resets every captain in the room back to round one with Gold, cargo, workers and upgrades wiped. It also reopens the room so captains who could not join mid voyage can join again. That reopening is the real point: `Room.started` is what the join routes check, and for a while nothing in the codebase ever set it back to false, so a restarted room rejected every new captain forever.
+
+**Tunneling through something other than ngrok.** `next.config.ts` only allowlists ngrok domains in `allowedDevOrigins`. Add yours or the dev server will refuse cross origin requests for its own `/_next` assets.
+
+## Working on this codebase
+
+The restart bug above is the best case study this codebase has, and the pattern matters more than the fix.
+
+**Find out which side owns the behavior before you touch anything.** Every captain runs an identical engine, so a gameplay bug looks like it must live in `engine.ts` and a multiplayer bug in `realtime.ts`. The restart bug lived in neither: no code anywhere ever called the thing that would have fixed it. Before changing a function, ask what is supposed to call it and whether anything actually does.
+
+**Look for state that only ever moves one way.** One `db.room.update` set `Room.started` to true and nothing ever set it back. Whenever a report sounds like "X used to work and now it is stuck", grep for every place a flag is written, not just read, and check the writers cover every transition the product needs, including the ones that undo an earlier one.
+
+**Do not trust that a button does what its label says.** The old restart button meant a full reset in single player and a local no-op in multiplayer. The join routes were already correct; the fix was giving the button the server side counterpart its label had always implied.
+
+**Gate new server actions the way the existing ones are gated.** The restart handler is deliberately shaped almost identically to `room:start` right above it: same auth check, same host only check, same guard against double firing, same broadcast then checkpoint shape. That consistency is what lets the next person read one handler and understand the rest.
+
+**Keep real money math out of socket closures.** Anything deciding Gold or Reputation belongs in a pure module under `src/lib/game` with a test, the way `convoy.ts`, `backing.ts` and `harborPulse.ts` were pulled out of `realtime.ts`. Logic nested inside `attachRealtime` cannot be imported, cannot be tested, and can only be exercised against a live server and a live database.
+
+**Verify multiplayer fixes with more than one client.** A bug like the restart one is invisible with a single tab open. Two browser profiles work, but scripting the REST and Socket.IO calls against the running dev server is faster than choreographing windows by hand every time.
+
+**"It builds on my machine" proves nothing, and this codebase has already proven that once.** The lightningcss lockfile issue passed every local check because everything local ran on the one platform whose binaries made it into `node_modules`. When a change touches dependencies, the lockfile, or anything platform specific, build for the deploy target before trusting it:
+
+```bash
+docker run --rm --platform linux/amd64 -v "$(pwd):/work" -w /work node:22-slim \
+  bash -c "npm ci && npm run build"
+```
