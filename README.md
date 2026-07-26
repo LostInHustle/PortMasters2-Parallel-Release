@@ -225,7 +225,7 @@ grep -c '"node_modules/lightningcss-' package-lock.json   # expect 11, not 1
 
 **Restarting feels like a big hammer.** It is, deliberately. Only the host can do it, it asks for confirmation, and it resets every captain in the room back to round one with Gold, cargo, workers and upgrades wiped. It also reopens the room so captains who could not join mid voyage can join again. That reopening is the real point: `Room.started` is what the join routes check, and for a while nothing in the codebase ever set it back to false, so a restarted room rejected every new captain forever.
 
-**Tunneling through something other than ngrok.** `next.config.ts` only allowlists ngrok domains in `allowedDevOrigins`. Add yours or the dev server will refuse cross origin requests for its own `/_next` assets.
+**Tunneling through something other than ngrok.** `allowedDevOrigins` in `next.config.ts` covers ngrok's four domains plus `192.*.*.*`, so a tunnel through anything else, or a LAN address outside that range, needs adding to the list or the dev server will refuse cross origin requests for its own `/_next` assets. That `192.*.*.*` entry is also why you can open the dev server from a phone on the same wifi without a tunnel at all.
 
 ## Working on this codebase
 
