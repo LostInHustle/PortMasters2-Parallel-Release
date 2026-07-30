@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { COLORS, ICONS, RECIPES, WAGES } from "@/lib/game/constants";
+import { ICONS, RECIPES, WAGES } from "@/lib/game/constants";
 import {
   assignTask,
   fireWorker,
@@ -17,6 +17,7 @@ import {
 import type { GameContext, GameState, Worker } from "@/lib/game/types";
 import type { PublicUser } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { itemColorResolver } from "@/lib/use-color-preference";
 import { Term } from "../../Term";
 import { ItemIcon } from "../../shared";
 import { ReadyFooter, type PhaseSync } from "./PhaseShared";
@@ -111,13 +112,18 @@ export function WorkerMgmt({
   act,
   phaseSync,
   members,
+  colorFor,
 }: {
   game: GameState;
   ctx: GameContext;
   act: (fn: (g: GameState, logs: string[]) => void) => void;
   phaseSync: PhaseSync;
   members: PublicUser[];
+  // [MANIFEST 16: Colorblind Safe Palette] Optional, falls back to the
+  // plain COLORS lookup when a caller hasn't wired useColorPreference in.
+  colorFor?: (item: string) => string | undefined;
 }) {
+  const resolveColor = itemColorResolver(colorFor);
   // Driven by the roster rather than three hardcoded artisans, so the
   // Coppersmith and Potter a charter brings are hirable, payable, and
   // assignable the moment they unlock, with no further edits here. Each
@@ -195,10 +201,12 @@ export function WorkerMgmt({
             {unlockedResources(game.difficulty, game.currentRound).map((r) => (
               <div key={r} className="flex items-center text-[11px] py-0.5">
                 <ItemIcon item={r} className="mr-1.5 h-3.5 w-3.5" />
-                <span className="flex-1" style={{ color: COLORS[r] }}>
+                <span className="flex-1" style={{ color: resolveColor(r) }}>
                   {r}
                 </span>
-                <b style={{ color: COLORS[r] }}>{game.inventory[r] || 0}</b>
+                <b style={{ color: resolveColor(r) }}>
+                  {game.inventory[r] || 0}
+                </b>
               </div>
             ))}
           </div>
@@ -209,10 +217,12 @@ export function WorkerMgmt({
             {openProducts.map((r) => (
               <div key={r} className="flex items-center text-[11px] py-0.5">
                 <ItemIcon item={r} className="mr-1.5 h-3.5 w-3.5" />
-                <span className="flex-1" style={{ color: COLORS[r] }}>
+                <span className="flex-1" style={{ color: resolveColor(r) }}>
                   {r}
                 </span>
-                <b style={{ color: COLORS[r] }}>{game.inventory[r] || 0}</b>
+                <b style={{ color: resolveColor(r) }}>
+                  {game.inventory[r] || 0}
+                </b>
               </div>
             ))}
           </div>

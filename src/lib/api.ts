@@ -96,6 +96,12 @@ export const api = {
     }),
   getRoom: (id: string) =>
     jfetch<{ room: RoomDetail; messages: ChatMessage[] }>(`/api/rooms/${id}`),
+  // The room this captain is still seated in, or null. Used on page load to
+  // put a captain who merely reloaded back aboard instead of stranding them
+  // in the Lobby while the harbor waits on their ready vote; see
+  // src/app/api/rooms/active/route.ts for why membership, not client state,
+  // is the thing asked.
+  getActiveRoom: () => jfetch<{ room: RoomDetail | null }>("/api/rooms/active"),
   joinRoomById: (id: string) =>
     jfetch<{ room: RoomSummary }>(`/api/rooms/${id}/join`, { method: "POST" }),
   joinRoomByCode: (code: string) =>

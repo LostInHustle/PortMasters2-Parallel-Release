@@ -7,7 +7,6 @@ import {
   CONVOY_VENTURE_MAX_TARGET,
   CONVOY_VENTURE_MIN_ROUNDS_AHEAD,
   CONVOY_VENTURE_MIN_TARGET,
-  COLORS,
 } from "@/lib/game/constants";
 import { getHireCost } from "@/lib/game/engine";
 import type { GameState } from "@/lib/game/types";
@@ -19,6 +18,7 @@ import {
 } from "@/lib/game/pools";
 import type { ConvoyVenture } from "@/lib/use-convoy";
 import { cn } from "@/lib/utils";
+import { itemColorResolver } from "@/lib/use-color-preference";
 import { Term } from "../Term";
 import { priceAwareTermContent } from "./PriceTooltips";
 import { GameLogPanel } from "./GameLogPanel";
@@ -53,6 +53,7 @@ export function GameStatusPanel({
   onRepayLoan,
   convoy,
   myUserId,
+  colorFor,
 }: {
   game: GameState;
   logs: string[];
@@ -72,7 +73,13 @@ export function GameStatusPanel({
     contribute: (ventureId: string, amount: number) => void;
   };
   myUserId?: string;
+  // [MANIFEST 16: Colorblind Safe Palette] Optional, like convoy above, so
+  // a caller that hasn't wired in useColorPreference yet still compiles
+  // unchanged; falls back to the plain COLORS lookup this panel always
+  // used before the palette became player selectable.
+  colorFor?: (item: string) => string | undefined;
 }) {
+  const resolveColor = itemColorResolver(colorFor);
   const discount = game.shipLevel * 5;
   const showObligations = ![0, 5, "endgame", "bankruptcy"].includes(game.phase);
 
@@ -179,7 +186,7 @@ export function GameStatusPanel({
               key={r}
               icon={<ItemIcon item={r} className="h-3.5 w-3.5" />}
               name={r}
-              color={COLORS[r]}
+              color={resolveColor(r)}
               count={game.inventory[r] || 0}
               priceContent={priceAwareTermContent(game, r)}
             />
@@ -192,7 +199,7 @@ export function GameStatusPanel({
               key={r}
               icon={<ItemIcon item={r} className="h-3.5 w-3.5" />}
               name={r}
-              color={COLORS[r]}
+              color={resolveColor(r)}
               count={game.inventory[r] || 0}
               priceContent={priceAwareTermContent(game, r)}
             />

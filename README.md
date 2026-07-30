@@ -75,6 +75,10 @@ These are the systems that make a harbor different from several people playing s
 - **Tidewatch Alerts** are the cooperative counterpart. Once the combined Reputation of everyone in the harbor reaches 500, every captain's purchase board gains a permanent extra cargo lot for the rest of the voyage.
 - **Convoy Ventures** pool Gold toward a target by a deadline round. Fill it and every contributor gets back fifty percent more than they put in; miss the deadline and they get back half. A harbor fills exactly one venture per voyage, which cancels the rest with full refunds, and no captain may fund more than half of any target alone, so a venture cannot complete without someone else choosing to back it.
 - **Backing** adds a third role to an aid loan: a captain who is neither lender nor borrower pledges Gold as a safety net. If the loan is repaid the pledge comes back whole, plus a Reputation bonus smaller than the lender's. If the borrower falls short, the pledge covers the gap up to its own size and no further, so it narrows the lender's risk without erasing it.
+- **Bequest Routing** lets a bankrupt captain redirect a still outstanding loan they lent to a different, still active captain in the room, right from the Bankruptcy screen, so a repayment that lands after their own voyage is over goes somewhere it can still be spent.
+- **Harbor Watch** gives the host a way to mute one captain's room chat for the rest of the voyage without touching their Gold, cargo, ship, or progress, a much smaller tool than restarting the whole room.
+- **Colorblind Safe Palette** swaps every good's color for a second mapping built around distinguishability under the common forms of color vision deficiency, toggled per player from the game room header and remembered on that device.
+- **Fleet Ticker** is a slim strip pinned under the header, showing every captain's round, phase, Gold, and Reputation at a glance on every screen size, complementing the fuller Harbor Roster rather than replacing it.
 - **Direct barter offers** can be addressed to one named captain instead of the whole room. Nobody else sees the offer or can accept it.
 
 ### What carries across voyages
@@ -233,7 +237,7 @@ grep -c '"node_modules/lightningcss-' package-lock.json
 
 **"Start Voyage" does nothing.** A room needs at least two captains. A solo room is not allowed to set sail, since synchronized phases are the entire point.
 
-**A captain who refreshed seems to linger.** Closing a tab does not free the seat immediately. There is a thirty second grace period so a refresh or a flaky connection does not cost someone their spot.
+**A captain who refreshed seems to linger.** Closing a tab does not free the seat immediately. There is a thirty second grace period so a refresh or a flaky connection does not cost someone their spot. A refresh also puts that captain straight back into their own room rather than the Lobby: the active room is read back from durable membership on load (`GET /api/rooms/active`), because the seat surviving is only half of what is needed. The realtime layer builds each checkpoint's required roster from that same membership, so a captain stranded in the Lobby was still being counted and still owed a ready vote they had no way to cast, which froze every other captain in the harbor until they found and rejoined their room by hand.
 
 **Restarting feels like a big hammer.** It is, deliberately. Only the host can do it, it asks for confirmation, and it resets every captain in the room back to round one with Gold, cargo, workers and upgrades wiped. It also reopens the room so captains who could not join mid voyage can join again. That reopening is the real point: `Room.started` is what the join routes check, and for a while nothing in the codebase ever set it back to false, so a restarted room rejected every new captain forever.
 

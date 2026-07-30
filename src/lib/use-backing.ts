@@ -14,6 +14,11 @@ export type OutstandingLoan = {
   backerId?: string;
   backerName?: string;
   backedAmount?: number;
+  // [MANIFEST 07: Bequest Routing] Set only once the lender (typically
+  // from the Bankruptcy screen) has redirected future repayment on this
+  // specific loan; see the redirect action below.
+  redirectToUserId?: string;
+  redirectToName?: string;
 };
 
 export type BackingResolved = {
@@ -116,10 +121,23 @@ export function useBacking(
     [socket, roomId],
   );
 
+  // [MANIFEST 07: Bequest Routing] Only the lender of one of these loans
+  // can call this meaningfully; the server enforces that regardless (see
+  // loan:redirect in src/server/realtime.ts). Pass an empty targetUserId
+  // to clear an already set redirect.
+  const redirect = useCallback(
+    (debtId: string, targetUserId: string) => {
+      if (!socket) return;
+      socket.emit("loan:redirect", { roomId, debtId, targetUserId });
+    },
+    [socket, roomId],
+  );
+
   return {
     loans,
     error,
     clearError: () => setError(null),
     offer,
+    redirect,
   };
 }

@@ -22,7 +22,7 @@
 // =====================================================================
 import type { Server as HttpServer } from "http";
 import { Server } from "socket.io";
-import { db } from "../lib/db";
+import { db, PUBLIC_USER_SELECT } from "../lib/db";
 import { leaveRoomForUser, roomMemberIds } from "../lib/rooms";
 import {
   levelForRenownXP,
@@ -73,6 +73,26 @@ type SocketState = {
   user: PublicUser;
   roomId: string | null;
   authed: boolean;
+};
+
+// One captain's last reported status, as cached per room and rebroadcast on
+// the "game:status" channel. Mirrors GameStatusUpdate in src/lib/realtime.ts
+// rather than importing it, for the same reason `publicUser` is duplicated
+// below: that module is a client entry point that pulls in socket.io-client,
+// which has no business inside this Node server. Spelled out here instead of
+// left as `any`, so the several readers that reach for `.phase` or
+// `.reputation` are checked rather than trusted.
+type CaptainStatus = {
+  roomId: string;
+  user: PublicUser;
+  round: number;
+  phase: number | string;
+  phaseLabel: string;
+  gold: number;
+  reputation: number;
+  shipLevel: number;
+  gameOver: boolean;
+  at: number;
 };
 
 export function attachRealtime(httpServer: HttpServer): Server {
@@ -144,6 +164,12 @@ export function attachRealtime(httpServer: HttpServer): Server {
   // needing to refresh. Read fresh from the database every time rather
   // than cached, since host changes are rare and this only fires on
   // join/leave/disconnect, never on the hot game-action path.
+  //
+  // [MANIFEST 14: Harbor Watch] mutedUserIds rides along on the same
+  // broadcast every client already listens to for the roster itself, so
+  // muting someone needs no separate client subscription: the roster (and
+  // the muted captain's own client) simply see the flag the next time
+  // membership is re-emitted, which mute/unmute below always triggers.
   async function emitRoomMembers(roomId: string) {
     const members = roomMembers(roomId).map(({ socketId: _sid, ...u }) => u);
     const room = await db.room.findUnique({
@@ -154,14 +180,22 @@ export function attachRealtime(httpServer: HttpServer): Server {
       roomId,
       members,
       hostId: room?.hostId ?? null,
+      mutedUserIds: Array.from(roomMutedUsers.get(roomId) ?? []),
     });
   }
 
+  // [MANIFEST 14: Harbor Watch] Who the host has muted from room chat this
+  // voyage, in memory only, the same reasoning startingRooms/restartingRooms
+  // above use: no horizontal scaling, so a plain in-process Set is all the
+  // durability a per-voyage flag needs. Cleared on room:restart and on room
+  // deletion, alongside every other per-voyage structure this file keeps.
+  const roomMutedUsers = new Map<string, Set<string>>();
+
   // Last-known game status per (room, user) so late joiners can hydrate the
   // roster immediately instead of seeing "loading…" until the next broadcast.
-  const roomStatuses = new Map<string, Map<string, any>>();
+  const roomStatuses = new Map<string, Map<string, CaptainStatus>>();
 
-  function rememberStatus(roomId: string, payload: any) {
+  function rememberStatus(roomId: string, payload: CaptainStatus) {
     let m = roomStatuses.get(roomId);
     if (!m) {
       m = new Map();
@@ -255,6 +289,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         roomDocksWinners.delete(roomId);
         roomSurges.delete(roomId);
         concludedRooms.delete(roomId);
+        roomMutedUsers.delete(roomId);
       } else {
         io.to(`room:${roomId}`).emit("room:system", {
           roomId,
@@ -441,8 +476,15 @@ export function attachRealtime(httpServer: HttpServer): Server {
     }[] = [];
     for (const id of memberIds) {
       const st = statuses.get(id);
+      // A member with no cached status at all has certainly not finished, so
+      // they are "still out at sea" exactly like one mid voyage. That was
+      // already the behaviour, reached indirectly: a missing status produced
+      // an empty phase string, which matched neither terminal phase and so
+      // returned below. Saying it outright keeps the invariant visible to the
+      // reader, and lets the compiler see that `st` is present past this line
+      // rather than leaving the field reads below to be taken on trust.
       const phase = st ? String(st.phase) : "";
-      if (phase !== "endgame" && phase !== "bankruptcy") return; // someone is still out at sea
+      if (!st || (phase !== "endgame" && phase !== "bankruptcy")) return;
       finished.push({
         userId: id,
         user: st.user,
@@ -836,6 +878,15 @@ export function attachRealtime(httpServer: HttpServer): Server {
     backerId?: string;
     backerName?: string;
     backedAmount?: number;
+    // [MANIFEST 07: Bequest Routing] Set only by loan:redirect below, only
+    // by the lender themselves. When present, aid:repay hands the Gold to
+    // this captain's own client instead of the original lender's, since a
+    // bankrupt lender has no voyage left to receive it in. The lender of
+    // record never changes, only who actually gets credited: backing
+    // above still resolves against lenderId exactly as it always did,
+    // since a redirect is about where the Gold lands, not who was owed it.
+    redirectToUserId?: string;
+    redirectToName?: string;
   };
   const roomOutstandingLoans = new Map<string, LoanRecord[]>();
 
@@ -1193,16 +1244,27 @@ export function attachRealtime(httpServer: HttpServer): Server {
 
       // Leave previous room channel if any.
       if (s.roomId) {
-        socket.leave(`room:${s.roomId}`);
-        // Guarded: the user may have another tab still sitting in the old
-        // room, and that tab's heartbeat is the only thing keeping the
-        // roster status live for them there.
-        forgetStatusIfLastSocket(s.roomId, s.userId);
-        io.to(`room:${s.roomId}`).emit("room:system", {
-          roomId: s.roomId,
+        const previousRoomId = s.roomId;
+        socket.leave(`room:${previousRoomId}`);
+        // Clear this socket's room BEFORE re-emitting the old room's roster.
+        // roomMembers() builds that roster from live sockets whose own
+        // s.roomId still points at the room, so emitting while this socket
+        // still claimed the old room left the departing captain listed on
+        // everyone else's roster, and nothing re-emitted afterwards to
+        // correct it. Only this socket is cleared: another tab of the same
+        // captain genuinely still sitting in the old room keeps its own
+        // s.roomId and so correctly stays on the roster, the same reasoning
+        // the guarded forgetStatusIfLastSocket below follows.
+        s.roomId = null;
+        forgetStatusIfLastSocket(previousRoomId, s.userId);
+        io.to(`room:${previousRoomId}`).emit("room:system", {
+          roomId: previousRoomId,
           content: `${s.user.displayName} set sail for another port`,
         });
-        emitRoomMembers(s.roomId);
+        // Safe to leave unawaited: emitRoomMembers snapshots the member list
+        // synchronously before its own database await, so it already sees the
+        // cleared s.roomId above.
+        emitRoomMembers(previousRoomId);
       }
 
       // They're back, so don't let a grace timer started by an earlier
@@ -1249,12 +1311,29 @@ export function attachRealtime(httpServer: HttpServer): Server {
       broadcastPresence();
     });
 
+    // A captain deliberately leaving a room, emitted by handleLeave in
+    // GameRoom.tsx right after POST /api/rooms/[id]/leave has actually ended
+    // their membership.
+    //
+    // This is only ever the deliberate act. It must NOT be emitted from a
+    // component's unmount cleanup (see the note in MembersPanel.tsx): dropping
+    // the channel on a mere tab switch silently breaks every later room scoped
+    // event for that captain.
+    //
+    // The REST route cannot do this itself. It runs in a Next request, with no
+    // handle on the socket server, so without this event the leaver's socket
+    // kept claiming the room: they stayed on everyone else's roster until they
+    // happened to join elsewhere or their socket dropped. Their open barter
+    // offers and aid request would likewise have outlived them, letting another
+    // captain trade with someone who is no longer in the harbor.
     socket.on("room:leave", (payload: { roomId?: string }) => {
       const s = requireAuth();
       if (!s) return;
       const roomId = payload?.roomId ?? s.roomId;
       if (!roomId) return;
       socket.leave(`room:${roomId}`);
+      // Cleared before emitRoomMembers below, for the same reason room:join
+      // clears it before re-emitting the room it is leaving.
       if (s.roomId === roomId) s.roomId = null;
       forgetStatus(roomId, s.userId);
       removeUserBarterOffers(roomId, s.userId);
@@ -1798,7 +1877,6 @@ export function attachRealtime(httpServer: HttpServer): Server {
       "barter:post",
       async (payload: {
         roomId?: string;
-        tempId?: string;
         offerItem?: string;
         offerAmount?: number;
         requestItem?: string;
@@ -1824,7 +1902,6 @@ export function attachRealtime(httpServer: HttpServer): Server {
         ) {
           socket.emit("barter:error", {
             roomId,
-            tempId: payload?.tempId,
             error: "Invalid barter offer",
           });
           return;
@@ -1835,7 +1912,6 @@ export function attachRealtime(httpServer: HttpServer): Server {
           if (payload.targetUserId === s.userId) {
             socket.emit("barter:error", {
               roomId,
-              tempId: payload?.tempId,
               error: "You can't direct an offer to yourself.",
             });
             return;
@@ -1849,7 +1925,6 @@ export function attachRealtime(httpServer: HttpServer): Server {
           if (!targetMember) {
             socket.emit("barter:error", {
               roomId,
-              tempId: payload?.tempId,
               error: "That captain isn't in this harbor.",
             });
             return;
@@ -1868,11 +1943,12 @@ export function attachRealtime(httpServer: HttpServer): Server {
           ...(targetUserId ? { targetUserId, targetName } : {}),
         };
         roomBarterOffers.set(roomId, [...barterList(roomId), offer]);
-        socket.emit("barter:posted", {
-          roomId,
-          tempId: payload?.tempId,
-          offer,
-        });
+        // No separate ack to the poster: broadcastBarter below already sends
+        // the whole board, including this offer, to every captain in the room
+        // and the poster with it. There used to be a "barter:posted" emit here
+        // carrying a client supplied tempId, the usual optimistic insert
+        // handshake, but the client half was never built: nothing ever sent a
+        // tempId and nothing ever listened for the ack.
         broadcastBarter(roomId);
       },
     );
@@ -2127,7 +2203,15 @@ export function attachRealtime(httpServer: HttpServer): Server {
         const loan = loanList(roomId).find((l) => l.debtId === debtId);
         if (loan && loan.borrowerId === s.userId) {
           removeLoan(roomId, debtId);
-          if (lenderSockets && (amount as number) > 0) {
+          // [MANIFEST 07: Bequest Routing] A redirect only ever changes
+          // who receives this direct credit; backing:covered/resolved
+          // below stay addressed to the loan's own lenderId/backerId
+          // exactly as before, since a redirect is not a transfer of who
+          // was owed the debt, only of where the actual Gold lands.
+          const repaySockets = loan.redirectToUserId
+            ? userSockets.get(loan.redirectToUserId)
+            : lenderSockets;
+          if (repaySockets && (amount as number) > 0) {
             const repaid = {
               roomId,
               debtId,
@@ -2135,8 +2219,26 @@ export function attachRealtime(httpServer: HttpServer): Server {
               fromUserId: s.userId,
               fromName: s.user.displayName,
             };
-            for (const sid of lenderSockets)
+            for (const sid of repaySockets)
               io.to(sid).emit("aid:repaid", repaid);
+          }
+          // [MANIFEST 07: Bequest Routing] The original lender's own client
+          // still carries this loan in its own loansGiven list and has no
+          // other way to learn it closed, since aid:repaid above went to
+          // the redirect target instead of them. This never credits their
+          // Gold, the redirect target already got that; it only tells
+          // their client to stop tracking a debt that is no longer open.
+          if (loan.redirectToUserId) {
+            const originalLenderSockets = userSockets.get(loan.lenderId);
+            if (originalLenderSockets) {
+              const redirected = {
+                roomId,
+                debtId,
+                redirectedToName: loan.redirectToName ?? "another captain",
+              };
+              for (const sid of originalLenderSockets)
+                io.to(sid).emit("aid:redirected", redirected);
+            }
           }
           if (loan.backerId && loan.backedAmount) {
             const { calledAmount, refundAmount } = computeBackingResolution(
@@ -2164,6 +2266,43 @@ export function attachRealtime(httpServer: HttpServer): Server {
           }
           broadcastLoans(roomId);
         }
+      },
+    );
+
+    // [MANIFEST 07: Bequest Routing] Only the lender of record can redirect
+    // their own outstanding loan, and only to a captain currently online in
+    // the same room, never to themselves, the borrower, or nobody at all
+    // with an empty id. Passing an empty targetUserId clears a redirect
+    // already set, the same "empty payload undoes it" shape the rest of
+    // this file uses for a cleared value.
+    socket.on(
+      "loan:redirect",
+      (payload: {
+        roomId?: string;
+        debtId?: string;
+        targetUserId?: string;
+      }) => {
+        const s = requireAuth();
+        if (!s) return;
+        const roomId = payload?.roomId ?? s.roomId;
+        const debtId = payload?.debtId;
+        const targetUserId = payload?.targetUserId ?? "";
+        if (!roomId || roomId !== s.roomId || !debtId) return;
+        const loan = loanList(roomId).find((l) => l.debtId === debtId);
+        if (!loan || loan.lenderId !== s.userId) return;
+        if (!targetUserId) {
+          delete loan.redirectToUserId;
+          delete loan.redirectToName;
+          broadcastLoans(roomId);
+          return;
+        }
+        if (targetUserId === loan.lenderId || targetUserId === loan.borrowerId)
+          return;
+        const target = roomMembers(roomId).find((m) => m.id === targetUserId);
+        if (!target) return;
+        loan.redirectToUserId = target.id;
+        loan.redirectToName = target.displayName;
+        broadcastLoans(roomId);
       },
     );
 
@@ -2303,17 +2442,22 @@ export function attachRealtime(httpServer: HttpServer): Server {
         const content = (payload?.content ?? "").trim();
         if (!roomId || !content) return;
         if (content.length > 1000) return;
+        // [MANIFEST 14: Harbor Watch] A muted captain keeps playing
+        // normally; they simply cannot post to room chat until the voyage
+        // ends. Rejected before the message is even persisted, so a muted
+        // post leaves no trace to clean up, the same silent drop DM
+        // recipients who blocked each other would get if this project ever
+        // added that.
+        if (roomMutedUsers.get(roomId)?.has(s.userId)) {
+          socket.emit("chat:muted", { roomId });
+          return;
+        }
 
         const msg = await db.message.create({
           data: { roomId, senderId: s.userId, recipientId: null, content },
           include: {
             sender: {
-              select: {
-                id: true,
-                username: true,
-                displayName: true,
-                avatarHue: true,
-              },
+              select: PUBLIC_USER_SELECT,
             },
           },
         });
@@ -2343,20 +2487,10 @@ export function attachRealtime(httpServer: HttpServer): Server {
           data: { roomId: null, senderId: s.userId, recipientId, content },
           include: {
             sender: {
-              select: {
-                id: true,
-                username: true,
-                displayName: true,
-                avatarHue: true,
-              },
+              select: PUBLIC_USER_SELECT,
             },
             recipient: {
-              select: {
-                id: true,
-                username: true,
-                displayName: true,
-                avatarHue: true,
-              },
+              select: PUBLIC_USER_SELECT,
             },
           },
         });
@@ -2380,6 +2514,65 @@ export function attachRealtime(httpServer: HttpServer): Server {
             io.to(sid).emit("chat:dm", messagePayload);
           }
         }
+      },
+    );
+
+    // [MANIFEST 14: Harbor Watch] Host only, same shape as room:restart's
+    // own host check above: read the room fresh rather than trust anything
+    // the client claims, reject with room:error if the caller isn't
+    // actually the host, and only touch chat, never gold, cargo, ship, or
+    // progress. emitRoomMembers re-broadcasts the roster (with the new
+    // mutedUserIds) so every client, including the muted captain's own,
+    // picks up the change immediately.
+    socket.on(
+      "chat:mute",
+      async (payload: { roomId?: string; targetUserId?: string }) => {
+        const s = requireAuth();
+        if (!s) return;
+        const roomId = payload?.roomId ?? s.roomId;
+        const targetUserId = payload?.targetUserId;
+        if (!roomId || roomId !== s.roomId || !targetUserId) return;
+        const room = await db.room.findUnique({
+          where: { id: roomId },
+          select: { hostId: true },
+        });
+        if (!room || room.hostId !== s.userId) {
+          socket.emit("room:error", {
+            roomId,
+            error: "Only the host can mute a captain.",
+          });
+          return;
+        }
+        // The host can never mute themselves; nothing to gate them with
+        // if the harbor's own control disappeared from under them.
+        if (targetUserId === room.hostId) return;
+        let set = roomMutedUsers.get(roomId);
+        if (!set) {
+          set = new Set();
+          roomMutedUsers.set(roomId, set);
+        }
+        set.add(targetUserId);
+        await emitRoomMembers(roomId);
+      },
+    );
+
+    socket.on(
+      "chat:unmute",
+      async (payload: { roomId?: string; targetUserId?: string }) => {
+        const s = requireAuth();
+        if (!s) return;
+        const roomId = payload?.roomId ?? s.roomId;
+        const targetUserId = payload?.targetUserId;
+        if (!roomId || roomId !== s.roomId || !targetUserId) return;
+        const room = await db.room.findUnique({
+          where: { id: roomId },
+          select: { hostId: true },
+        });
+        if (!room || room.hostId !== s.userId) return;
+        const set = roomMutedUsers.get(roomId);
+        if (!set || !set.delete(targetUserId)) return;
+        if (set.size === 0) roomMutedUsers.delete(roomId);
+        await emitRoomMembers(roomId);
       },
     );
 
@@ -2546,6 +2739,10 @@ export function attachRealtime(httpServer: HttpServer): Server {
         roomSurges.delete(roomId);
         // A restarted room can sail, and conclude, all over again.
         concludedRooms.delete(roomId);
+        // [MANIFEST 14: Harbor Watch] A mute lasts only "for the remainder
+        // of the voyage", so a fresh one clears the slate the same way
+        // every other per-voyage structure above does.
+        if (roomMutedUsers.delete(roomId)) emitRoomMembers(roomId);
 
         io.to(`room:${roomId}`).emit("room:restarted", {
           roomId,

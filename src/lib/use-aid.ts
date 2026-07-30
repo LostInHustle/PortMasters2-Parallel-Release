@@ -28,6 +28,15 @@ export type RepaidLoan = {
   fromName: string;
 };
 
+// [MANIFEST 07: Bequest Routing] Fires only on the original lender's own
+// client, only for a loan they redirected before it was repaid: the Gold
+// already went to the redirect target via onRepaid on their client
+// instead, this is purely "stop tracking a debt that is no longer open."
+export type RedirectedLoanClosed = {
+  debtId: string;
+  redirectedToName: string;
+};
+
 /**
  * Phase 3's shared "I'm short, can someone help" board: a thin relay
  * around the aid:* socket events (see src/server/realtime.ts), kept
@@ -49,6 +58,7 @@ export function useAid(
   myUserId: string,
   onGranted: (loan: GrantedLoan, role: "borrower" | "helper") => void,
   onRepaid: (loan: RepaidLoan) => void,
+  onRedirectedClosed?: (closed: RedirectedLoanClosed) => void,
 ) {
   const [requests, setRequests] = useState<AidRequest[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +71,10 @@ export function useAid(
   useEffect(() => {
     onRepaidRef.current = onRepaid;
   }, [onRepaid]);
+  const onRedirectedClosedRef = useRef(onRedirectedClosed);
+  useEffect(() => {
+    onRedirectedClosedRef.current = onRedirectedClosed;
+  }, [onRedirectedClosed]);
 
   useEffect(() => {
     if (!socket) return;
@@ -83,6 +97,12 @@ export function useAid(
       if (data.roomId !== roomId) return;
       onRepaidRef.current(data);
     };
+    const onRedirectedEvent = (
+      data: RedirectedLoanClosed & { roomId: string },
+    ) => {
+      if (data.roomId !== roomId) return;
+      onRedirectedClosedRef.current?.(data);
+    };
     const onHelpFail = (data: {
       roomId: string;
       requestId: string;
@@ -99,6 +119,7 @@ export function useAid(
     socket.on("aid:update", onUpdate);
     socket.on("aid:granted", onGrantedEvent);
     socket.on("aid:repaid", onRepaidEvent);
+    socket.on("aid:redirected", onRedirectedEvent);
     socket.on("aid:help:fail", onHelpFail);
     socket.on("aid:error", onPostError);
     socket.emit("aid:state:request", { roomId });
@@ -107,6 +128,7 @@ export function useAid(
       socket.off("aid:update", onUpdate);
       socket.off("aid:granted", onGrantedEvent);
       socket.off("aid:repaid", onRepaidEvent);
+      socket.off("aid:redirected", onRedirectedEvent);
       socket.off("aid:help:fail", onHelpFail);
       socket.off("aid:error", onPostError);
     };

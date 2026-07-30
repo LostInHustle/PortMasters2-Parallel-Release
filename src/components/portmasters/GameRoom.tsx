@@ -23,7 +23,12 @@ import {
   type PlayerDetailData,
 } from "@/lib/use-player-detail";
 import { useBarter, type BarterOffer } from "@/lib/use-barter";
-import { useAid, type GrantedLoan, type RepaidLoan } from "@/lib/use-aid";
+import {
+  useAid,
+  type GrantedLoan,
+  type RepaidLoan,
+  type RedirectedLoanClosed,
+} from "@/lib/use-aid";
 import {
   useBacking,
   type BackingCovered,
@@ -49,6 +54,7 @@ import {
   NotificationHistoryModal,
 } from "./game/GameModals";
 import { MembersPanel } from "./MembersPanel";
+import { FleetTicker } from "./FleetTicker";
 import { ChatPanel } from "./ChatPanel";
 import { Avatar, MeritIcon, OnlineDot, Pill } from "./shared";
 import { NotificationCenter } from "./NotificationCenter";
@@ -65,12 +71,15 @@ import {
   Ship,
   LifeBuoy,
   Bell,
+  Palette,
 } from "lucide-react";
-import { normalizeRoomName } from "@/lib/utils";
+import { cn, normalizeRoomName } from "@/lib/utils";
+import { useColorPreference } from "@/lib/use-color-preference";
 import {
   acceptBarterOffer,
   applyTidewatchSurge,
   claimWordOnTheDocksReward,
+  clearRedirectedLoan,
   contributeToVenture,
   grantLoan,
   nextPhase,
@@ -198,7 +207,26 @@ export function GameRoom({
     },
     [act],
   );
-  const aid = useAid(socket, room.id, me.id, onAidGranted, onAidRepaid);
+  // [MANIFEST 07: Bequest Routing] I was the lender, but redirected this
+  // specific loan before it was repaid; the Gold already went to the
+  // redirect target's own client via their own onAidRepaid, this only
+  // stops my client from carrying a closed debt forever.
+  const onAidRedirectedClosed = useCallback(
+    (closed: RedirectedLoanClosed) => {
+      act((g, l) =>
+        clearRedirectedLoan(g, closed.debtId, closed.redirectedToName, l),
+      );
+    },
+    [act],
+  );
+  const aid = useAid(
+    socket,
+    room.id,
+    me.id,
+    onAidGranted,
+    onAidRepaid,
+    onAidRedirectedClosed,
+  );
 
   // [MANIFEST 05: Backing] The server just accepted my own pledge to back
   // someone else's loan (see backing:offer in src/server/realtime.ts);
@@ -461,6 +489,11 @@ export function GameRoom({
   const notifications = useNotificationCenter();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
+  // [MANIFEST 16: Colorblind Safe Palette] colorFor threads down to every
+  // panel that colors a good's name; see useColorPreference for why this
+  // stays client only.
+  const { colorblindSafe, setColorblindSafe, colorFor } = useColorPreference();
+
   const myDetail = useCallback(
     (): PlayerDetailData => ({
       money: state.game.money,
@@ -497,16 +530,23 @@ export function GameRoom({
   // player detail modal always see the current roster, not just the
   // snapshot that arrived via REST on mount.
   const [hostId, setHostId] = useState<string>((room as any).host?.id ?? me.id);
+  // [MANIFEST 14: Harbor Watch] Rides the same room:members broadcast
+  // hostId already reads live from; whether I'm muted only ever matters to
+  // my own client, which is why this derives amIMuted below rather than
+  // exposing the whole list past what MembersPanel needs to render it.
+  const [mutedUserIds, setMutedUserIds] = useState<string[]>([]);
   useEffect(() => {
     if (!socket) return;
     const onMembers = (data: {
       roomId: string;
       members?: Array<PublicUser & { joinedAt?: string }>;
       hostId: string | null;
+      mutedUserIds?: string[];
     }) => {
       if (data.roomId !== room.id) return;
       if (data.hostId) setHostId(data.hostId);
       if (data.members) setMembers(data.members);
+      if (data.mutedUserIds) setMutedUserIds(data.mutedUserIds);
     };
     socket.on("room:members", onMembers);
     return () => {
@@ -514,6 +554,7 @@ export function GameRoom({
     };
   }, [socket, room.id]);
   const isHost = hostId === me.id;
+  const amIMuted = mutedUserIds.includes(me.id);
 
   // DM state
   const [dmTarget, setDmTarget] = useState<PublicUser | null>(null);
@@ -704,6 +745,17 @@ export function GameRoom({
     }
     try {
       await api.leaveRoom(room.id);
+      // Only once membership is genuinely gone. The REST route above runs in a
+      // Next request and cannot reach the socket server, so this is what tells
+      // the harbor to drop this captain from the live roster and clear their
+      // open barter offers and aid request; without it they linger on everyone
+      // else's roster until their socket happens to drop.
+      //
+      // Deliberately inside the try, after the await: if the leave failed, the
+      // captain is still a member and the room's ready check still counts them,
+      // so announcing a departure that did not happen would be worse than
+      // staying quiet.
+      socket?.emit("room:leave", { roomId: room.id });
     } catch {
       /* ignore */
     }
@@ -800,6 +852,22 @@ export function GameRoom({
             <Button
               variant="ghost"
               size="sm"
+              className={cn(
+                "rounded-lg",
+                colorblindSafe && "text-teal-600 dark:text-teal-400",
+              )}
+              onClick={() => setColorblindSafe(!colorblindSafe)}
+              title={
+                colorblindSafe
+                  ? "Colorblind safe palette on, click to use the default colors"
+                  : "Use a colorblind safe palette for goods"
+              }
+            >
+              <Palette className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               className="rounded-lg relative"
               onClick={() => {
                 setNotificationsOpen((v) => !v);
@@ -836,6 +904,16 @@ export function GameRoom({
 
       {/* Main layout */}
       <main className="flex-1 px-3 sm:px-5 pb-4 max-w-[1600px] w-full mx-auto">
+        {/* [MANIFEST 18: Fleet Ticker] Full width on every screen size, so
+            the whole harbor's headline numbers are visible without scrolling
+            past the phase panel first, which the roster below already
+            requires on anything under the lg breakpoint. */}
+        <FleetTicker
+          socket={socket}
+          roomId={room.id}
+          me={me}
+          initialMembers={members}
+        />
         <div className="grid grid-cols-1 lg:grid-cols-[clamp(220px,22vw,300px)_minmax(0,1fr)_clamp(260px,26vw,360px)] gap-3">
           {/* Left: status + log.
               On desktop this rail is pinned to the viewport and each panel
@@ -863,6 +941,7 @@ export function GameRoom({
                 onRepayLoan={handleRepayLoan}
                 convoy={convoy}
                 myUserId={me.id}
+                colorFor={colorFor}
               />
             </div>
           </div>
@@ -887,6 +966,7 @@ export function GameRoom({
               onShowGuide={() => setGuideOpen(true)}
               onShowTips={() => setTipsOpen(true)}
               onShowTutorial={() => setTutOpen(true)}
+              colorFor={colorFor}
             />
             <GameControlPanel
               game={state.game}
@@ -961,6 +1041,7 @@ export function GameRoom({
                     mode="room"
                     roomId={room.id}
                     initialMessages={roomMessages}
+                    disabled={amIMuted}
                   />
                 </TabsContent>
                 <TabsContent
@@ -1033,6 +1114,7 @@ export function GameRoom({
         }
         isMe={selectedPlayerId === me.id}
         difficulty={state.game.difficulty}
+        colorFor={colorFor}
         detail={
           selectedPlayerId ? playerDetail.detail[selectedPlayerId] : undefined
         }

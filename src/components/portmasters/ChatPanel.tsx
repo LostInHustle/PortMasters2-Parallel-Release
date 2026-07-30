@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { SendHorizontal, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 /**
  * A self-contained chat surface. Two modes: room, messages broadcast to a
@@ -26,6 +27,7 @@ export function ChatPanel({
   other,
   initialMessages,
   className,
+  disabled,
 }: {
   socket: Socket | null;
   me: PublicUser;
@@ -34,6 +36,12 @@ export function ChatPanel({
   other?: PublicUser;
   initialMessages?: ChatMessage[];
   className?: string;
+  // [MANIFEST 14: Harbor Watch] Set only for the room mode instance, only
+  // while the host has muted this captain. A muted captain keeps reading
+  // room chat live same as anyone; they just can't post to it until the
+  // voyage ends, which is enforced again server side regardless of this
+  // prop, so a stale client can never actually post past the block.
+  disabled?: boolean;
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>(
     initialMessages ?? [],
@@ -95,11 +103,26 @@ export function ChatPanel({
           : [...prev, { ...message, mine: message.sender.id === me.id }],
       );
     };
+    // [MANIFEST 14: Harbor Watch] Defensive: the disabled prop (driven by
+    // GameRoom.tsx's own room:members tracking) already hides the input
+    // the moment a mute takes effect, so this should be unreachable in
+    // ordinary use. It only ever fires for a stale client, a tab whose
+    // React state has not caught up to a mute that just landed, which is
+    // exactly the moment a silent server side drop would otherwise look
+    // like a message that vanished for no reason.
+    const onMuted = (data: { roomId: string }) => {
+      if (mode !== "room" || data.roomId !== roomId) return;
+      toast.error("You're muted", {
+        description: "The host has muted you in room chat this voyage.",
+      });
+    };
     socket.on("chat:room", onRoom);
     socket.on("chat:dm", onDm);
+    socket.on("chat:muted", onMuted);
     return () => {
       socket.off("chat:room", onRoom);
       socket.off("chat:dm", onDm);
+      socket.off("chat:muted", onMuted);
     };
   }, [socket, mode, roomId, other?.id, me.id]);
 
@@ -195,37 +218,43 @@ export function ChatPanel({
           })
         )}
       </div>
-      <div className="p-2.5 border-t border-black/5 dark:border-white/10 flex items-center gap-2">
-        <Input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              send();
+      {disabled ? (
+        <div className="p-2.5 border-t border-black/5 dark:border-white/10 text-center text-xs text-muted-foreground">
+          The host has muted you in room chat for the rest of this voyage.
+        </div>
+      ) : (
+        <div className="p-2.5 border-t border-black/5 dark:border-white/10 flex items-center gap-2">
+          <Input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                send();
+              }
+            }}
+            placeholder={
+              mode === "room"
+                ? "Message the harbor…"
+                : `Message ${other?.displayName ?? ""}…`
             }
-          }}
-          placeholder={
-            mode === "room"
-              ? "Message the harbor…"
-              : `Message ${other?.displayName ?? ""}…`
-          }
-          className="h-9 rounded-full bg-black/5 dark:bg-white/10 border-0 text-sm"
-          maxLength={1000}
-        />
-        <Button
-          size="icon"
-          onClick={send}
-          disabled={!input.trim() || sending}
-          className="h-9 w-9 rounded-full pm-grad-primary text-white shrink-0"
-        >
-          {sending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <SendHorizontal className="h-4 w-4" />
-          )}
-        </Button>
-      </div>
+            className="h-9 rounded-full bg-black/5 dark:bg-white/10 border-0 text-sm"
+            maxLength={1000}
+          />
+          <Button
+            size="icon"
+            onClick={send}
+            disabled={!input.trim() || sending}
+            className="h-9 w-9 rounded-full pm-grad-primary text-white shrink-0"
+          >
+            {sending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <SendHorizontal className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

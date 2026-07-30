@@ -44,6 +44,10 @@ type Props = {
   onShowGuide: () => void;
   onShowTips: () => void;
   onShowTutorial: () => void;
+  // [MANIFEST 16: Colorblind Safe Palette] Optional, falls back to the
+  // plain COLORS lookup inside each phase when a caller hasn't wired
+  // useColorPreference in.
+  colorFor?: (item: string) => string | undefined;
 };
 
 export function GamePhasePanel({
@@ -62,6 +66,7 @@ export function GamePhasePanel({
   onRestart,
   onShowRumors,
   onShowTutorial,
+  colorFor,
 }: Props) {
   return (
     <div className="pm-glass rounded-2xl p-4 sm:p-5 min-h-[520px]">
@@ -108,6 +113,7 @@ export function GamePhasePanel({
           phaseSync={phaseSync}
           members={members}
           onShowRumors={onShowRumors}
+          colorFor={colorFor}
         />
       );
     if (p === "barter")
@@ -119,6 +125,7 @@ export function GamePhasePanel({
           myUserId={myUserId}
           phaseSync={phaseSync}
           members={members}
+          colorFor={colorFor}
         />
       );
     if (p === "worker_mgmt")
@@ -129,11 +136,18 @@ export function GamePhasePanel({
           act={act}
           phaseSync={phaseSync}
           members={members}
+          colorFor={colorFor}
         />
       );
     if (p === 2)
       return (
-        <Orders game={game} act={act} phaseSync={phaseSync} members={members} />
+        <Orders
+          game={game}
+          act={act}
+          phaseSync={phaseSync}
+          members={members}
+          colorFor={colorFor}
+        />
       );
     if (p === 3)
       return (
@@ -156,7 +170,15 @@ export function GamePhasePanel({
           members={members}
         />
       );
-    if (p === "bankruptcy") return <Bankruptcy game={game} />;
+    if (p === "bankruptcy")
+      return (
+        <Bankruptcy
+          game={game}
+          members={members}
+          backing={backing}
+          myUserId={myUserId}
+        />
+      );
     if (p === "endgame")
       return (
         <Endgame

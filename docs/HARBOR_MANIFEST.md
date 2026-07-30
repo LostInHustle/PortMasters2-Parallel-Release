@@ -14,18 +14,18 @@ Every claim in the original about what the project contained was checked against
 | 04  | Convoy Ventures         | II. The peer economy                  | substantial                                             | Shipped   |
 | 05  | Backing                 | II. The peer economy                  | moderate                                                | Shipped   |
 | 06  | Partial Sight           | II. The peer economy                  | moderate                                                | Not built |
-| 07  | Bequest Routing         | II. The peer economy                  | light                                                   | Not built |
+| 07  | Bequest Routing         | II. The peer economy                  | light                                                   | Shipped   |
 | 08  | Trading Houses          | III. Identity and the long game       | moderate, needs a balance session                       | Not built |
 | 09  | House Rally             | III. Identity and the long game       | light, once entry eight exists                          | Not built |
 | 10  | Ages of the Ledger      | III. Identity and the long game       | moderate                                                | Not built |
 | 11  | Captain's Rival         | III. Identity and the long game       | moderate                                                | Not built |
 | 12  | Voyage Chronicle        | III. Identity and the long game       | light to moderate                                       | Not built |
 | 13  | Ledger Integrity Pass   | IV. Trust and safety                  | moderate, do this before entries eight, ten, and eleven | Not built |
-| 14  | Harbor Watch            | IV. Trust and safety                  | light                                                   | Not built |
+| 14  | Harbor Watch            | IV. Trust and safety                  | light                                                   | Shipped   |
 | 15  | Bilingual Harbor        | V. Getting more captains to the table | substantial                                             | Dropped   |
-| 16  | Colorblind Safe Palette | V. Getting more captains to the table | light                                                   | Not built |
+| 16  | Colorblind Safe Palette | V. Getting more captains to the table | light                                                   | Shipped   |
 | 17  | Quick Start Match       | V. Getting more captains to the table | moderate                                                | Not built |
-| 18  | Fleet Ticker            | VI. Reading the room                  | light                                                   | Not built |
+| 18  | Fleet Ticker            | VI. Reading the room                  | light                                                   | Shipped   |
 
 Entry 15, Bilingual Harbor, is **dropped, not pending**. English and Chinese localization was built in full and then removed at the project owner's request. Do not treat it as outstanding work.
 
@@ -121,7 +121,7 @@ New mechanism. Effort: moderate.
 
 _A bankrupt captain still gets to decide where their gold goes next._
 
-Extends a shipped feature. Effort: light.
+Extends a shipped feature. Effort: light. **Shipped.**
 
 **The situation today.** The bankruptcy screen already shows a captain every loan still owed to them, under the heading Silent Partner, and that gold already lands the moment each borrower repays, exactly as described in the correction above. What it does not do yet is give the bankrupt captain any choice in the matter. The gold simply accumulates on an account with no voyage left to spend it in.
 
@@ -129,7 +129,7 @@ Extends a shipped feature. Effort: light.
 
 **Why this fits.** It respects what already shipped instead of redoing it, and answers the one real gap the shipped version leaves open: gold that currently has nowhere useful to go once its original owner is out of the voyage.
 
-**System notes.** One redirect field added to the existing loan record, checked at the same repayment settlement point `src/server/realtime.ts` already runs when a debt is repaid.
+**System notes.** Built as `redirectToUserId`/`redirectToName` on the server's own `LoanRecord`, set only by the lender through a new `loan:redirect` event, checked at the same `aid:repay` settlement point `src/server/realtime.ts` already runs when a debt is repaid. One nuance the original proposal did not anticipate: the original lender's own client still carries the loan in its local `loansGiven` list, and since `aid:repaid` now goes to the redirect target instead of them, they would never otherwise learn it closed. A second, Gold free event, `aid:redirected`, tells their client to stop tracking it (see `clearRedirectedLoan` in `src/lib/game/engine.ts`) without crediting them a second time. The Bankruptcy screen itself gained a `members`/`backing` prop pair to render the picker, both optional so no other caller of that screen needs to change.
 
 ## III. Identity and the long game
 
@@ -223,7 +223,7 @@ New validation logic. Effort: moderate, do this before entries eight, ten, and e
 
 _A host gets a way to quiet one voice without ending anyone's voyage._
 
-New mechanism. Effort: light.
+New mechanism. Effort: light. **Shipped.**
 
 **The situation today.** Room chat and direct messages are both fully open with no moderation tool anywhere in the product, not even a basic mute. The only way a host currently has to deal with an unwanted message is the same restart option covered at length in this project's own README, which resets every captain in the room back to round one.
 
@@ -231,7 +231,7 @@ New mechanism. Effort: light.
 
 **Why this fits.** This is a plain gap in this project's own social surface, not a reaction to anything in the sibling codebase. A game whose entire pitch is a small group of real people talking to each other in real time needs some way to handle one disruptive person that costs less than resetting everyone else's progress, and today it has none.
 
-**System notes.** One boolean flag per room member, checked by `src/server/realtime.ts` before relaying a chat message the same way it already checks membership before relaying one, host only, gated the same way `room:start` and `room:restart` already are.
+**System notes.** Built as a per-room `Set<userId>` in memory (`roomMutedUsers`), not a schema column: a mute only ever lasts "for the remainder of the voyage," and every other per-voyage-only flag in this file (`roomSurges`, `roomDocksWinners`, and so on) already follows that same in-memory, cleared-on-restart convention. Checked by `chat:room` in `src/server/realtime.ts` before a message is even persisted, host only, gated the same way `room:restart` already is. The muted set rides along on the existing `room:members` broadcast as `mutedUserIds` rather than a new event, so the roster, the host's own mute control, and the muted captain's own client all learn about a change from the one broadcast every client already listens to.
 
 ## V. Getting more captains to the table
 
@@ -253,7 +253,7 @@ New infrastructure. Effort: substantial. **Dropped.**
 
 _The exact same color coding, readable by more eyes._
 
-New mechanism. Effort: light.
+New mechanism. Effort: light. **Shipped.**
 
 **The situation today.** `src/lib/game/constants.ts` assigns a fixed color to every good, Silk a deep crimson red, Tea a forest green, sitting close enough together on the color wheel that a red green colorblind player, roughly one in twelve men by most estimates, would have real difficulty telling them apart at a glance in the same list.
 
@@ -261,7 +261,7 @@ New mechanism. Effort: light.
 
 **Why this fits.** It is a small, self contained fix to a specific, confirmed detail already sitting in the constants file, the kind of basic accessibility care that costs very little and excludes nobody who does not choose to use it.
 
-**System notes.** One alternate lookup table shaped exactly like the existing `COLORS` constant, swapped in per player based on a settings flag. No engine or database change required at all.
+**System notes.** Built as `COLORS_COLORBLIND_SAFE` in `src/lib/game/constants.ts`, shaped exactly like the existing `COLORS` constant, anchored on the Okabe and Ito palette so every hue stays distinguishable under the common forms of color vision deficiency, separated by lightness and saturation as well as hue rather than hue alone. `useColorPreference` in `src/lib/use-color-preference.ts` reads and writes the choice to `localStorage`, matching how the onboarding tutorial's own seen flag already persists; a `colorFor` function it returns threads down as an optional prop through every panel that colors a good's name (`GameStatusPanel`, `PlayerDetailModal`, and the Purchase, Barter, Worker, and Orders phase panels), falling back to the plain `COLORS` lookup for any caller that does not pass it. No engine or database change, exactly as proposed.
 
 ### 17. Quick Start Match
 
@@ -283,34 +283,30 @@ New mechanism. Effort: moderate.
 
 _A glance at the whole harbor, without opening six separate popups._
 
-New interface. Effort: light.
+New interface. Effort: light. **Shipped**, with a correction below to what "the situation today" actually was by the time this got built.
 
-**The situation today.** The server already tracks and broadcasts every captain's live round, phase, gold, and Reputation, cached per room in the `roomStatuses` map inside `src/server/realtime.ts` specifically so a late joiner can hydrate immediately. The only way any captain sees that data today is by opening one specific roster member's detail popup at a time, one captain, one click, one modal.
+**The situation today, corrected.** By the time this entry was actually picked up, `MembersPanel.tsx` had already grown a live, always visible roster row per captain (round, phase, gold, Reputation, no click required), built from the same `game:status` broadcast this entry's original proposal assumed was still locked behind a one captain, one click, one modal design. That earlier claim, checked directly against the source rather than assumed, did not hold up. What the roster panel does not solve is layout: it sits in the right column of the three column desktop grid, and on any screen under the `lg` breakpoint it stacks to the very bottom of the page, behind the phase panel, so a captain on a phone has to scroll past everything else to see it.
 
-**What we add.** A compact strip, always visible in the game room shell rather than tucked behind a click, summarizing every other captain's round, phase, and headline numbers at once, built entirely from the `game:status` broadcast this project already relays for exactly this purpose.
+**What we actually add.** A second, genuinely distinct component: a slim horizontal strip mounted directly under the header, full width, on every screen size, so the whole harbor's headline numbers are visible without scrolling past anything, on desktop and mobile alike. It does not replace the roster panel, which still owns the fuller per-captain view, the click through to the detail popup, and now the Harbor Watch mute control too; it exists specifically to close the mobile-layout gap the roster panel's own stacking order left open.
 
-**Why this fits.** It does not ask for a single new piece of data from anywhere. The server already computes and sends everything this needs. It only changes how much of that already flowing information is visible passively instead of requiring six separate clicks to piece together the same picture.
+**Why this fits.** It still asks for no new server data. The server already computes and sends everything this needs over `game:status`, exactly as originally proposed; only the actual gap being closed changed, from "there is no glance view at all" to "the glance view that already exists is not always on screen."
 
-**System notes.** A new component reading the same `roomStatuses` feed the members panel already subscribes to. No server change required at all.
+**System notes.** `src/components/portmasters/FleetTicker.tsx`, a new component with its own self-contained `room:members`/`game:status` subscription, the same pattern `MembersPanel.tsx` already uses rather than threading a second copy of that state down from `GameRoom.tsx`. No server change required at all.
 
 ## Suggested order of work
 
-Four waves, each assuming the ones before it are done or far enough along to satisfy its dependencies. The original table predates entries 01 through 05 shipping, so their rows are dropped here and the waves renumbered around what actually remains.
+Three waves, each assuming the ones before it are done or far enough along to satisfy its dependencies. The original table predates entries 01 through 05 shipping, and Wave One below (Fleet Ticker, Colorblind Safe Palette, Harbor Watch, Bequest Routing) has since shipped in full too, so their rows are dropped here and the waves renumbered around what actually remains.
 
-| Wave                                          | Entry                       | Effort            | Depends on                                              |
-| --------------------------------------------- | --------------------------- | ----------------- | ------------------------------------------------------- |
-| One, light and independent                    | 18. Fleet Ticker            | Light             | Nothing new, reads an existing broadcast                |
-| One, light and independent                    | 16. Colorblind Safe Palette | Light             | Nothing new                                             |
-| One, light and independent                    | 14. Harbor Watch            | Light             | Nothing new                                             |
-| One, light and independent                    | 07. Bequest Routing         | Light             | The already shipped Silent Partner panel                |
-| Two, moderate and mostly independent          | 13. Ledger Integrity Pass   | Moderate          | Nothing new, but should ship before 08, 10 and 11       |
-| Two, moderate and mostly independent          | 17. Quick Start Match       | Moderate          | Nothing new, needs an eligibility ruling                |
-| Two, moderate and mostly independent          | 12. Voyage Chronicle        | Light to moderate | Nothing new                                             |
-| Three, needs a decision or a dependency first | 06. Partial Sight           | Moderate          | Entry 05's trust threshold, plus a banding numbers pass |
-| Three, needs a decision or a dependency first | 08. Trading Houses          | Moderate          | A dedicated balance session, ideally 13 first           |
-| Three, needs a decision or a dependency first | 09. House Rally             | Light             | Entry 08                                                |
-| Three, needs a decision or a dependency first | 10. Ages of the Ledger      | Moderate          | A decided rollover cadence, ideally 13 first            |
-| Three, needs a decision or a dependency first | 11. Captain's Rival         | Moderate          | Ideally 13 first                                        |
+| Wave                                        | Entry                     | Effort            | Depends on                                              |
+| ------------------------------------------- | ------------------------- | ----------------- | ------------------------------------------------------- |
+| One, moderate and mostly independent        | 13. Ledger Integrity Pass | Moderate          | Nothing new, but should ship before 08, 10 and 11       |
+| One, moderate and mostly independent        | 17. Quick Start Match     | Moderate          | Nothing new, needs an eligibility ruling                |
+| One, moderate and mostly independent        | 12. Voyage Chronicle      | Light to moderate | Nothing new                                             |
+| Two, needs a decision or a dependency first | 06. Partial Sight         | Moderate          | Entry 05's trust threshold, plus a banding numbers pass |
+| Two, needs a decision or a dependency first | 08. Trading Houses        | Moderate          | A dedicated balance session, ideally 13 first           |
+| Two, needs a decision or a dependency first | 09. House Rally           | Light             | Entry 08                                                |
+| Two, needs a decision or a dependency first | 10. Ages of the Ledger    | Moderate          | A decided rollover cadence, ideally 13 first            |
+| Two, needs a decision or a dependency first | 11. Captain's Rival       | Moderate          | Ideally 13 first                                        |
 
 ## Open questions, still unanswered
 

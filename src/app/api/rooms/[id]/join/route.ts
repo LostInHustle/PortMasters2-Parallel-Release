@@ -1,7 +1,7 @@
 // POST /api/rooms/[id]/join: join by room id (or by code through /api/rooms/join)
 // POST /api/rooms/join: join by code (handled below as an alias)
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { db, PUBLIC_USER_SELECT } from "@/lib/db";
 import { getCurrentUser, publicUser } from "@/lib/api-auth";
 
 export async function POST(
@@ -18,12 +18,7 @@ export async function POST(
     include: {
       members: true,
       host: {
-        select: {
-          id: true,
-          username: true,
-          displayName: true,
-          avatarHue: true,
-        },
+        select: PUBLIC_USER_SELECT,
       },
     },
   });
@@ -55,12 +50,7 @@ export async function POST(
     where: { roomId: room.id },
     include: {
       user: {
-        select: {
-          id: true,
-          username: true,
-          displayName: true,
-          avatarHue: true,
-        },
+        select: PUBLIC_USER_SELECT,
       },
     },
   });

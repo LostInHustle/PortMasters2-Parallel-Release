@@ -1,7 +1,7 @@
 // POST /api/rooms/join: join a room by its 6 character code
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { db } from "@/lib/db";
+import { db, PUBLIC_USER_SELECT } from "@/lib/db";
 import { getCurrentUser, publicUser } from "@/lib/api-auth";
 
 const Schema = z.object({ code: z.string().length(6) });
@@ -31,12 +31,7 @@ export async function POST(req: NextRequest) {
     include: {
       members: true,
       host: {
-        select: {
-          id: true,
-          username: true,
-          displayName: true,
-          avatarHue: true,
-        },
+        select: PUBLIC_USER_SELECT,
       },
     },
   });
@@ -67,12 +62,7 @@ export async function POST(req: NextRequest) {
     where: { roomId: room.id },
     include: {
       user: {
-        select: {
-          id: true,
-          username: true,
-          displayName: true,
-          avatarHue: true,
-        },
+        select: PUBLIC_USER_SELECT,
       },
     },
   });
