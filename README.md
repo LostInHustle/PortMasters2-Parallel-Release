@@ -237,7 +237,7 @@ grep -c '"node_modules/lightningcss-' package-lock.json
 
 **"Start Voyage" does nothing.** A room needs at least two captains. A solo room is not allowed to set sail, since synchronized phases are the entire point.
 
-**A captain who refreshed seems to linger.** Closing a tab does not free the seat immediately. There is a thirty second grace period so a refresh or a flaky connection does not cost someone their spot.
+**A captain who refreshed seems to linger.** Closing a tab does not free the seat immediately. There is a thirty second grace period so a refresh or a flaky connection does not cost someone their spot. A refresh also puts that captain straight back into their own room rather than the Lobby: the active room is read back from durable membership on load (`GET /api/rooms/active`), because the seat surviving is only half of what is needed. The realtime layer builds each checkpoint's required roster from that same membership, so a captain stranded in the Lobby was still being counted and still owed a ready vote they had no way to cast, which froze every other captain in the harbor until they found and rejoined their room by hand.
 
 **Restarting feels like a big hammer.** It is, deliberately. Only the host can do it, it asks for confirmation, and it resets every captain in the room back to round one with Gold, cargo, workers and upgrades wiped. It also reopens the room so captains who could not join mid voyage can join again. That reopening is the real point: `Room.started` is what the join routes check, and for a while nothing in the codebase ever set it back to false, so a restarted room rejected every new captain forever.
 
