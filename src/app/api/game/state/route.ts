@@ -4,6 +4,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/api-auth";
+import {
+  checkSave,
+  describeFindings,
+  snapshotFromSave,
+} from "@/lib/game/integrity";
 
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
@@ -82,12 +87,50 @@ export async function PUT(req: NextRequest) {
       { status: 403 },
     );
 
+  // [MANIFEST 13: Ledger Integrity Pass] The one guard on an endpoint that
+  // otherwise writes whatever arrives. The save is still accepted either
+  // way: a captain mid voyage must never lose their game to a false
+  // positive, and the ceiling in integrity.ts is set from the theoretical
+  // maximum precisely so it cannot produce one. What an implausible save
+  // does earn is a permanent mark on the row, so the account level features
+  // that later read standings can decline to trust it.
+  //
+  // Judged against the room's own currentRound rather than anything in the
+  // payload. That is the one number here the client cannot forge: the
+  // synchronized ready check in src/server/realtime.ts owns it.
+  const room = await db.room.findUnique({
+    where: { id: roomId },
+    select: { currentRound: true },
+  });
+  const snapshot = snapshotFromSave(data);
+  const verdict = snapshot
+    ? checkSave(snapshot, room?.currentRound ?? 1)
+    : { plausible: true, findings: [] };
+
   const json = JSON.stringify(data);
+  // Only ever set the mark, never clear it. A save that was implausible once
+  // stays flagged even if every later save looks ordinary, since the point
+  // is that this account claimed it at all.
+  const flag = verdict.plausible
+    ? {}
+    : {
+        integritySuspect: true,
+        integrityNote: describeFindings(verdict.findings),
+      };
+
+  if (!verdict.plausible) {
+    console.warn(
+      `[integrity] implausible save user=${user.id} room=${roomId} ${describeFindings(verdict.findings)}`,
+    );
+  }
+
   const record = await db.gameState.upsert({
     where: { userId_roomId: { userId: user.id, roomId } },
-    create: { userId: user.id, roomId, data: json },
-    update: { data: json },
+    create: { userId: user.id, roomId, data: json, ...flag },
+    update: { data: json, ...flag },
   });
 
+  // Deliberately unchanged in shape. A tampering client learns nothing about
+  // whether it tripped the guard, and an honest one has nothing to act on.
   return NextResponse.json({ ok: true, updatedAt: record.updatedAt });
 }

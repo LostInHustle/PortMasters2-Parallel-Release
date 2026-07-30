@@ -20,7 +20,7 @@ Every claim in the original about what the project contained was checked against
 | 10  | Ages of the Ledger      | III. Identity and the long game       | moderate                                                | Not built |
 | 11  | Captain's Rival         | III. Identity and the long game       | moderate                                                | Not built |
 | 12  | Voyage Chronicle        | III. Identity and the long game       | light to moderate                                       | Not built |
-| 13  | Ledger Integrity Pass   | IV. Trust and safety                  | moderate, do this before entries eight, ten, and eleven | Not built |
+| 13  | Ledger Integrity Pass   | IV. Trust and safety                  | moderate, do this before entries eight, ten, and eleven | Shipped   |
 | 14  | Harbor Watch            | IV. Trust and safety                  | light                                                   | Shipped   |
 | 15  | Bilingual Harbor        | V. Getting more captains to the table | substantial                                             | Dropped   |
 | 16  | Colorblind Safe Palette | V. Getting more captains to the table | light                                                   | Shipped   |
@@ -209,7 +209,7 @@ New mechanism. Effort: light to moderate.
 
 _The one save endpoint that currently trusts a client completely gets one narrow guard._
 
-New validation logic. Effort: moderate, do this before entries eight, ten, and eleven.
+New validation logic. Effort: moderate, do this before entries eight, ten, and eleven. **Shipped.**
 
 **The situation today.** Reading `src/app/api/game/state/route.ts` directly confirms the source page's claim: `PUT /api/game/state` validates that the request has the right shape, a room id string and a data object, using Zod, but it never checks whether the actual values inside that data object are plausible given what was saved last time. A captain's browser computes their own gold, score, and inventory, and the server currently writes back whatever arrives without comparing it to anything.
 
@@ -297,16 +297,15 @@ New interface. Effort: light. **Shipped**, with a correction below to what "the 
 
 Three waves, each assuming the ones before it are done or far enough along to satisfy its dependencies. The original table predates entries 01 through 05 shipping, and Wave One below (Fleet Ticker, Colorblind Safe Palette, Harbor Watch, Bequest Routing) has since shipped in full too, so their rows are dropped here and the waves renumbered around what actually remains.
 
-| Wave                                        | Entry                     | Effort            | Depends on                                              |
-| ------------------------------------------- | ------------------------- | ----------------- | ------------------------------------------------------- |
-| One, moderate and mostly independent        | 13. Ledger Integrity Pass | Moderate          | Nothing new, but should ship before 08, 10 and 11       |
-| One, moderate and mostly independent        | 17. Quick Start Match     | Moderate          | Nothing new, needs an eligibility ruling                |
-| One, moderate and mostly independent        | 12. Voyage Chronicle      | Light to moderate | Nothing new                                             |
-| Two, needs a decision or a dependency first | 06. Partial Sight         | Moderate          | Entry 05's trust threshold, plus a banding numbers pass |
-| Two, needs a decision or a dependency first | 08. Trading Houses        | Moderate          | A dedicated balance session, ideally 13 first           |
-| Two, needs a decision or a dependency first | 09. House Rally           | Light             | Entry 08                                                |
-| Two, needs a decision or a dependency first | 10. Ages of the Ledger    | Moderate          | A decided rollover cadence, ideally 13 first            |
-| Two, needs a decision or a dependency first | 11. Captain's Rival       | Moderate          | Ideally 13 first                                        |
+| Wave                                        | Entry                  | Effort            | Depends on                                              |
+| ------------------------------------------- | ---------------------- | ----------------- | ------------------------------------------------------- |
+| One, moderate and mostly independent        | 17. Quick Start Match  | Moderate          | Nothing new, needs an eligibility ruling                |
+| One, moderate and mostly independent        | 12. Voyage Chronicle   | Light to moderate | Nothing new                                             |
+| Two, needs a decision or a dependency first | 06. Partial Sight      | Moderate          | Entry 05's trust threshold, plus a banding numbers pass |
+| Two, needs a decision or a dependency first | 08. Trading Houses     | Moderate          | A dedicated balance session, ideally 13 first           |
+| Two, needs a decision or a dependency first | 09. House Rally        | Light             | Entry 08                                                |
+| Two, needs a decision or a dependency first | 10. Ages of the Ledger | Moderate          | A decided rollover cadence, ideally 13 first            |
+| Two, needs a decision or a dependency first | 11. Captain's Rival    | Moderate          | Ideally 13 first                                        |
 
 ## Open questions, still unanswered
 

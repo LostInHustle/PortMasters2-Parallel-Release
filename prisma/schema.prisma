@@ -28,20 +28,20 @@ datasource db {
 }
 
 model User {
-  id           String    @id @default(cuid())
-  username     String    @unique
+  id           String   @id @default(cuid())
+  username     String   @unique
   passwordHash String
   displayName  String
-  avatarHue    Int       @default(180)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  avatarHue    Int      @default(180)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   sessions     Session[]
   memberships  RoomMember[]
-  ownedRooms   Room[]      @relation("RoomHost")
+  ownedRooms   Room[]         @relation("RoomHost")
   gameStates   GameState[]
-  sentMessages Message[]   @relation("MessageSender")
-  recvMessages Message[]   @relation("MessageRecipient")
+  sentMessages Message[]      @relation("MessageSender")
+  recvMessages Message[]      @relation("MessageRecipient")
   legacy       CaptainLegacy?
   merits       CaptainMerit[]
 }
@@ -53,18 +53,18 @@ model Session {
   expiresAt DateTime
   createdAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
 
 model Room {
-  id          String    @id @default(cuid())
-  code        String    @unique
-  name        String
-  hostId      String
-  isPublic    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  hostId    String
+  isPublic  Boolean  @default(true)
+  createdAt DateTime @default(now())
 
   // The room's shared checkpoint: the round and phase every captain is
   // synchronized to. currentPhase stores the Phase union (see
@@ -73,8 +73,8 @@ model Room {
   // every current room member (minus anyone bankrupt or at the endgame
   // screen) has signaled ready, so it survives a server restart instead
   // of living only in memory.
-  currentRound Int      @default(1)
-  currentPhase String   @default("0")
+  currentRound Int    @default(1)
+  currentPhase String @default("0")
 
   // Bumped by one every time the host restarts the voyage (see the
   // "room:restart" handler in src/server/realtime.ts). Folded into each
@@ -82,7 +82,7 @@ model Room {
   // src/lib/use-game-session.ts) so a restart overwrites the room with a
   // brand-new voyage (fresh market, orders, and Broker intel for everyone),
   // while a mid-voyage reload still reproduces the current one.
-  voyageEpoch  Int      @default(0)
+  voyageEpoch Int @default(0)
 
   // Flips to true the moment the host starts the voyage (see the
   // "room:start" handler in src/server/realtime.ts). A room sits open in
@@ -90,32 +90,32 @@ model Room {
   // once a voyage is under way the room is locked, and the join routes
   // (src/app/api/rooms/[id]/join, src/app/api/rooms/join) refuse anyone
   // who isn't already a member.
-  started      Boolean  @default(false)
+  started Boolean @default(false)
 
   // The difficulty tier the host chose for this harbor (see
   // src/lib/game/difficulty.ts). One tier for the whole room: every captain
   // folds it into their own game state so they all resolve the same voyage
   // length, market breadth, and raid odds. Defaults to the entry tier so every
   // pre-existing room keeps the current single mode with no change.
-  difficulty   String   @default("fair_winds")
+  difficulty String @default("fair_winds")
 
-  host        User       @relation("RoomHost", fields: [hostId], references: [id], onDelete: Cascade)
-  members     RoomMember[]
-  messages    Message[]
-  gameStates  GameState[]
+  host           User            @relation("RoomHost", fields: [hostId], references: [id], onDelete: Cascade)
+  members        RoomMember[]
+  messages       Message[]
+  gameStates     GameState[]
   convoyVentures ConvoyVenture[]
 
   @@index([hostId])
 }
 
 model RoomMember {
-  id        String   @id @default(cuid())
-  userId    String
-  roomId    String
-  joinedAt  DateTime @default(now())
+  id       String   @id @default(cuid())
+  userId   String
+  roomId   String
+  joinedAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
   @@unique([userId, roomId])
   @@index([roomId])
@@ -125,11 +125,20 @@ model GameState {
   id        String   @id @default(cuid())
   userId    String
   roomId    String
-  data      String   // JSON blob of the full per-player game state
+  data      String // JSON blob of the full per-player game state
   updatedAt DateTime @updatedAt
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  // [MANIFEST 13: Ledger Integrity Pass] Set when a save arrives carrying
+  // numbers no real voyage could have produced (see checkSave in
+  // src/lib/game/integrity.ts). The save is still written: this only ever
+  // records that it was implausible, so the entries that later read account
+  // level standings can decline to trust it. Never cleared automatically,
+  // since the point is that this account claimed it at least once.
+  integritySuspect Boolean @default(false)
+  integrityNote    String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
   @@unique([userId, roomId])
   @@index([userId])
@@ -146,15 +155,15 @@ model GameState {
 // See src/lib/game/legacy.ts for the level curve, titles, and the
 // starting Gold bonus this unlocks.
 model CaptainLegacy {
-  id               String   @id @default(cuid())
-  userId           String   @unique
-  renownLevel      Int      @default(1)
-  renownXP         Int      @default(0)
-  voyagesCompleted Int      @default(0)
+  id               String @id @default(cuid())
+  userId           String @unique
+  renownLevel      Int    @default(1)
+  renownXP         Int    @default(0)
+  voyagesCompleted Int    @default(0)
   // Times a captain has ended a voyage with the highest Reputation among
   // everyone who reached the endgame screen (not bankrupt) in that room.
-  seaMasterCrowns  Int      @default(0)
-  bestScore        Int      @default(0)
+  seaMasterCrowns  Int    @default(0)
+  bestScore        Int    @default(0)
 
   // Voyages completed back to back without going bankrupt, reset to 0 the
   // moment one ends in bankruptcy. Powers the "iron_hull" merit (see
@@ -175,12 +184,12 @@ model CaptainLegacy {
   // the moment Day 7 is claimed); lastCheckInDate is the "YYYY-MM-DD" UTC
   // key of the most recent claim, which enforces one claim per day. Kept on
   // this account-level table since check-in, like Renown, spans every room.
-  checkInCount     Int      @default(0)
-  lastCheckInDate  String?
+  checkInCount    Int     @default(0)
+  lastCheckInDate String?
 
-  updatedAt        DateTime @updatedAt
+  updatedAt DateTime @updatedAt
 
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // One row per merit a captain has ever earned (see src/lib/game/merits.ts
@@ -195,7 +204,7 @@ model CaptainMerit {
   meritId  String
   earnedAt DateTime @default(now())
 
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, meritId])
   @@index([userId])
@@ -213,17 +222,17 @@ model CaptainMerit {
 // fresh voyageEpoch (see Room.voyageEpoch) can never resolve against a
 // venture from a voyage that no longer exists.
 model ConvoyVenture {
-  id            String   @id @default(cuid())
-  roomId        String
-  voyageEpoch   Int
-  posterId      String
-  posterName    String
-  targetGold    Int
-  deadlineRound Int
+  id               String @id @default(cuid())
+  roomId           String
+  voyageEpoch      Int
+  posterId         String
+  posterName       String
+  targetGold       Int
+  deadlineRound    Int
   // Multiplies targetGold for the reward split among contributors if the
   // venture fills; see CONVOY_VENTURE_PAYOUT_MULTIPLIER in
   // src/lib/game/constants.ts for the current value and reasoning.
-  payoutMultiplier Float @default(1.5)
+  payoutMultiplier Float  @default(1.5)
 
   // JSON map of { [userId]: { name: string, amount: number } }, the pooled
   // contributions so far. A JSON column rather than a second table: every
@@ -237,8 +246,8 @@ model ConvoyVenture {
   // paid out, "failed" once its deadline round passed short of target and
   // partial refunds went out. Terminal once "filled" or "failed"; nothing
   // ever moves a venture back to "open".
-  status    String   @default("open")
-  createdAt DateTime @default(now())
+  status     String    @default("open")
+  createdAt  DateTime  @default(now())
   resolvedAt DateTime?
 
   room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
@@ -247,16 +256,16 @@ model ConvoyVenture {
 }
 
 model Message {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   roomId      String?
   senderId    String
   recipientId String?
   content     String
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime @default(now())
 
-  room        Room?     @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  sender      User      @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
-  recipient   User?     @relation("MessageRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  room      Room? @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  sender    User  @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient User? @relation("MessageRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
 
   @@index([roomId, createdAt])
   @@index([senderId, recipientId, createdAt])
