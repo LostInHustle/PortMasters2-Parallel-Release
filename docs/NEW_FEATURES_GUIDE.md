@@ -246,7 +246,9 @@ You will need three captains for the most convincing version of this test, thoug
 
 ## Status: what exists in the game right now versus what is still planned
 
-This document only covers the five features that actually exist in the game as of this writing. Thirteen more are planned as part of the same larger project but have not been built yet, so please do not go looking for them; if you do not see something described in the broader project plan, it almost certainly just has not been built yet rather than being broken.
+This document only covers the five features that actually exist in the game as of this writing. Twelve more are planned and one has been dropped, so please do not go looking for them; if you do not see something described here, it almost certainly just has not been built yet rather than being broken.
+
+The design source for all eighteen, with what each one does and why, now lives in [HARBOR_MANIFEST.md](HARBOR_MANIFEST.md) alongside this file. Where the two disagree, that file is right about intent and this one is right about what is actually playable.
 
 **Built and playable right now:**
 
@@ -267,9 +269,12 @@ This document only covers the five features that actually exist in the game as o
 12. Voyage Chronicle
 13. Ledger Integrity Pass
 14. Harbor Watch
-15. Bilingual Harbor
-16. Colorblind Safe Palette
-17. Quick Start Match
-18. Fleet Ticker
+15. Colorblind Safe Palette
+16. Quick Start Match
+17. Fleet Ticker
 
-As each of the remaining fourteen gets built, this document should grow a matching section for it, written the same way: what it does in plain words, exactly what you will see on screen, and a step by step way to confirm it yourself while actually playing.
+**Dropped, not pending:** Bilingual Harbor, which was entry 15 in the original manifest. English and Chinese localization was built in full and then removed at the project owner's request, so it is not outstanding work and should not be picked back up without a fresh decision.
+
+The manifest also recommends an order that is not this numeric one, since it sequences by dependency instead. Of what remains, Fleet Ticker, Colorblind Safe Palette, Harbor Watch and Bequest Routing are the four with no blockers at all.
+
+As each of the remaining twelve gets built, this document should grow a matching section for it, written the same way: what it does in plain words, exactly what you will see on screen, and a step by step way to confirm it yourself while actually playing.
