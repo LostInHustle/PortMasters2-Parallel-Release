@@ -23,6 +23,7 @@
 import {
   AID_REPUTATION_PER_GOLD,
   APP_NAME,
+  BACKING_REPUTATION_PER_GOLD,
   BOONS,
   BROKERS_FAVOR_PAYOUT_CAP,
   BROKERS_FAVOR_UNLOCK_LEVEL,
@@ -30,7 +31,6 @@ import {
   ICONS,
   MERCHANT_RATINGS,
   MODULES,
-  PORTS,
   PRODUCT_PRICES,
   PRODUCTS,
   RECIPES,
@@ -1803,6 +1803,81 @@ export function receiveRepayment(
   logs.push(`💰 ${fromName} repaid you ${amount} Gold`);
 }
 
+// [MANIFEST 05: Backing] Escrows a pledge immediately, the same escrow on
+// commitment timing every other cross player commitment in this game
+// already uses. The server (see backing:offer in src/server/realtime.ts)
+// is what actually decided how much of the requested pledge a loan still
+// has room for, the same relationship venture contributions have with
+// their own overflow cap, so amount here is always already the correct,
+// server confirmed figure, never the raw request.
+export function pledgeBacking(
+  state: GameState,
+  amount: number,
+  logs: string[],
+) {
+  if (amount <= 0) return;
+  if (state.money < amount) {
+    logs.push(`❌ Need ${amount} Gold to back that loan, have ${state.money}`);
+    return;
+  }
+  state.money -= amount;
+  logs.push(`🛡️ Pledged ${amount} Gold to back a fellow captain's loan`);
+}
+
+// [MANIFEST 05: Backing] The backer's own side of however the loan they
+// backed actually resolved. refundAmount is whatever was never called on
+// and comes back untouched; calledAmount is whatever genuinely went to
+// cover the lender's shortfall and is gone for good. The Reputation bonus
+// only applies when nothing at all was called, since that's the case the
+// backer's own real risk never actually needed catching, see
+// BACKING_REPUTATION_PER_GOLD.
+export function receiveBackingOutcome(
+  state: GameState,
+  refundAmount: number,
+  calledAmount: number,
+  logs: string[],
+) {
+  if (refundAmount > 0) state.money += refundAmount;
+  if (calledAmount <= 0) {
+    const repGain = Math.max(
+      1,
+      Math.floor(refundAmount * BACKING_REPUTATION_PER_GOLD),
+    );
+    state.score += repGain;
+    logs.push(
+      `🛡️ Your backing was never called on. Pledge returned in full: ${refundAmount} Gold. Reputation +${repGain} for the risk paying off.`,
+    );
+  } else if (refundAmount > 0) {
+    logs.push(
+      `🛡️ Your backing partially covered a captain's shortfall: ${calledAmount} Gold spent, ${refundAmount} Gold returned.`,
+    );
+  } else {
+    logs.push(
+      `🛡️ Your backing fully covered a captain's shortfall: all ${calledAmount} Gold pledged was spent helping the lender.`,
+    );
+  }
+}
+
+// [MANIFEST 05: Backing] The lender's side of a called backing pledge,
+// arriving separately from, and in addition to, whatever the borrower
+// themselves managed to pay through the ordinary receiveRepayment above.
+// From the lender's perspective these are two distinct, unrelated
+// captains paying them, so they arrive as two distinct calls rather than
+// one merged figure.
+export function receiveBackedCoverage(
+  state: GameState,
+  amount: number,
+  backerName: string,
+  borrowerName: string,
+  logs: string[],
+) {
+  state.money += amount;
+  logs.push(
+    `🛡️ ${backerName} covered ${amount} Gold of ${borrowerName}'s shortfall as a backer.`,
+  );
+}
+
+// ---------- Convoy Ventures ----------
 // [MANIFEST 04: Convoy Ventures] Escrows a contribution immediately, the
 // same moment barter posting escrows an offer (see postBarterOffer) rather
 // than waiting for the venture to actually resolve. The server (see
@@ -1872,13 +1947,19 @@ export function settleOutstandingDebts(state: GameState, logs: string[]) {
   for (const debt of state.debts) {
     const paid = Math.min(state.money, debt.amount);
     state.money -= paid;
-    if (paid > 0)
-      settlements.push({
-        lenderId: debt.counterpartyId,
-        lenderName: debt.counterpartyName,
-        amount: paid,
-        debtId: debt.id,
-      });
+    // Reported even when paid is 0. This record is not only "credit the
+    // lender", it is also the one signal that closes the debt on the server's
+    // ledger and resolves any Backing pledge on it (see aid:repay in
+    // src/server/realtime.ts). Skipping it for a total default used to strand
+    // the loan open forever: the backer's escrowed Gold was neither returned
+    // nor called, and the lender never received the coverage that pledge
+    // existed for, which is precisely the case Backing is meant to cover.
+    settlements.push({
+      lenderId: debt.counterpartyId,
+      lenderName: debt.counterpartyName,
+      amount: paid,
+      debtId: debt.id,
+    });
     if (paid < debt.amount) {
       state.defaultedDebt = true;
       logs.push(

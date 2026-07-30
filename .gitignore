@@ -54,6 +54,12 @@ prompt
 # Skills directory
 /skills/
 
+# Agent skill packs fetched from elsewhere, plus the lockfile that pins them.
+# Same reasoning as .claude above: personal tooling, not something a clone
+# needs to build or run the game.
+/.agents/
+skills-lock.json
+
 # Generated Prisma client (run `prisma generate` or `npm install`)
 /generated/
 

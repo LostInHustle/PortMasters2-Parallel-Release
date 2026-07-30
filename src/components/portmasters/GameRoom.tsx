@@ -10,7 +10,10 @@ import {
 } from "@/lib/api";
 import type { VoyageCompleteEvent } from "@/lib/realtime";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
-import { BROKERS_FAVOR_UNLOCK_LEVEL } from "@/lib/game/constants";
+import {
+  BROKERS_FAVOR_UNLOCK_LEVEL,
+  WORD_ON_THE_DOCKS_THRESHOLD,
+} from "@/lib/game/constants";
 import { meritById } from "@/lib/game/merits";
 import { useRealtime } from "@/lib/use-realtime";
 import { useGameSession } from "@/lib/use-game-session";
@@ -21,6 +24,12 @@ import {
 } from "@/lib/use-player-detail";
 import { useBarter, type BarterOffer } from "@/lib/use-barter";
 import { useAid, type GrantedLoan, type RepaidLoan } from "@/lib/use-aid";
+import {
+  useBacking,
+  type BackingCovered,
+  type BackingResolved,
+  type OutstandingLoan,
+} from "@/lib/use-backing";
 import {
   useConvoy,
   type VentureOutcome,
@@ -65,7 +74,10 @@ import {
   contributeToVenture,
   grantLoan,
   nextPhase,
+  pledgeBacking,
   purchaseIntel,
+  receiveBackedCoverage,
+  receiveBackingOutcome,
   receiveLoan,
   receiveRepayment,
   receiveVentureSettlement,
@@ -187,6 +199,57 @@ export function GameRoom({
     [act],
   );
   const aid = useAid(socket, room.id, me.id, onAidGranted, onAidRepaid);
+
+  // [MANIFEST 05: Backing] The server just accepted my own pledge to back
+  // someone else's loan (see backing:offer in src/server/realtime.ts);
+  // escrow it immediately, same as any other cross-player commitment.
+  const onBackingAccepted = useCallback(
+    (loan: OutstandingLoan) => {
+      if (loan.backedAmount)
+        act((g, l) => pledgeBacking(g, loan.backedAmount!, l));
+    },
+    [act],
+  );
+  // A loan I backed just resolved, one way or another: called on (partly
+  // or fully) or never needed at all. Mirrors onAidRepaid above.
+  const onBackingResolved = useCallback(
+    (resolved: BackingResolved) => {
+      act((g, l) =>
+        receiveBackingOutcome(
+          g,
+          resolved.refundAmount,
+          resolved.calledAmount,
+          l,
+        ),
+      );
+    },
+    [act],
+  );
+  // I'm the lender: a backer just covered part of a shortfall a borrower
+  // couldn't pay directly, on top of (never instead of) whatever the
+  // borrower themselves paid via onAidRepaid.
+  const onBackingCovered = useCallback(
+    (covered: BackingCovered) => {
+      act((g, l) =>
+        receiveBackedCoverage(
+          g,
+          covered.amount,
+          covered.backerName,
+          covered.borrowerName,
+          l,
+        ),
+      );
+    },
+    [act],
+  );
+  const backing = useBacking(
+    socket,
+    room.id,
+    me.id,
+    onBackingAccepted,
+    onBackingResolved,
+    onBackingCovered,
+  );
 
   // [MANIFEST 04: Convoy Ventures] The server already confirmed this
   // contribution was accepted (see venture:contribute in
@@ -349,11 +412,11 @@ export function GameRoom({
       if (data.winnerId === me.id) {
         act((g, l) => claimWordOnTheDocksReward(g, l));
         toast.success("📣 Word on the Docks!", {
-          description: `First to complete 3 trade orders this voyage. +${data.reward} Gold.`,
+          description: `First to complete ${WORD_ON_THE_DOCKS_THRESHOLD} trade orders this voyage. +${data.reward} Gold.`,
         });
       } else {
         toast("📣 Word on the Docks", {
-          description: `${data.winnerName} was first to complete 3 trade orders this voyage.`,
+          description: `${data.winnerName} was first to complete ${WORD_ON_THE_DOCKS_THRESHOLD} trade orders this voyage.`,
         });
       }
     };
@@ -816,6 +879,7 @@ export function GameRoom({
               phaseSync={phaseSync}
               barter={barter}
               aid={aid}
+              backing={backing}
               voyageResult={voyageResult}
               myLegacy={myLegacy}
               onRestart={handleRestart}

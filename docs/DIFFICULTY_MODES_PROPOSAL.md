@@ -208,11 +208,14 @@ export interface DifficultyConfig {
   incomeTaxRate: number;
   purchaseCardsBase: number;
   orderCardsBase: number;
-  charterUnlocks: Record<number, number>; // round -> extra cards added to both boards
-  pirateChance: readonly [number] | readonly [number, number]; // flat, or [firstHalf, secondHalf]
+  // Round, mapped to the extra cards added to both boards
+  charterUnlocks: Record<number, number>;
+  // Either one flat chance, or [firstHalf, secondHalf]
+  pirateChance: readonly [number] | readonly [number, number];
   escortCostRate: number;
   brokerCorruption: boolean;
-  mandates: Record<number, number>; // round -> mandate template index
+  // Round, mapped to the mandate template index
+  mandates: Record<number, number>;
   renownXpMultiplier: number;
 }
 

@@ -6,7 +6,7 @@ The database is a single SQLite file that this one process reads and writes dire
 
 ## Running it locally
 
-```
+```bash
 npm install
 npm run dev
 ```
@@ -15,7 +15,7 @@ That is all. Running `npm install` also generates the Prisma client, and `npm ru
 
 If you want to share your local instance, for example through ngrok, point it to the same port:
 
-```
+```bash
 ngrok http 2232
 ```
 
@@ -23,10 +23,10 @@ ngrok http 2232
 
 A `railway.json` file at the repository root already instructs Railway how to build and start the app, so a new project pointed at this repository should work immediately. It runs:
 
-```
-build:  npm install && npm run build
-start:  npm run start
-```
+| Phase | Command                        |
+| ----- | ------------------------------ |
+| Build | `npm install && npm run build` |
+| Start | `npm run start`                |
 
 Railway assigns the public `PORT` automatically. `server.ts` reads it from the environment, so you do not need to set one.
 

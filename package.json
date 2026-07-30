@@ -17,7 +17,8 @@
     "test:integration": "tsx scripts/tests/integration.voyage.ts",
     "test:harbor": "tsx scripts/tests/integration.harbor.ts",
     "test:convoy": "tsx scripts/tests/integration.convoy.ts",
-    "test": "npm run test:unit && npm run test:effects && npm run test:integration && npm run test:harbor && npm run test:convoy",
+    "test:backing": "tsx scripts/tests/integration.backing.ts",
+    "test": "npm run test:unit && npm run test:effects && npm run test:integration && npm run test:harbor && npm run test:convoy && npm run test:backing",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
@@ -47,7 +48,6 @@
     "socket.io-client": "^4.8.3",
     "sonner": "^2.0.6",
     "tailwind-merge": "^3.3.1",
-    "tailwindcss-animate": "^1.0.7",
     "zod": "^4.0.2"
   },
   "devDependencies": {
@@ -57,7 +57,6 @@
     "eslint": "^9",
     "eslint-config-next": "^16.1.1",
     "prettier": "^3.9.5",
-    "prettier-plugin-tailwindcss": "^0.8.0",
     "prisma": "^7.8.0",
     "tailwindcss": "^4",
     "tsx": "^4.19.2",

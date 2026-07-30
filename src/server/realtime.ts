@@ -57,6 +57,7 @@ import {
   ventureTotal,
   type VentureOutcome,
 } from "../lib/game/convoy";
+import { computeBackingResolution } from "../lib/game/backing";
 import { computeHarborPulse } from "../lib/game/harborPulse";
 
 // ---------- Types ----------
@@ -249,6 +250,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         roomStatuses.delete(roomId);
         roomBarterOffers.delete(roomId);
         roomAidRequests.delete(roomId);
+        roomOutstandingLoans.delete(roomId);
         roomPulseTallies.delete(roomId);
         roomDocksWinners.delete(roomId);
         roomSurges.delete(roomId);
@@ -479,6 +481,52 @@ export function attachRealtime(httpServer: HttpServer): Server {
       );
     }
 
+    // [MANIFEST 05: Backing] The backstop for a loan nobody ever reported.
+    // Normally the borrower's own client closes every debt it holds at the
+    // forced final settlement (see settleOutstandingDebts in
+    // src/lib/game/engine.ts, which reports even a 0 Gold default), and that
+    // report is what resolves the backer's pledge. A borrower who dropped out
+    // and never came back never sends it, which would leave their backer's
+    // escrowed Gold stranded forever, neither returned nor called.
+    //
+    // Deliberately limited to borrowers with no live socket. A still connected
+    // borrower is one whose report may simply not have arrived yet, and
+    // sweeping that loan here would race their genuine settlement and rob the
+    // lender of whatever the borrower actually did pay. An absent borrower
+    // paid nothing by definition, so 0 is the honest repaid amount.
+    let sweptAny = false;
+    for (const loan of [...loanList(roomId)]) {
+      if ((userSockets.get(loan.borrowerId)?.size ?? 0) > 0) continue;
+      removeLoan(roomId, loan.debtId);
+      sweptAny = true;
+      if (!loan.backerId || !loan.backedAmount) continue;
+      const { calledAmount, refundAmount } = computeBackingResolution(
+        loan.amount,
+        0,
+        loan.backedAmount,
+      );
+      for (const sid of userSockets.get(loan.backerId) ?? []) {
+        io.to(sid).emit("backing:resolved", {
+          roomId,
+          debtId: loan.debtId,
+          refundAmount,
+          calledAmount,
+        });
+      }
+      if (calledAmount > 0) {
+        for (const sid of userSockets.get(loan.lenderId) ?? []) {
+          io.to(sid).emit("backing:covered", {
+            roomId,
+            debtId: loan.debtId,
+            amount: calledAmount,
+            backerName: loan.backerName,
+            borrowerName: loan.borrowerName,
+          });
+        }
+      }
+    }
+    if (sweptAny) broadcastLoans(roomId);
+
     const crownable = finished.filter((f) => f.phase === "endgame");
     const winnerId = crownable.length
       ? crownable.reduce((best, f) =>
@@ -679,9 +727,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
   ): BarterOffer[] {
     return offers.filter(
       (o) =>
-        !o.targetUserId ||
-        o.targetUserId === userId ||
-        o.fromUserId === userId,
+        !o.targetUserId || o.targetUserId === userId || o.fromUserId === userId,
     );
   }
 
@@ -768,6 +814,54 @@ export function attachRealtime(httpServer: HttpServer): Server {
     if (next.length) roomAidRequests.set(roomId, next);
     else roomAidRequests.delete(roomId);
     broadcastAid(roomId);
+  }
+
+  // ---------- Backing ----------
+  // [MANIFEST 05] A granted loan (see aid:help above) used to vanish from
+  // this server's view entirely the moment it was handed over: the two
+  // captains it involved were the only ones who ever knew it existed. This
+  // is the one piece of state that makes it visible to the rest of the
+  // harbor, so a third captain can back it. Unlike roomAidRequests (which
+  // clears the instant Settlement's phase ends), a granted loan is a real
+  // debt that can span the rest of the voyage, so this only ever clears on
+  // repayment (see aid:repay below) or a fresh voyage (room:restart).
+  type LoanRecord = {
+    debtId: string;
+    borrowerId: string;
+    borrowerName: string;
+    lenderId: string;
+    lenderName: string;
+    amount: number;
+    round: number;
+    backerId?: string;
+    backerName?: string;
+    backedAmount?: number;
+  };
+  const roomOutstandingLoans = new Map<string, LoanRecord[]>();
+
+  function loanList(roomId: string): LoanRecord[] {
+    return roomOutstandingLoans.get(roomId) ?? [];
+  }
+
+  function broadcastLoans(roomId: string) {
+    io.to(`room:${roomId}`).emit("loans:update", {
+      roomId,
+      loans: loanList(roomId),
+    });
+  }
+
+  function clearLoans(roomId: string) {
+    if (!roomOutstandingLoans.has(roomId)) return;
+    roomOutstandingLoans.delete(roomId);
+    broadcastLoans(roomId);
+  }
+
+  function removeLoan(roomId: string, debtId: string) {
+    const list = roomOutstandingLoans.get(roomId);
+    if (!list) return;
+    const next = list.filter((l) => l.debtId !== debtId);
+    if (next.length) roomOutstandingLoans.set(roomId, next);
+    else roomOutstandingLoans.delete(roomId);
   }
 
   // ---------- The Harbor Pulse ----------
@@ -1951,6 +2045,22 @@ export function attachRealtime(httpServer: HttpServer): Server {
           amount: request.amount,
           round: request.round,
         };
+        // [MANIFEST 05: Backing] The request just became a real debt; from
+        // here it's tracked room wide until it's repaid, so a third captain
+        // can back it (see backing:offer below).
+        roomOutstandingLoans.set(roomId, [
+          ...loanList(roomId),
+          {
+            debtId: request.id,
+            borrowerId: request.fromUserId,
+            borrowerName: request.fromName,
+            lenderId: s.userId,
+            lenderName: s.user.displayName,
+            amount: request.amount,
+            round: request.round,
+          },
+        ]);
+        broadcastLoans(roomId);
         socket.emit("aid:granted", granted);
         const borrowerSockets = userSockets.get(request.fromUserId);
         if (borrowerSockets) {
@@ -1981,25 +2091,147 @@ export function attachRealtime(httpServer: HttpServer): Server {
         const lenderId = payload?.lenderId;
         const amount = payload?.amount;
         const debtId = payload?.debtId;
+        // 0 is a legal amount, and means a total default: the borrower
+        // reached the forced settlement holding no Gold at all. It still has
+        // to be processed, because this event is what closes the debt and
+        // resolves any Backing pledge on it, not merely what credits the
+        // lender. Only a negative or non-integer amount is nonsense.
         if (
           !roomId ||
           roomId !== s.roomId ||
           !lenderId ||
           !debtId ||
           !Number.isInteger(amount) ||
-          (amount as number) < 1
+          (amount as number) < 0
         )
           return;
         const lenderSockets = userSockets.get(lenderId);
-        if (!lenderSockets) return;
-        const repaid = {
-          roomId,
-          debtId,
-          amount,
-          fromUserId: s.userId,
-          fromName: s.user.displayName,
-        };
-        for (const sid of lenderSockets) io.to(sid).emit("aid:repaid", repaid);
+
+        // [MANIFEST 05: Backing] This debt is now settled, one way or
+        // another (a voluntary repayment, or the forced one at the voyage's
+        // final round), so it's done being tracked. amount can be less than
+        // the loan's original amount only in the forced case (see
+        // settleOutstandingDebts in src/lib/game/engine.ts); whatever gap
+        // that leaves is exactly what a backer, if any, is on the hook for,
+        // up to whatever they pledged. No gap at all means the backing was
+        // never needed, and the whole pledge comes back with a Reputation
+        // bonus (see receiveBackingOutcome in src/lib/game/engine.ts).
+        //
+        // Everything below, the lender's credit included, is deliberately
+        // gated on the loan still being open. Two reasons: only the borrower
+        // may settle their own debt, since otherwise any captain could clear
+        // a loan they have no part in and call someone else's pledge doing
+        // it; and settling has to be idempotent, since a duplicated or
+        // replayed event must not credit the lender a second time for a debt
+        // already closed.
+        const loan = loanList(roomId).find((l) => l.debtId === debtId);
+        if (loan && loan.borrowerId === s.userId) {
+          removeLoan(roomId, debtId);
+          if (lenderSockets && (amount as number) > 0) {
+            const repaid = {
+              roomId,
+              debtId,
+              amount,
+              fromUserId: s.userId,
+              fromName: s.user.displayName,
+            };
+            for (const sid of lenderSockets)
+              io.to(sid).emit("aid:repaid", repaid);
+          }
+          if (loan.backerId && loan.backedAmount) {
+            const { calledAmount, refundAmount } = computeBackingResolution(
+              loan.amount,
+              amount as number,
+              loan.backedAmount,
+            );
+            const backerSockets = userSockets.get(loan.backerId);
+            if (backerSockets) {
+              const resolved = { roomId, debtId, refundAmount, calledAmount };
+              for (const sid of backerSockets)
+                io.to(sid).emit("backing:resolved", resolved);
+            }
+            if (calledAmount > 0 && lenderSockets) {
+              const covered = {
+                roomId,
+                debtId,
+                amount: calledAmount,
+                backerName: loan.backerName,
+                borrowerName: loan.borrowerName,
+              };
+              for (const sid of lenderSockets)
+                io.to(sid).emit("backing:covered", covered);
+            }
+          }
+          broadcastLoans(roomId);
+        }
+      },
+    );
+
+    socket.on("loans:state:request", (payload: { roomId?: string }) => {
+      const s = requireAuth();
+      if (!s) return;
+      const roomId = payload?.roomId ?? s.roomId;
+      if (!roomId || roomId !== s.roomId) return;
+      socket.emit("loans:update", { roomId, loans: loanList(roomId) });
+    });
+
+    // A third captain co-signs part of an existing loan between two
+    // others. One backer per loan, capped at whatever the loan still owes,
+    // and never the lender or borrower themselves, who each already have
+    // their own stake in it. First to reach the server wins the slot, the
+    // same race-safety as barter:accept and aid:help above.
+    socket.on(
+      "backing:offer",
+      (payload: { roomId?: string; debtId?: string; amount?: number }) => {
+        const s = requireAuth();
+        if (!s) return;
+        const roomId = payload?.roomId ?? s.roomId;
+        const debtId = payload?.debtId;
+        const amount = payload?.amount;
+        if (
+          !roomId ||
+          roomId !== s.roomId ||
+          !debtId ||
+          !Number.isInteger(amount) ||
+          (amount as number) < 1
+        )
+          return;
+        const loan = loanList(roomId).find((l) => l.debtId === debtId);
+        if (!loan) {
+          socket.emit("backing:fail", {
+            roomId,
+            debtId,
+            reason: "That loan is no longer outstanding.",
+          });
+          return;
+        }
+        if (loan.borrowerId === s.userId || loan.lenderId === s.userId) {
+          socket.emit("backing:fail", {
+            roomId,
+            debtId,
+            reason: "You can't back a loan you're already part of.",
+          });
+          return;
+        }
+        if (loan.backerId) {
+          socket.emit("backing:fail", {
+            roomId,
+            debtId,
+            reason: "That loan already has a backer.",
+          });
+          return;
+        }
+        const accepted = Math.min(amount as number, loan.amount);
+        loan.backerId = s.userId;
+        loan.backerName = s.user.displayName;
+        loan.backedAmount = accepted;
+        broadcastLoans(roomId);
+        const acceptedEvent = { ...loan, roomId };
+        const backerSockets = userSockets.get(s.userId);
+        if (backerSockets) {
+          for (const sid of backerSockets)
+            io.to(sid).emit("backing:accepted", acceptedEvent);
+        }
       },
     );
 
@@ -2295,6 +2527,11 @@ export function attachRealtime(httpServer: HttpServer): Server {
         roomStatuses.delete(roomId);
         clearBarter(roomId);
         clearAid(roomId);
+        // A brand new voyage means every existing debt is wiped clean along
+        // with everyone's Gold and GameState, so any loan (and any backing
+        // pledged against it) still tracked under the old voyage has
+        // nothing left to resolve against.
+        clearLoans(roomId);
         // A restart resets currentRound back to 1, so any tally still held
         // under the old voyage's round numbers would otherwise leak into the
         // new voyage's identically numbered rounds.

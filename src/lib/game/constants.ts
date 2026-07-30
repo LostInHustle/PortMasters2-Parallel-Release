@@ -117,7 +117,6 @@ export const PORTS_TIER0 = [
 ] as const;
 export const PORTS_TIER1 = ["Fuzhou Port", "Goryeo Port"] as const;
 export const PORTS_TIER2 = ["Srivijaya Port", "Dashi Port"] as const;
-export const PORTS = [...PORTS_TIER0, ...PORTS_TIER1, ...PORTS_TIER2] as const;
 
 export const RECIPES: Record<
   string,
@@ -564,7 +563,7 @@ export const BROKERS_FAVOR_PAYOUT_CAP = 200;
 // moment it happens. Deliberately tier independent, same reward and same
 // threshold on every difficulty, since the point is a spontaneous race
 // between real captains, not one more dial to retune per tier.
-export const WORD_ON_THE_DOCKS_THRESHOLD = 3;
+export const WORD_ON_THE_DOCKS_THRESHOLD = 5;
 export const WORD_ON_THE_DOCKS_REWARD = 25;
 
 // [MANIFEST 03: Tidewatch Alerts] Deliberately not a difficulty dial: this
@@ -577,7 +576,7 @@ export const WORD_ON_THE_DOCKS_REWARD = 25;
 // additive on top of whatever the difficulty tier's own charter schedule is
 // already doing, and never subtracted back out. See the game:status handler
 // in src/server/realtime.ts for where the combined total is actually read.
-export const TIDEWATCH_SURGE_THRESHOLD = 250;
+export const TIDEWATCH_SURGE_THRESHOLD = 500;
 
 // [MANIFEST 04: Convoy Ventures] A pooled, multi captain investment: gold
 // only (see the ConvoyVenture Prisma model), too large a target for one
@@ -605,6 +604,19 @@ export const CONVOY_VENTURE_FAILURE_REFUND_RATE = 0.5;
 // share below half is what actually forces at least one other captain to
 // genuinely take part before a venture can ever fill.
 export const CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE = 0.5;
+
+// [MANIFEST 05: Backing] A third captain can co-sign part of an existing
+// loan between two others, pledging their own Gold as a safety net for the
+// lender. The pledge is escrowed immediately, the same moment every other
+// commitment in this game is (a barter offer, an aid loan, a Convoy
+// Venture contribution), and is only ever spent if the loan actually
+// defaults, up to whatever the backer pledged. If the loan is repaid in
+// full and the backing is never called on, the backer gets their whole
+// pledge back, plus a small Reputation bonus for having genuinely put
+// Gold at risk that paid off, half of what the lender themselves earns per
+// Gold lent (see AID_REPUTATION_PER_GOLD), since backing is a supporting
+// role, not the primary loan.
+export const BACKING_REPUTATION_PER_GOLD = AID_REPUTATION_PER_GOLD / 2;
 
 // =====================================================================
 // Player-facing copy. The wording is preserved from the original game; the
@@ -821,6 +833,13 @@ ${mandates.length ? `\n📜 Imperial Mandates:\n• On voyage${mandates.length =
 • Still short when the voyage finishes? That unpaid loan is what bankrupts you, not the round it was borrowed in
 • Lending Gold raises your own reputation, scaled to how much you lent
 
+🛡️ Backing:
+• Every outstanding loan in your harbor is visible on the settlement screen, to everyone, not just the lender and borrower
+• A third captain can back one: pledge some of their own Gold as a safety net for the lender, escrowed the instant they pledge it
+• Only spent if the loan actually defaults, and only up to whatever was pledged; the lender still eats any shortfall past that
+• Never called on when the loan is repaid in full? The whole pledge comes back, plus a small Reputation bonus for the risk paying off
+• One backer per loan; you can't back a loan you're the lender or borrower on yourself
+
 Captain's Legacy:
 • Every voyage's final Reputation becomes Renown XP on your account the moment the voyage ends, win or lose
 • Renown is permanent: it survives a restart and carries into every future voyage, in any harbor, unlike Gold, cargo, and ship level
@@ -894,6 +913,11 @@ export function tipsText(difficulty: Difficulty): string {
 1. Repay a loan as soon as you can afford it, instead of waiting for it to be deducted automatically at Round ${cfg.rounds}
 2. Lending Gold raises your own reputation, so helping a captain who can clearly repay you is rarely a bad trade
 3. Watch how much you've lent out across the voyage; it's still your Gold until it's actually repaid
+
+🛡️ Backing Strategy:
+1. Back a loan you'd have happily lent Gold on yourself; you're taking on the same risk without earning the lender's own full reputation rate
+2. Only pledge what you can afford to lose outright, the same rule as lending directly
+3. A loan to a captain who's clearly about to turn a profit is a safer backing bet than one taken late in the voyage with little runway left to repay it
 
 💾 Save game progress frequently with Ctrl+S!`;
 }

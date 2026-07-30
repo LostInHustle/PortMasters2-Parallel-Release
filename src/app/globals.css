@@ -326,4 +326,96 @@
     background-color: oklch(0.6 0.08 195 / 0.7);
     background-clip: content-box;
   }
+
+  /* ---------- Artisan identity palette ----------
+     One hue per artisan type (see WORKER_TYPES in src/lib/game/constants.ts),
+     chosen to echo what that craft actually makes: indigo cloth for the
+     weavers, brocade violet for the master, sachet rose, copper, celadon,
+     balm amber, pearl blue. The roster has grown from three artisans to
+     seven, and grew into a wall of identical teal headings above a hire row
+     whose green / amber / grey cycle simply repeated every third button, so
+     colour said nothing about which craft you were looking at and every
+     group read like the one above it.
+
+     Each type carries only its oklch components, not a finished colour, so
+     one property can serve solid ink, a 7% wash and a 30% border without a
+     second variable per shade. It also keeps the minifier honest:
+     color-mix() gets rewritten with a flat fallback for old browsers that
+     would paint a chip's text and its background the same colour, whereas
+     an unresolvable oklch(var(...)) is passed through untouched and simply
+     ignored where it isn't understood.
+
+     Class names are composed from the worker id at the call site, which is
+     safe because these are hand-written rules rather than scanned Tailwind
+     utilities. The accent rules use two-class selectors so they outrank the
+     single-class utilities a Button variant brings with it. */
+  .pm-artisan {
+    --pm-artisan: 0.52 0.13 200;
+  }
+  .pm-artisan-weaver {
+    --pm-artisan: 0.52 0.16 265;
+  }
+  .pm-artisan-master {
+    --pm-artisan: 0.52 0.16 305;
+  }
+  .pm-artisan-sachet_maker {
+    --pm-artisan: 0.54 0.16 350;
+  }
+  .pm-artisan-coppersmith {
+    --pm-artisan: 0.54 0.14 50;
+  }
+  .pm-artisan-potter {
+    --pm-artisan: 0.5 0.12 160;
+  }
+  .pm-artisan-perfumer {
+    --pm-artisan: 0.52 0.12 85;
+  }
+  .pm-artisan-jeweler {
+    --pm-artisan: 0.52 0.13 215;
+  }
+  .dark .pm-artisan-weaver {
+    --pm-artisan: 0.79 0.13 265;
+  }
+  .dark .pm-artisan-master {
+    --pm-artisan: 0.79 0.14 305;
+  }
+  .dark .pm-artisan-sachet_maker {
+    --pm-artisan: 0.8 0.14 350;
+  }
+  .dark .pm-artisan-coppersmith {
+    --pm-artisan: 0.81 0.13 50;
+  }
+  .dark .pm-artisan-potter {
+    --pm-artisan: 0.8 0.12 160;
+  }
+  .dark .pm-artisan-perfumer {
+    --pm-artisan: 0.84 0.14 85;
+  }
+  .dark .pm-artisan-jeweler {
+    --pm-artisan: 0.8 0.11 215;
+  }
+
+  .pm-artisan .pm-artisan-ink,
+  .pm-artisan.pm-artisan-ink {
+    color: oklch(var(--pm-artisan));
+  }
+  .pm-artisan .pm-artisan-edge,
+  .pm-artisan.pm-artisan-edge {
+    border-color: oklch(var(--pm-artisan) / 0.5);
+  }
+  .pm-artisan .pm-artisan-wash,
+  .pm-artisan.pm-artisan-wash {
+    background-color: oklch(var(--pm-artisan) / 0.06);
+  }
+  .pm-artisan .pm-artisan-chip,
+  .pm-artisan.pm-artisan-chip {
+    color: oklch(var(--pm-artisan));
+    background-color: oklch(var(--pm-artisan) / 0.12);
+    border-color: oklch(var(--pm-artisan) / 0.28);
+  }
+  .pm-artisan .pm-artisan-chip:hover,
+  .pm-artisan.pm-artisan-chip:hover {
+    color: oklch(var(--pm-artisan));
+    background-color: oklch(var(--pm-artisan) / 0.2);
+  }
 }

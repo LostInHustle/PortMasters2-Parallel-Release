@@ -57,7 +57,6 @@ import {
   type GameContext,
   type GameState,
 } from "../../src/lib/game/types";
-import { WORD_ON_THE_DOCKS_THRESHOLD } from "../../src/lib/game/constants";
 
 const ctx: GameContext = { seedBase: "integration:room1:captain1" };
 
