@@ -1244,16 +1244,27 @@ export function attachRealtime(httpServer: HttpServer): Server {
 
       // Leave previous room channel if any.
       if (s.roomId) {
-        socket.leave(`room:${s.roomId}`);
-        // Guarded: the user may have another tab still sitting in the old
-        // room, and that tab's heartbeat is the only thing keeping the
-        // roster status live for them there.
-        forgetStatusIfLastSocket(s.roomId, s.userId);
-        io.to(`room:${s.roomId}`).emit("room:system", {
-          roomId: s.roomId,
+        const previousRoomId = s.roomId;
+        socket.leave(`room:${previousRoomId}`);
+        // Clear this socket's room BEFORE re-emitting the old room's roster.
+        // roomMembers() builds that roster from live sockets whose own
+        // s.roomId still points at the room, so emitting while this socket
+        // still claimed the old room left the departing captain listed on
+        // everyone else's roster, and nothing re-emitted afterwards to
+        // correct it. Only this socket is cleared: another tab of the same
+        // captain genuinely still sitting in the old room keeps its own
+        // s.roomId and so correctly stays on the roster, the same reasoning
+        // the guarded forgetStatusIfLastSocket below follows.
+        s.roomId = null;
+        forgetStatusIfLastSocket(previousRoomId, s.userId);
+        io.to(`room:${previousRoomId}`).emit("room:system", {
+          roomId: previousRoomId,
           content: `${s.user.displayName} set sail for another port`,
         });
-        emitRoomMembers(s.roomId);
+        // Safe to leave unawaited: emitRoomMembers snapshots the member list
+        // synchronously before its own database await, so it already sees the
+        // cleared s.roomId above.
+        emitRoomMembers(previousRoomId);
       }
 
       // They're back, so don't let a grace timer started by an earlier
@@ -1297,6 +1308,41 @@ export function attachRealtime(httpServer: HttpServer): Server {
         roomId,
         requests: aidList(roomId),
       });
+      broadcastPresence();
+    });
+
+    // A captain deliberately leaving a room, emitted by handleLeave in
+    // GameRoom.tsx right after POST /api/rooms/[id]/leave has actually ended
+    // their membership.
+    //
+    // This is only ever the deliberate act. It must NOT be emitted from a
+    // component's unmount cleanup (see the note in MembersPanel.tsx): dropping
+    // the channel on a mere tab switch silently breaks every later room scoped
+    // event for that captain.
+    //
+    // The REST route cannot do this itself. It runs in a Next request, with no
+    // handle on the socket server, so without this event the leaver's socket
+    // kept claiming the room: they stayed on everyone else's roster until they
+    // happened to join elsewhere or their socket dropped. Their open barter
+    // offers and aid request would likewise have outlived them, letting another
+    // captain trade with someone who is no longer in the harbor.
+    socket.on("room:leave", (payload: { roomId?: string }) => {
+      const s = requireAuth();
+      if (!s) return;
+      const roomId = payload?.roomId ?? s.roomId;
+      if (!roomId) return;
+      socket.leave(`room:${roomId}`);
+      // Cleared before emitRoomMembers below, for the same reason room:join
+      // clears it before re-emitting the room it is leaving.
+      if (s.roomId === roomId) s.roomId = null;
+      forgetStatus(roomId, s.userId);
+      removeUserBarterOffers(roomId, s.userId);
+      removeUserAidRequest(roomId, s.userId);
+      io.to(`room:${roomId}`).emit("room:system", {
+        roomId,
+        content: `${s.user.displayName} left the harbor`,
+      });
+      emitRoomMembers(roomId);
       broadcastPresence();
     });
 

@@ -61,16 +61,15 @@ export function MembersPanel({
     };
     socket.on("room:system", onSystem);
     return () => {
-      // IMPORTANT: detach the listener only, never leave the room channel
-      // here. This cleanup runs whenever the panel unmounts (a tab switch, a
-      // re-render under a different key), not when the captain actually
-      // leaves the room. Dropping the channel would silently break every
-      // later room scoped event (ready votes, status broadcasts, barter,
-      // aid) with no error and no recovery short of a full reload. Actually
-      // leaving a room is a deliberate act and goes through api.leaveRoom
-      // (see handleLeave in GameRoom.tsx), which ends membership; switching
-      // rooms is handled by the server's own "room:join", which leaves the
-      // previous channel for you.
+      // IMPORTANT: detach the listener only. Do not emit "room:leave" here.
+      // That event does exist and is genuinely used, but only from
+      // handleLeave in GameRoom.tsx, for a deliberate departure. This cleanup
+      // runs on any unmount (a tab switch, a re-render under a different
+      // key), when the captain has not left at all, and dropping the channel
+      // then would silently break every later room scoped event (ready votes,
+      // status broadcasts, barter, aid) with no error and no recovery short
+      // of a full reload. Switching rooms needs nothing here either: the
+      // server's own "room:join" leaves the previous channel for you.
       socket.off("room:system", onSystem);
     };
   }, [socket, roomId]);

@@ -745,6 +745,17 @@ export function GameRoom({
     }
     try {
       await api.leaveRoom(room.id);
+      // Only once membership is genuinely gone. The REST route above runs in a
+      // Next request and cannot reach the socket server, so this is what tells
+      // the harbor to drop this captain from the live roster and clear their
+      // open barter offers and aid request; without it they linger on everyone
+      // else's roster until their socket happens to drop.
+      //
+      // Deliberately inside the try, after the await: if the leave failed, the
+      // captain is still a member and the room's ready check still counts them,
+      // so announcing a departure that did not happen would be worse than
+      // staying quiet.
+      socket?.emit("room:leave", { roomId: room.id });
     } catch {
       /* ignore */
     }
