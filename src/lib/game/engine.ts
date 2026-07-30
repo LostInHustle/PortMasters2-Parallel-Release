@@ -22,6 +22,7 @@
 // =====================================================================
 import {
   AID_REPUTATION_PER_GOLD,
+  helperReputationCapFor,
   APP_NAME,
   BACKING_REPUTATION_PER_GOLD,
   BOONS,
@@ -1742,6 +1743,32 @@ export function receiveLoan(
   );
 }
 
+// Reputation earned by helping another captain, whether by lending (see
+// grantLoan) or by backing someone else's loan (see receiveBackingOutcome).
+// Both share one per voyage ceiling rather than having one each, because
+// two separate ceilings would just move the exploit from whichever is
+// capped to whichever is not. Returns what was actually granted, which can
+// be zero once the ceiling is reached, so the caller can word its own log
+// line honestly rather than claiming Reputation the captain did not get.
+function grantHelperReputation(
+  state: GameState,
+  rawGain: number,
+  logs: string[],
+): number {
+  const cap = helperReputationCapFor(state.difficulty);
+  const headroom = Math.max(0, cap - state.helperReputationEarned);
+  const granted = Math.min(Math.max(1, rawGain), headroom);
+  if (granted <= 0) {
+    logs.push(
+      `🤝 No Reputation this time: you have already earned this voyage's full ${cap} for helping other captains.`,
+    );
+    return 0;
+  }
+  state.score += granted;
+  state.helperReputationEarned += granted;
+  return granted;
+}
+
 export function grantLoan(
   state: GameState,
   loan: {
@@ -1760,14 +1787,18 @@ export function grantLoan(
     amount: loan.amount,
     roundBorrowed: state.currentRound,
   });
-  const repGain = Math.max(
-    1,
+  const repGain = grantHelperReputation(
+    state,
     Math.floor(loan.amount * AID_REPUTATION_PER_GOLD),
+    logs,
   );
-  state.score += repGain;
-  logs.push(
-    `🤝 Lent ${loan.borrowerName} ${loan.amount} Gold. Reputation +${repGain} for helping a fellow captain.`,
-  );
+  if (repGain > 0) {
+    logs.push(
+      `🤝 Lent ${loan.borrowerName} ${loan.amount} Gold. Reputation +${repGain} for helping a fellow captain.`,
+    );
+  } else {
+    logs.push(`🤝 Lent ${loan.borrowerName} ${loan.amount} Gold.`);
+  }
 }
 
 // Voluntary, captain-initiated repayment. The caller (GameRoom.tsx) reads
@@ -1855,13 +1886,15 @@ export function receiveBackingOutcome(
 ) {
   if (refundAmount > 0) state.money += refundAmount;
   if (calledAmount <= 0) {
-    const repGain = Math.max(
-      1,
+    const repGain = grantHelperReputation(
+      state,
       Math.floor(refundAmount * BACKING_REPUTATION_PER_GOLD),
+      logs,
     );
-    state.score += repGain;
     logs.push(
-      `🛡️ Your backing was never called on. Pledge returned in full: ${refundAmount} Gold. Reputation +${repGain} for the risk paying off.`,
+      repGain > 0
+        ? `🛡️ Your backing was never called on. Pledge returned in full: ${refundAmount} Gold. Reputation +${repGain} for the risk paying off.`
+        : `🛡️ Your backing was never called on. Pledge returned in full: ${refundAmount} Gold.`,
     );
   } else if (refundAmount > 0) {
     logs.push(

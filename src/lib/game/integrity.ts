@@ -87,6 +87,24 @@ export function plausibleCeiling(perRound: number, roundsElapsed: number) {
   return perRound * (rounds + 1) + STARTING_ALLOWANCE;
 }
 
+// Two bands, because one threshold cannot serve two jobs.
+//
+// The ceiling above is the impossible band: derived from the theoretical
+// maximum, so far past real play that nothing honest can reach it, and
+// therefore safe to attach a real consequence to. Anything over it loses
+// the voyage's Renown and merits (see maybeConcludeVoyage in
+// src/server/realtime.ts).
+//
+// The suspect band sits a tenth of the way up. Still several times what a
+// genuine high scoring round reaches, so it is not evidence of anything on
+// its own, but it is where the interesting saves are. It only ever records,
+// never acts, and exists so there is real data to tighten the impossible
+// band with later. Attaching a consequence to a number nobody has measured
+// is how honest players lose voyages.
+const SUSPECT_FRACTION = 10;
+
+export type IntegritySeverity = "ok" | "suspect" | "impossible";
+
 // ---------- Reading a save ----------
 export type SaveSnapshot = { money: number; score: number };
 
@@ -112,6 +130,7 @@ export type IntegrityFinding = {
 
 export type IntegrityVerdict = {
   plausible: boolean;
+  severity: IntegritySeverity;
   findings: IntegrityFinding[];
 };
 
@@ -145,13 +164,19 @@ export function checkSave(
       perRound: MAX_PLAUSIBLE_SCORE_PER_ROUND,
     },
   ];
+  let severity: IntegritySeverity = "ok";
   for (const c of checks) {
     const ceiling = plausibleCeiling(c.perRound, roundsElapsed);
-    if (!Number.isFinite(c.value) || c.value < 0 || c.value > ceiling) {
+    const broken = !Number.isFinite(c.value) || c.value < 0;
+    if (broken || c.value > ceiling) {
+      severity = "impossible";
+      findings.push({ field: c.field, value: c.value, ceiling });
+    } else if (c.value > ceiling / SUSPECT_FRACTION) {
+      if (severity === "ok") severity = "suspect";
       findings.push({ field: c.field, value: c.value, ceiling });
     }
   }
-  return { plausible: findings.length === 0, findings };
+  return { plausible: severity === "ok", severity, findings };
 }
 
 // One line, stable enough to grep a production log for, and short enough to

@@ -179,6 +179,8 @@ If instead the borrower comes up short, your pledge is what covers the gap, up t
 
 Only one captain can back any given loan, and you cannot back a loan you are already the lender or the borrower on, since you already have your own stake in how that one turns out.
 
+One ceiling covers both sides of helping. Across a whole voyage, everything you earn from lending Gold and from backing someone else's loan is capped together, and the cap depends on how long the voyage is: 96 Reputation on Fair Winds, 120 on Open Waters, 144 on Monsoon Season. A longer voyage offers more chances to help and holds far more Gold by its midpoint, so one fixed number for all three would have been mean to the long tier and generous to the short one. Each of those is worth five times its own number in Gold lent, so even the shortest tier covers three sizeable bailouts without cutting you off. The ceiling exists because without it two captains could agree in chat to pass one large loan back and forth, banking a fifth of it as Reputation each time. Without that ceiling, two captains could agree in chat to pass one large loan back and forth, banking a fifth of it as Reputation each time, which is why it exists.
+
 ### Where to find it and how to use it
 
 Every outstanding loan in your harbor, not just the ones you are personally involved in, is now visible on the Settlement screen, in a new "Loans You Could Back" section right underneath "Captains Asking for Help." Type in how much Gold you want to pledge and press the Back button.
@@ -367,7 +369,13 @@ Every captain's browser works out its own Gold and Reputation and then posts the
 
 This adds one check at that save endpoint. When a save arrives claiming more Gold or Reputation than the game could possibly have produced by the round the room has actually reached, the save is still written, but the row is marked as suspect and a line is logged on the server.
 
-It deliberately does not reject anything. A captain halfway through a voyage must never lose their game to a mistaken guard, so the ceiling is set from the theoretical maximum rather than from what real play looks like: it allows several times the top merchant rating in a single round. It catches a save claiming millions. It will not catch one quietly padded by fifty, and it is not meant to.
+It deliberately never rejects a save or interrupts a voyage. A captain halfway through a game must never lose it to a mistaken guard, so the ceiling is set from the theoretical maximum rather than from what real play looks like: it allows several times the top merchant rating in a single round. It catches a figure claiming millions. It will not catch one quietly padded by fifty, and it is not meant to.
+
+There are two bands. **Suspect** is a tenth of the way to the ceiling: still far past a genuine high scoring round, so it proves nothing on its own. It is recorded and nothing else happens, and it exists so there is real data to tighten the upper band with later. **Impossible** is over the ceiling itself, or a figure that is broken outright such as a negative or a NaN. Only that band has a consequence.
+
+That consequence lands at the end of the voyage rather than during it. A captain who finishes on an impossible figure still finishes, still appears in the final standings, and keeps whatever happened inside that voyage. What they do not get is anything that outlives it: no Renown XP, no merits, and no Sea Master crown. They are also taken out of the running for the crown entirely rather than crowned and then stripped, so an invented score can never deny the crown to the captain who actually earned it.
+
+This matters more than the save check on its own, because the save endpoint is not how a voyage's numbers become permanent. The conclusion reads the live status every client reports a few times a minute, and never opens the saved game at all. A client that kept its saves ordinary and only inflated that status would have banked Renown with nothing in its way.
 
 The reason it exists now rather than later is that Trading Houses, Ages of the Ledger and Captain's Rival all read account level standings. A forged score used to spoil one voyage. Once those three exist, it would spoil a permanent record everyone else can see.
 
@@ -387,6 +395,7 @@ You need a way to send a request directly, since the game itself will never prod
 4. Confirm `integritySuspect` on that row is now true and `integrityNote` records what tripped.
 5. Save normally again, and confirm the flag stays true. It is never cleared automatically, since the point is that the account claimed it at least once.
 6. To confirm the guard cannot fire on real play, finish a voyage at the top merchant rating and confirm the flag is still false.
+7. To confirm the consequence, have one captain report an impossible Reputation and finish the voyage. Confirm they still appear in the standings, confirm their Renown XP for that voyage is zero, confirm no new merits were granted, and confirm the crown went to the highest scoring honest captain rather than to nobody.
 
 ---
 

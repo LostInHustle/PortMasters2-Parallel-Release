@@ -1135,6 +1135,48 @@ test("clearRedirectedLoan only removes the matching debt, leaving any other outs
 // real voyage's numbers stay plausible, and a forged one does not.
 suite("Ledger Integrity: implausible saves are flagged, real ones never are");
 
+test("the three bands are ordered: ok, then suspect, then impossible", () => {
+  const ceiling = plausibleCeiling(MAX_PLAUSIBLE_GOLD_PER_ROUND, 4);
+  assertEqual(
+    checkSave({ money: 500, score: 300 }, 4).severity,
+    "ok",
+    "ordinary play is ok",
+  );
+  assertEqual(
+    checkSave({ money: Math.floor(ceiling / 2), score: 0 }, 4).severity,
+    "suspect",
+    "well past normal but under the ceiling only records",
+  );
+  assertEqual(
+    checkSave({ money: ceiling + 1, score: 0 }, 4).severity,
+    "impossible",
+    "over the ceiling is the band that acts",
+  );
+});
+
+test("only the impossible band is ever acted on, so suspect stays a recording band", () => {
+  const ceiling = plausibleCeiling(MAX_PLAUSIBLE_GOLD_PER_ROUND, 8);
+  const suspect = checkSave({ money: Math.floor(ceiling / 2), score: 0 }, 8);
+  assert(!suspect.plausible, "a suspect save is still reported");
+  assert(
+    suspect.severity !== "impossible",
+    "but it is never escalated to the band that costs a captain their Renown",
+  );
+});
+
+test("corruption is always impossible, never merely suspect", () => {
+  assertEqual(
+    checkSave({ money: NaN, score: 0 }, 3).severity,
+    "impossible",
+    "NaN cannot be explained by a good round",
+  );
+  assertEqual(
+    checkSave({ money: -5, score: 0 }, 3).severity,
+    "impossible",
+    "negative Gold cannot either",
+  );
+});
+
 test("a save from an ordinary voyage is plausible at every round", () => {
   for (let round = 1; round <= 16; round++) {
     const v = checkSave({ money: 400, score: 300 }, round);
@@ -1183,11 +1225,16 @@ test("the ceiling grows with the rounds actually elapsed on the server", () => {
   const late = plausibleCeiling(MAX_PLAUSIBLE_GOLD_PER_ROUND, 12);
   assert(late > early, "a longer voyage allows more");
   const forged = { money: late - 1, score: 0 };
-  assert(
-    !checkSave(forged, 1).plausible,
-    "what is plausible at round twelve is not plausible at round one",
+  assertEqual(
+    checkSave(forged, 1).severity,
+    "impossible",
+    "a round twelve fortune claimed in round one is impossible",
   );
-  assert(checkSave(forged, 12).plausible, "and is plausible at round twelve");
+  assertEqual(
+    checkSave(forged, 12).severity,
+    "suspect",
+    "the same figure at round twelve is under the ceiling, so it records without acting",
+  );
 });
 
 test("a round count of zero or nonsense still allows one full round", () => {

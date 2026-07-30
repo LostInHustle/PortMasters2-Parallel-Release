@@ -43,6 +43,7 @@ import {
   WORD_ON_THE_DOCKS_THRESHOLD,
 } from "../lib/game/constants";
 import { meritById, qualifyingMerits } from "../lib/game/merits";
+import { checkSave, describeFindings } from "../lib/game/integrity";
 import {
   normalizeDifficulty,
   renownMultiplierFor,
@@ -569,7 +570,31 @@ export function attachRealtime(httpServer: HttpServer): Server {
     }
     if (sweptAny) broadcastLoans(roomId);
 
-    const crownable = finished.filter((f) => f.phase === "endgame");
+    // [MANIFEST 13: Ledger Integrity Pass] Judged once, up front, because the
+    // verdict decides the crown as well as the Renown. A forged finisher is
+    // taken out of the running entirely rather than crowned and then stripped:
+    // leaving them in would let an impossible score deny the crown to the
+    // captain who actually earned it, since the winner is whoever reported the
+    // highest Reputation.
+    const integrityByUser = new Map<string, ReturnType<typeof checkSave>>();
+    for (const f of finished) {
+      const verdict = checkSave(
+        { money: f.gold, score: f.reputation },
+        roundsFor(roomDifficulty),
+      );
+      integrityByUser.set(f.userId, verdict);
+      if (verdict.severity !== "ok") {
+        console.warn(
+          `[integrity] ${verdict.severity} finish user=${f.userId} room=${roomId} ${describeFindings(verdict.findings)}`,
+        );
+      }
+    }
+    const isForged = (userId: string) =>
+      integrityByUser.get(userId)?.severity === "impossible";
+
+    const crownable = finished.filter(
+      (f) => f.phase === "endgame" && !isForged(f.userId),
+    );
     const winnerId = crownable.length
       ? crownable.reduce((best, f) =>
           f.reputation > best.reputation ? f : best,
@@ -593,7 +618,25 @@ export function attachRealtime(httpServer: HttpServer): Server {
     }[] = [];
 
     for (const f of finished) {
-      const xpGained = Math.round(Math.max(0, f.reputation) * renownMultiplier);
+      // [MANIFEST 13: Ledger Integrity Pass] The consequence, at the one
+      // moment a voyage's numbers stop being local and become a permanent
+      // account record.
+      //
+      // The guard on PUT /api/game/state was never enough on its own: this
+      // conclusion reads roomStatuses, filled by the game:status heartbeat,
+      // and never opens the GameState table at all. A client that simply
+      // never sent an odd save, and instead reported an impossible figure on
+      // the heartbeat, banked Renown and merits with nothing in its way.
+      //
+      // Only the impossible band acts. A suspect finish is recorded and paid
+      // in full, since that band exists to gather data, not to punish. An
+      // impossible one still finishes the voyage and still appears in the
+      // standings, so the room is never left broken or waiting; it simply
+      // banks nothing that outlives the voyage.
+      const forged = isForged(f.userId);
+      const xpGained = forged
+        ? 0
+        : Math.round(Math.max(0, f.reputation) * renownMultiplier);
       const crowned = f.userId === winnerId;
       const bankrupt = f.phase === "bankruptcy";
       const prior = await db.captainLegacy.findUnique({
@@ -669,7 +712,13 @@ export function attachRealtime(httpServer: HttpServer): Server {
         difficulty: roomDifficulty,
         bankrupt,
       });
-      const newMerits = qualifying.filter((id) => !existingMeritIds.has(id));
+      // [MANIFEST 13] A forged finish earns no merits either. Merits are
+      // permanent and account wide, so they are exactly the kind of record
+      // this entry exists to keep clean, and awarding one off an impossible
+      // Reputation would outlast the voyage that invented it.
+      const newMerits = forged
+        ? []
+        : qualifying.filter((id) => !existingMeritIds.has(id));
       // One upsert per merit rather than a single createMany: SQLite's
       // Prisma client (unlike Postgres/MySQL) doesn't support
       // skipDuplicates, and there are never more than a handful of merits

@@ -105,7 +105,7 @@ export async function PUT(req: NextRequest) {
   const snapshot = snapshotFromSave(data);
   const verdict = snapshot
     ? checkSave(snapshot, room?.currentRound ?? 1)
-    : { plausible: true, findings: [] };
+    : { plausible: true, severity: "ok" as const, findings: [] };
 
   const json = JSON.stringify(data);
   // Only ever set the mark, never clear it. A save that was implausible once
@@ -115,12 +115,12 @@ export async function PUT(req: NextRequest) {
     ? {}
     : {
         integritySuspect: true,
-        integrityNote: describeFindings(verdict.findings),
+        integrityNote: `${verdict.severity}: ${describeFindings(verdict.findings)}`,
       };
 
   if (!verdict.plausible) {
     console.warn(
-      `[integrity] implausible save user=${user.id} room=${roomId} ${describeFindings(verdict.findings)}`,
+      `[integrity] ${verdict.severity} save user=${user.id} room=${roomId} ${describeFindings(verdict.findings)}`,
     );
   }
 
