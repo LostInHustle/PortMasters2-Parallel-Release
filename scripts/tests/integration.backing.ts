@@ -24,6 +24,7 @@ import {
   pledgeBacking,
   receiveBackedCoverage,
   receiveBackingOutcome,
+  settleOutstandingDebts,
 } from "../../src/lib/game/engine";
 import { createInitialGameState } from "../../src/lib/game/types";
 
@@ -140,6 +141,83 @@ test("receiveBackedCoverage credits the lender exactly the amount the backer cov
     "exactly the covered amount is credited",
   );
   assert(logs.length > 0, "a log line is written");
+});
+
+// ---------- Forced settlement reporting ----------
+// The bug these cover: computeBackingResolution was always correct, but for a
+// total default nothing ever called it. settleOutstandingDebts only recorded a
+// settlement when the borrower paid something, and that record is the one
+// signal that closes the loan on the server's ledger and resolves the pledge
+// (see aid:repay in src/server/realtime.ts). A borrower reaching the final
+// round with no Gold therefore stranded the loan open forever: the backer's
+// escrowed Gold was neither returned nor called, and the lender never received
+// the coverage that pledge existed for, in exactly the case Backing is for.
+suite("Backing: a forced settlement is always reported, even at zero Gold");
+
+function debtState(money: number, owed: number) {
+  const state = createInitialGameState(0, 1, 0, "fair_winds");
+  state.money = money;
+  state.debts = [
+    {
+      id: "debt-1",
+      counterpartyId: "lender-1",
+      counterpartyName: "Lender L",
+      amount: owed,
+      roundBorrowed: 1,
+    },
+  ];
+  return state;
+}
+
+test("a borrower holding no Gold at all still reports the debt as settled", () => {
+  const state = debtState(0, 60);
+  const logs: string[] = [];
+  settleOutstandingDebts(state, logs);
+  const pending = state._pendingDebtSettlements ?? [];
+  assertEqual(pending.length, 1, "the closure is reported despite paying 0");
+  assertEqual(pending[0].amount, 0, "reported amount is exactly 0");
+  assertEqual(pending[0].debtId, "debt-1", "the debt it closes is identified");
+  assert(
+    state.defaultedDebt,
+    "the borrower is still marked as having defaulted",
+  );
+  assertEqual(state.debts.length, 0, "the debt is cleared from the borrower");
+});
+
+test("that zero report is what lets the whole pledge be called on", () => {
+  const state = debtState(0, 60);
+  settleOutstandingDebts(state, []);
+  const reported = (state._pendingDebtSettlements ?? [])[0];
+  const { calledAmount, refundAmount } = computeBackingResolution(
+    60,
+    reported.amount,
+    20,
+  );
+  assertEqual(calledAmount, 20, "the backer's entire pledge covers the gap");
+  assertEqual(refundAmount, 0, "nothing comes back to the backer");
+});
+
+test("a partial payment reports the partial amount, not the full debt", () => {
+  const state = debtState(25, 60);
+  settleOutstandingDebts(state, []);
+  const reported = (state._pendingDebtSettlements ?? [])[0];
+  assertEqual(reported.amount, 25, "only what the borrower could pay");
+  assertEqual(state.money, 0, "every Gold the borrower had went to the lender");
+});
+
+test("a borrower who can cover the debt reports it in full and does not default", () => {
+  const state = debtState(100, 60);
+  settleOutstandingDebts(state, []);
+  const reported = (state._pendingDebtSettlements ?? [])[0];
+  assertEqual(reported.amount, 60, "the whole debt is repaid");
+  assert(!state.defaultedDebt, "no default is recorded");
+  const { calledAmount, refundAmount } = computeBackingResolution(
+    60,
+    reported.amount,
+    20,
+  );
+  assertEqual(calledAmount, 0, "the pledge is never called on");
+  assertEqual(refundAmount, 20, "the pledge comes back whole");
 });
 
 // ---------- Constant sanity ----------

@@ -1947,13 +1947,19 @@ export function settleOutstandingDebts(state: GameState, logs: string[]) {
   for (const debt of state.debts) {
     const paid = Math.min(state.money, debt.amount);
     state.money -= paid;
-    if (paid > 0)
-      settlements.push({
-        lenderId: debt.counterpartyId,
-        lenderName: debt.counterpartyName,
-        amount: paid,
-        debtId: debt.id,
-      });
+    // Reported even when paid is 0. This record is not only "credit the
+    // lender", it is also the one signal that closes the debt on the server's
+    // ledger and resolves any Backing pledge on it (see aid:repay in
+    // src/server/realtime.ts). Skipping it for a total default used to strand
+    // the loan open forever: the backer's escrowed Gold was neither returned
+    // nor called, and the lender never received the coverage that pledge
+    // existed for, which is precisely the case Backing is meant to cover.
+    settlements.push({
+      lenderId: debt.counterpartyId,
+      lenderName: debt.counterpartyName,
+      amount: paid,
+      debtId: debt.id,
+    });
     if (paid < debt.amount) {
       state.defaultedDebt = true;
       logs.push(

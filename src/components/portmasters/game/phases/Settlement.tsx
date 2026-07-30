@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { QuantityInput } from "@/components/ui/quantity-input";
+import { WORKER_TYPES } from "@/lib/game/constants";
 import {
   difficultyConfig,
   escortRateFor,
   pirateChanceFor,
+  roundsFor,
 } from "@/lib/game/difficulty";
 import {
   finishSettlement,
@@ -105,19 +107,24 @@ function SettlementBills({
   phaseSync: PhaseSync;
   members: PublicUser[];
 }) {
-  const ww = game.workers.weaver.length * getHireCost(game, "weaver");
-  const mw = game.workers.master.length * getHireCost(game, "master");
-  const sw =
-    game.workers.sachet_maker.length * getHireCost(game, "sachet_maker");
-  const wagesDue = ww + mw + sw;
+  // One pass over the whole roster, deliberately mirroring payWages in
+  // engine.ts rather than listing artisans by hand. This screen used to total
+  // only the three founding types, so once a charter opened a Coppersmith,
+  // Potter, Perfumer or Jeweler, the bill shown here was lower than the bill
+  // actually charged a moment later. That also silently gated the aid request
+  // below, since canAfford decides whether it appears at all: a captain who
+  // genuinely could not pay was told they could, never got the chance to ask
+  // the harbor for help, and went bankrupt anyway.
+  const roster = WORKER_TYPES.map((w) => (game.workers[w.id] ?? []).length);
+  const wagesDue = WORKER_TYPES.reduce(
+    (sum, w, i) => sum + roster[i] * getHireCost(game, w.id),
+    0,
+  );
+  const nWorkers = roster.reduce((sum, n) => sum + n, 0);
   const maintCost = game.fixedCost + game.maintenancePenalty;
   const totalDue = wagesDue + maintCost;
   const canAfford = game.money >= totalDue;
   const balanceAfter = game.money - totalDue;
-  const nWorkers =
-    game.workers.weaver.length +
-    game.workers.master.length +
-    game.workers.sachet_maker.length;
 
   const myRequest = aid.requests.find((r) => r.fromUserId === myUserId);
   const otherRequests = aid.requests.filter((r) => r.fromUserId !== myUserId);
@@ -254,8 +261,8 @@ function SettlementBills({
           )}
           <p className="text-[11px] text-muted-foreground mt-2">
             A loan transfers instantly if someone helps. Repay it any time
-            before the voyage ends, or it's deducted automatically at Round 8
-            and handed to them.
+            before the voyage ends, or it's deducted automatically at Round{" "}
+            {roundsFor(game.difficulty)} and handed to them.
           </p>
         </div>
       )}

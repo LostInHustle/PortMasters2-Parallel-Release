@@ -258,6 +258,7 @@ The restart bug above is the best case study this codebase has, and the pattern 
 **"It builds on my machine" proves nothing, and this codebase has already proven that once.** The lightningcss lockfile issue passed every local check because everything local ran on the one platform whose binaries made it into `node_modules`. When a change touches dependencies, the lockfile, or anything platform specific, build for the deploy target before trusting it:
 
 ```bash
-docker run --rm --platform linux/amd64 -v "$(pwd):/work" -w /work node:22-slim \
-  bash -c "npm ci && npm run build"
+docker run --rm --platform linux/amd64 -v "$(pwd):/work" -v /work/node_modules -v /work/.next -w /work node:22-slim bash -c "npm ci && npm run build"
 ```
+
+The two bare `-v` flags matter. They shadow `node_modules` and `.next` with container only volumes, so the Linux binaries `npm ci` installs stay inside the container instead of overwriting your own. Without them the command bind mounts your working tree, `npm ci` wipes and refills `node_modules` in place, and your next `npm run dev` fails on the very native modules this check exists to test.
