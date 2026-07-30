@@ -125,7 +125,11 @@ export function snapshotFromSave(data: unknown): SaveSnapshot | null {
 export type IntegrityFinding = {
   field: "money" | "score";
   value: number;
-  ceiling: number;
+  // The threshold this value actually crossed, which is the suspect one for a
+  // suspect finding and the ceiling itself for an impossible one. Reporting
+  // the ceiling for both read as a plain falsehood in the log, since a
+  // suspect value is by definition under it.
+  threshold: number;
 };
 
 export type IntegrityVerdict = {
@@ -170,10 +174,14 @@ export function checkSave(
     const broken = !Number.isFinite(c.value) || c.value < 0;
     if (broken || c.value > ceiling) {
       severity = "impossible";
-      findings.push({ field: c.field, value: c.value, ceiling });
+      findings.push({ field: c.field, value: c.value, threshold: ceiling });
     } else if (c.value > ceiling / SUSPECT_FRACTION) {
       if (severity === "ok") severity = "suspect";
-      findings.push({ field: c.field, value: c.value, ceiling });
+      findings.push({
+        field: c.field,
+        value: c.value,
+        threshold: Math.floor(ceiling / SUSPECT_FRACTION),
+      });
     }
   }
   return { plausible: severity === "ok", severity, findings };
@@ -183,6 +191,6 @@ export function checkSave(
 // store on the row itself.
 export function describeFindings(findings: IntegrityFinding[]): string {
   return findings
-    .map((f) => `${f.field}=${f.value} exceeds ${f.ceiling}`)
+    .map((f) => `${f.field}=${f.value} exceeds ${f.threshold}`)
     .join("; ");
 }

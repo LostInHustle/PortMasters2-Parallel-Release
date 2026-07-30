@@ -99,6 +99,16 @@ A voyage resets everything inside it. Three things survive:
 
 That split is the single most useful thing to know before changing anything: ask which side owns the behavior before you touch it.
 
+### What that costs, and where the line is
+
+Letting each client own its own numbers means a captain can edit them. Open the developer tools, set your Gold to 5,000, and nothing disagrees with you, because nothing else independently knows what your Gold should be. This is a deliberate trade, not an oversight, and it is not going to be reversed: making the server authoritative means running the engine there instead, which is rebuilding the game rather than patching it, and the threat model does not justify it. This is a handful of people in a shared harbor, not an economy with real value attached.
+
+The line is drawn somewhere specific, though, and it is worth stating so nobody has to rediscover it. **Anything that stays inside one voyage is not defended.** A captain who inflates their own Gold mostly ruins their own afternoon. **Anything that escapes into the permanent account record is.** Renown, merits and the Sea Master crown all outlive the voyage that produced them, and a forged one is everybody's problem, not just the forger's.
+
+That is what the Ledger Integrity Pass guards (see `src/lib/game/integrity.ts`). It checks reported Gold and Reputation against a ceiling derived from the live game data and keyed to the room's own round, which is the one number a client cannot forge. A figure past that ceiling still finishes its voyage and still appears in the standings; it simply banks no Renown, earns no merits, and is taken out of the running for the crown. Nothing is ever rejected mid voyage, because a false positive that costs an honest captain their game would be worse than the cheating it prevents.
+
+Two consequences of the same trade are worth knowing. Gold moved between captains through aid, barter or backing cannot be verified either, which is why Reputation earned from helping is capped per voyage (see `helperReputationCapFor`). And any future leaderboard needs to read from something the server can vouch for, not from what a client last reported.
+
 ## Tech stack
 
 - Next.js 16 (App Router), React 19, TypeScript

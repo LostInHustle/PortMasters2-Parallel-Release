@@ -545,31 +545,8 @@ export function attachRealtime(httpServer: HttpServer): Server {
       if ((userSockets.get(loan.borrowerId)?.size ?? 0) > 0) continue;
       removeLoan(roomId, loan.debtId);
       sweptAny = true;
-      if (!loan.backerId || !loan.backedAmount) continue;
-      const { calledAmount, refundAmount } = computeBackingResolution(
-        loan.amount,
-        0,
-        loan.backedAmount,
-      );
-      for (const sid of userSockets.get(loan.backerId) ?? []) {
-        io.to(sid).emit("backing:resolved", {
-          roomId,
-          debtId: loan.debtId,
-          refundAmount,
-          calledAmount,
-        });
-      }
-      if (calledAmount > 0) {
-        for (const sid of userSockets.get(loan.lenderId) ?? []) {
-          io.to(sid).emit("backing:covered", {
-            roomId,
-            debtId: loan.debtId,
-            amount: calledAmount,
-            backerName: loan.backerName,
-            borrowerName: loan.borrowerName,
-          });
-        }
-      }
+      // An absent borrower paid nothing, so 0 is the honest repaid amount.
+      resolveBackingFor(roomId, loan, 0);
     }
     if (sweptAny) broadcastLoans(roomId);
 
@@ -1049,6 +1026,48 @@ export function attachRealtime(httpServer: HttpServer): Server {
       `settlement of ${debtId}`,
       db.loan.deleteMany({ where: { id: debtId } }),
     );
+  }
+
+  // [MANIFEST 05: Backing] Resolves whatever pledge sits on a loan that has
+  // just closed, and tells both sides. Shared because there are exactly two
+  // ways a loan closes and they were carrying byte for byte copies of this:
+  // a borrower reporting their own settlement over aid:repay, and the
+  // conclusion sweep standing in for a borrower who never did. They differ
+  // only in how much the borrower actually paid, which is the argument.
+  //
+  // Both recipients come off the loan record rather than off anything a
+  // caller passes in. The loan is the server's own copy of who lent and who
+  // backed; a payload is whatever a client said.
+  function resolveBackingFor(
+    roomId: string,
+    loan: LoanRecord,
+    repaidAmount: number,
+  ) {
+    if (!loan.backerId || !loan.backedAmount) return;
+    const { calledAmount, refundAmount } = computeBackingResolution(
+      loan.amount,
+      repaidAmount,
+      loan.backedAmount,
+    );
+    for (const sid of userSockets.get(loan.backerId) ?? []) {
+      io.to(sid).emit("backing:resolved", {
+        roomId,
+        debtId: loan.debtId,
+        refundAmount,
+        calledAmount,
+      });
+    }
+    if (calledAmount > 0) {
+      for (const sid of userSockets.get(loan.lenderId) ?? []) {
+        io.to(sid).emit("backing:covered", {
+          roomId,
+          debtId: loan.debtId,
+          amount: calledAmount,
+          backerName: loan.backerName,
+          borrowerName: loan.borrowerName,
+        });
+      }
+    }
   }
 
   // Rebuilds the ledger when the process starts. Without this the table
@@ -2361,6 +2380,11 @@ export function attachRealtime(httpServer: HttpServer): Server {
         // to be processed, because this event is what closes the debt and
         // resolves any Backing pledge on it, not merely what credits the
         // lender. Only a negative or non-integer amount is nonsense.
+        //
+        // lenderId is checked for presence and then deliberately ignored.
+        // Clients have always sent it and the wire contract keeps it, but
+        // who gets paid is read off the loan itself further down, never off
+        // a field the borrower filled in.
         if (
           !roomId ||
           roomId !== s.roomId ||
@@ -2370,8 +2394,6 @@ export function attachRealtime(httpServer: HttpServer): Server {
           (amount as number) < 0
         )
           return;
-        const lenderSockets = userSockets.get(lenderId);
-
         // [MANIFEST 05: Backing] This debt is now settled, one way or
         // another (a voluntary repayment, or the forced one at the voyage's
         // final round), so it's done being tracked. amount can be less than
@@ -2397,9 +2419,15 @@ export function attachRealtime(httpServer: HttpServer): Server {
           // below stay addressed to the loan's own lenderId/backerId
           // exactly as before, since a redirect is not a transfer of who
           // was owed the debt, only of where the actual Gold lands.
-          const repaySockets = loan.redirectToUserId
-            ? userSockets.get(loan.redirectToUserId)
-            : lenderSockets;
+          //
+          // Both branches read the loan, never the payload's own lenderId.
+          // The borrower is the one sending this, so a doctored client could
+          // otherwise name itself as the lender and have the repayment
+          // credited to its own screen while the captain who actually lent
+          // the Gold was never told the debt closed at all.
+          const repaySockets = userSockets.get(
+            loan.redirectToUserId ?? loan.lenderId,
+          );
           if (repaySockets && (amount as number) > 0) {
             const repaid = {
               roomId,
@@ -2429,30 +2457,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
                 io.to(sid).emit("aid:redirected", redirected);
             }
           }
-          if (loan.backerId && loan.backedAmount) {
-            const { calledAmount, refundAmount } = computeBackingResolution(
-              loan.amount,
-              amount as number,
-              loan.backedAmount,
-            );
-            const backerSockets = userSockets.get(loan.backerId);
-            if (backerSockets) {
-              const resolved = { roomId, debtId, refundAmount, calledAmount };
-              for (const sid of backerSockets)
-                io.to(sid).emit("backing:resolved", resolved);
-            }
-            if (calledAmount > 0 && lenderSockets) {
-              const covered = {
-                roomId,
-                debtId,
-                amount: calledAmount,
-                backerName: loan.backerName,
-                borrowerName: loan.borrowerName,
-              };
-              for (const sid of lenderSockets)
-                io.to(sid).emit("backing:covered", covered);
-            }
-          }
+          resolveBackingFor(roomId, loan, amount as number);
           broadcastLoans(roomId);
         }
       },
