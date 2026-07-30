@@ -26,7 +26,13 @@ import { ReadyFooter, type PhaseSync } from "./PhaseShared";
 // ones that happened to roll onto one of this round's five market cards.
 // A captain planning ahead for Tea or Brocade should be able to check
 // the going rate even when nobody's currently selling it.
-function MarketPriceReference({ game }: { game: GameState }) {
+function MarketPriceReference({
+  game,
+  colorFor,
+}: {
+  game: GameState;
+  colorFor: (item: string) => string | undefined;
+}) {
   return (
     <div className="rounded-xl border border-teal-500/15 bg-teal-500/[0.03] px-3.5 py-2.5 mb-3.5">
       <div className="text-[10px] font-semibold tracking-wide text-muted-foreground/80 mb-1.5">
@@ -41,7 +47,7 @@ function MarketPriceReference({ game }: { game: GameState }) {
               <ExpectedPriceTooltip price={explainExpectedPrice(game, item)} />
             }
           >
-            <span className="text-[11px]" style={{ color: COLORS[item] }}>
+            <span className="text-[11px]" style={{ color: colorFor(item) }}>
               <ItemIcon item={item} className="h-3 w-3" /> {item}
             </span>
           </Term>
@@ -57,13 +63,18 @@ export function Purchase({
   phaseSync,
   members,
   onShowRumors,
+  colorFor,
 }: {
   game: GameState;
   act: (fn: (g: GameState, logs: string[]) => void) => void;
   phaseSync: PhaseSync;
   members: PublicUser[];
   onShowRumors: () => void;
+  // [MANIFEST 16: Colorblind Safe Palette] Optional, falls back to the
+  // plain COLORS lookup when a caller hasn't wired useColorPreference in.
+  colorFor?: (item: string) => string | undefined;
 }) {
+  const resolveColor = colorFor ?? ((item: string) => COLORS[item]);
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -96,7 +107,7 @@ export function Purchase({
           </span>
         </div>
       )}
-      <MarketPriceReference game={game} />
+      <MarketPriceReference game={game} colorFor={resolveColor} />
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
         {game.resourceCards.map((c) => {
           const finalCost = getCardFinalCost(game, c);
@@ -129,7 +140,7 @@ export function Purchase({
                     >
                       <span
                         className="font-medium"
-                        style={{ color: COLORS[r.type] }}
+                        style={{ color: resolveColor(r.type) }}
                       >
                         {r.type}
                       </span>

@@ -56,6 +56,41 @@ export const COLORS: Record<string, string> = {
   "Pearl String": "#B9A0E0",
 };
 
+// [MANIFEST 16: Colorblind Safe Palette] The set above puts Silk (a
+// crimson red) and Tea (a forest green) close enough on the color wheel
+// that a red green colorblind captain, the most common form by far, would
+// struggle to tell them apart at a glance in the same list. This is a
+// second, complete mapping for the same set of goods, built around the
+// design technique that actually works for red green colorblindness:
+// separate every color by lightness and saturation as well as by hue,
+// never by hue alone, and keep any two colors that would clash under
+// protanopia or deuteranopia (reds, greens, and browns collapsing toward
+// each other) as far apart as possible. Anchored on the Okabe and Ito
+// palette, a widely cited set of hues confirmed distinguishable under
+// every common form of color vision deficiency. Selecting it changes
+// nothing about game rules, balance, or what any other captain sees, only
+// how one captain's own client renders a color already being shown to
+// them anyway; see useColorPreference in src/lib/use-color-preference.ts
+// for where a player turns it on.
+export const COLORS_COLORBLIND_SAFE: Record<string, string> = {
+  Gold: "#E8A33D",
+  Hemp: "#A67C52",
+  Silk: "#CC79A7",
+  Tea: "#009E73",
+  "Linen Clothes": "#0072B2",
+  "Cotton Clothes": "#56B4E9",
+  Brocade: "#D55E00",
+  Sachet: "#F0E442",
+  "Porcelain Clay": "#7A93A6",
+  "Copper Ore": "#B5651D",
+  "Celadon Ware": "#4FA98C",
+  "Bronze Mirror": "#7D6852",
+  Spices: "#B33F1E",
+  Pearls: "#A8B4BD",
+  "Foreign Balm": "#C99B6E",
+  "Pearl String": "#7B6FA6",
+};
+
 // =====================================================================
 // Content tiers. The founding trade (tier 0) is what every voyage starts
 // with; each charter a difficulty schedules opens the next tier of goods,

@@ -59,6 +59,8 @@ import {
   applyTidewatchSurge,
   claimWordOnTheDocksReward,
   completeOrder,
+  receiveRepayment,
+  clearRedirectedLoan,
 } from "../../src/lib/game/engine";
 import {
   createInitialGameState,
@@ -1058,6 +1060,66 @@ test("harbor system constants match the documented design", () => {
   assertEqual(WORD_ON_THE_DOCKS_THRESHOLD, 5, "first to 5 completed orders");
   assertEqual(WORD_ON_THE_DOCKS_REWARD, 25, "25 Gold reward");
   assertEqual(TIDEWATCH_SURGE_THRESHOLD, 500, "combined Reputation past 500");
+});
+
+// ---------- Bequest Routing (Manifest 07) ----------
+suite("Bequest Routing");
+
+function stateWithLoanGiven(): GameState {
+  const s = freshState();
+  s.loansGiven = [
+    {
+      id: "debt1",
+      counterpartyId: "borrower1",
+      counterpartyName: "Captain Borrower",
+      amount: 40,
+      roundBorrowed: 2,
+    },
+  ];
+  return s;
+}
+
+test("receiveRepayment credits Gold and removes the closed loan (the ordinary, non-redirected path)", () => {
+  const s = stateWithLoanGiven();
+  const before = s.money;
+  const logs: string[] = [];
+  receiveRepayment(s, "debt1", 40, "Captain Borrower", logs);
+  assertEqual(s.money, before + 40, "Gold credited to the original lender");
+  assertEqual(s.loansGiven.length, 0, "closed loan removed from loansGiven");
+  assertEqual(logs.length, 1, "one log line");
+});
+
+test("clearRedirectedLoan removes the loan without touching Gold, since the redirect target was credited instead", () => {
+  const s = stateWithLoanGiven();
+  const before = s.money;
+  const logs: string[] = [];
+  clearRedirectedLoan(s, "debt1", "Captain Ally", logs);
+  assertEqual(
+    s.money,
+    before,
+    "no Gold change on the original lender's own client",
+  );
+  assertEqual(
+    s.loansGiven.length,
+    0,
+    "the redirected loan still gets removed, so it never sits stale forever",
+  );
+  assertEqual(logs.length, 1, "one log line naming who it was paid out to");
+  assert(logs[0].includes("Captain Ally"), "log names the redirect target");
+});
+
+test("clearRedirectedLoan only removes the matching debt, leaving any other outstanding loan untouched", () => {
+  const s = stateWithLoanGiven();
+  s.loansGiven.push({
+    id: "debt2",
+    counterpartyId: "borrower2",
+    counterpartyName: "Captain Other",
+    amount: 15,
+    roundBorrowed: 3,
+  });
+  clearRedirectedLoan(s, "debt1", "Captain Ally", []);
+  assertEqual(s.loansGiven.length, 1, "only debt1 was removed");
+  assertEqual(s.loansGiven[0].id, "debt2", "debt2 is still tracked");
 });
 
 const ok = summary();

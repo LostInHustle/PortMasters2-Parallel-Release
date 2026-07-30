@@ -7,7 +7,15 @@ import type { GameStatusUpdate, RoomMemberLive } from "@/lib/realtime";
 import type { PublicUser } from "@/lib/api";
 import { Avatar, OnlineDot, Pill } from "./shared";
 import { cn } from "@/lib/utils";
-import { Ship, Coins, Trophy, Crown, SkullIcon } from "lucide-react";
+import {
+  Ship,
+  Coins,
+  Trophy,
+  Crown,
+  SkullIcon,
+  VolumeX,
+  Volume2,
+} from "lucide-react";
 
 type StatusMap = Record<string, GameStatusUpdate>;
 
@@ -34,6 +42,11 @@ export function MembersPanel({
   const [members, setMembers] = useState<RoomMemberLive[]>(initialMembers);
   const [statuses, setStatuses] = useState<StatusMap>({});
   const [systemNotes, setSystemNotes] = useState<string[]>([]);
+  // [MANIFEST 14: Harbor Watch] Rides the same room:members broadcast the
+  // roster itself already comes over. Named viewerIsHost, not isHost, so it
+  // never shadows the per-row "is this row the host" check further down.
+  const [mutedUserIds, setMutedUserIds] = useState<Set<string>>(new Set());
+  const viewerIsHost = me.id === hostId;
 
   // The room channel itself is joined (and re-joined on every reconnect)
   // from GameRoom.tsx, since that needs to happen exactly once per
@@ -43,8 +56,13 @@ export function MembersPanel({
   useEffect(() => {
     if (!socket) return;
 
-    const onMembers = (data: { roomId: string; members: RoomMemberLive[] }) => {
+    const onMembers = (data: {
+      roomId: string;
+      members: RoomMemberLive[];
+      mutedUserIds?: string[];
+    }) => {
       if (data.roomId !== roomId) return;
+      setMutedUserIds(new Set(data.mutedUserIds ?? []));
       // Defensive dedupe by id. The server now collapses a captain's many
       // sockets to one roster row, but a stale duplicate must never reach
       // the render below: it would collide on React's `key={m.id}`, whose
@@ -129,16 +147,25 @@ export function MembersPanel({
           const isMe = m.id === me.id;
           const isHost = m.id === hostId;
           const isBankrupt = st?.phase === "bankruptcy";
+          const isMuted = mutedUserIds.has(m.id);
           return (
-            <motion.button
+            <motion.div
               key={m.id}
               layout
+              role="button"
+              tabIndex={0}
               whileHover={{ scale: 1.01, y: -1 }}
               whileTap={{ scale: 0.97 }}
               transition={{ duration: 0.12, ease: "easeOut" }}
               onClick={() => onSelectPlayer(m.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSelectPlayer(m.id);
+                }
+              }}
               className={cn(
-                "w-full flex items-center gap-2.5 rounded-xl p-2 border text-left transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.05]",
+                "w-full flex items-center gap-2.5 rounded-xl p-2 border text-left transition-colors cursor-pointer hover:bg-black/[0.03] dark:hover:bg-white/[0.05]",
                 isMe
                   ? "border-teal-500/30 bg-teal-500/[0.06]"
                   : "border-black/5 dark:border-white/10 bg-background/40",
@@ -165,6 +192,11 @@ export function MembersPanel({
                       you
                     </Pill>
                   )}
+                  {isMuted && (
+                    <Pill tone="rose" className="!py-0">
+                      <VolumeX className="h-2.5 w-2.5" /> muted
+                    </Pill>
+                  )}
                 </div>
                 <div className="text-[10px] text-muted-foreground truncate">
                   {st ? `R${st.round} · ${st.phaseLabel}` : "loading…"}
@@ -185,8 +217,32 @@ export function MembersPanel({
                     </Pill>
                   </>
                 )}
+                {/* [MANIFEST 14: Harbor Watch] Host only, never on my own
+                    row: the host can mute anyone else, never themselves. */}
+                {viewerIsHost && !isMe && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      socket?.emit(isMuted ? "chat:unmute" : "chat:mute", {
+                        roomId,
+                        targetUserId: m.id,
+                      });
+                    }}
+                    title={
+                      isMuted ? "Unmute this captain" : "Mute this captain"
+                    }
+                    className="p-1 rounded-lg hover:bg-black/[0.05] dark:hover:bg-white/10 text-muted-foreground"
+                  >
+                    {isMuted ? (
+                      <Volume2 className="h-3.5 w-3.5" />
+                    ) : (
+                      <VolumeX className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                )}
               </div>
-            </motion.button>
+            </motion.div>
           );
         })}
         {members.length === 0 && (

@@ -75,6 +75,10 @@ These are the systems that make a harbor different from several people playing s
 - **Tidewatch Alerts** are the cooperative counterpart. Once the combined Reputation of everyone in the harbor reaches 500, every captain's purchase board gains a permanent extra cargo lot for the rest of the voyage.
 - **Convoy Ventures** pool Gold toward a target by a deadline round. Fill it and every contributor gets back fifty percent more than they put in; miss the deadline and they get back half. A harbor fills exactly one venture per voyage, which cancels the rest with full refunds, and no captain may fund more than half of any target alone, so a venture cannot complete without someone else choosing to back it.
 - **Backing** adds a third role to an aid loan: a captain who is neither lender nor borrower pledges Gold as a safety net. If the loan is repaid the pledge comes back whole, plus a Reputation bonus smaller than the lender's. If the borrower falls short, the pledge covers the gap up to its own size and no further, so it narrows the lender's risk without erasing it.
+- **Bequest Routing** lets a bankrupt captain redirect a still outstanding loan they lent to a different, still active captain in the room, right from the Bankruptcy screen, so a repayment that lands after their own voyage is over goes somewhere it can still be spent.
+- **Harbor Watch** gives the host a way to mute one captain's room chat for the rest of the voyage without touching their Gold, cargo, ship, or progress, a much smaller tool than restarting the whole room.
+- **Colorblind Safe Palette** swaps every good's color for a second mapping built around distinguishability under the common forms of color vision deficiency, toggled per player from the game room header and remembered on that device.
+- **Fleet Ticker** is a slim strip pinned under the header, showing every captain's round, phase, Gold, and Reputation at a glance on every screen size, complementing the fuller Harbor Roster rather than replacing it.
 - **Direct barter offers** can be addressed to one named captain instead of the whole room. Nobody else sees the offer or can accept it.
 
 ### What carries across voyages

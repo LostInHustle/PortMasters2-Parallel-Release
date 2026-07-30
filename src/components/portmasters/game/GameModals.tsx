@@ -445,6 +445,7 @@ export function PlayerDetailModal({
   loading,
   legacy,
   difficulty,
+  colorFor,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -456,7 +457,11 @@ export function PlayerDetailModal({
   // The viewer's own tier. Difficulty is room wide, so this correctly
   // describes any captain in the harbor without adding it to the payload.
   difficulty: Difficulty;
+  // [MANIFEST 16: Colorblind Safe Palette] Optional, falls back to the
+  // plain COLORS lookup when a caller hasn't wired useColorPreference in.
+  colorFor?: (item: string) => string | undefined;
 }) {
+  const resolveColor = colorFor ?? ((item: string) => COLORS[item]);
   // Only artisans this voyage has actually unlocked, and each group reports
   // how many are trained. Difficulty is a room property so the viewer's own
   // tier is authoritative for everyone; the round comes from the subject's own
@@ -586,10 +591,13 @@ export function PlayerDetailModal({
                           className="flex items-center text-[12px] py-0.5"
                         >
                           <ItemIcon item={r} className="mr-1.5 h-3.5 w-3.5" />
-                          <span className="flex-1" style={{ color: COLORS[r] }}>
+                          <span
+                            className="flex-1"
+                            style={{ color: resolveColor(r) }}
+                          >
                             {r}
                           </span>
-                          <b style={{ color: COLORS[r] }}>
+                          <b style={{ color: resolveColor(r) }}>
                             {detail.inventory[r] || 0}
                           </b>
                         </div>
@@ -605,10 +613,13 @@ export function PlayerDetailModal({
                           className="flex items-center text-[12px] py-0.5"
                         >
                           <ItemIcon item={r} className="mr-1.5 h-3.5 w-3.5" />
-                          <span className="flex-1" style={{ color: COLORS[r] }}>
+                          <span
+                            className="flex-1"
+                            style={{ color: resolveColor(r) }}
+                          >
                             {r}
                           </span>
-                          <b style={{ color: COLORS[r] }}>
+                          <b style={{ color: resolveColor(r) }}>
                             {detail.inventory[r] || 0}
                           </b>
                         </div>

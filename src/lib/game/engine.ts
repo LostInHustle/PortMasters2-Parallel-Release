@@ -30,7 +30,6 @@ import {
   COMMODITIES,
   ICONS,
   MERCHANT_RATINGS,
-  MODULES,
   PRODUCT_PRICES,
   PRODUCTS,
   RECIPES,
@@ -1801,6 +1800,23 @@ export function receiveRepayment(
   state.loansGiven = state.loansGiven.filter((l) => l.id !== debtId);
   state.money += amount;
   logs.push(`💰 ${fromName} repaid you ${amount} Gold`);
+}
+
+// [MANIFEST 07: Bequest Routing] Called only on the original lender's own
+// client, only for a loan they redirected before it was repaid. No Gold
+// changes here: the redirect target already received it via
+// receiveRepayment on their own client instead. This only stops a debt
+// that is no longer open from sitting in loansGiven forever, which is
+// what would otherwise happen since aid:repaid never reaches this client
+// for a redirected loan.
+export function clearRedirectedLoan(
+  state: GameState,
+  debtId: string,
+  redirectedToName: string,
+  logs: string[],
+) {
+  state.loansGiven = state.loansGiven.filter((l) => l.id !== debtId);
+  logs.push(`🤝 Your bequest was paid out to ${redirectedToName}`);
 }
 
 // [MANIFEST 05: Backing] Escrows a pledge immediately, the same escrow on

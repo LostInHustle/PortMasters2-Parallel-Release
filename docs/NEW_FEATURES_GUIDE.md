@@ -2,7 +2,7 @@
 
 This document is written for a player sitting down to actually play the game, not for a developer reading code. It explains each new feature in plain language, tells you exactly where to look on screen, and walks through a specific set of steps you (and a friend, since most of these need two or more captains in the same harbor) can follow to confirm each one is really working while you play.
 
-Five of these features exist in the game right now. The other thirteen are planned but not yet built, so you will not find them if you go looking, that is expected and not a bug. The status list at the very bottom of this document tells you exactly which is which, so check there first if you are ever unsure whether something should be visible yet.
+Nine of these features exist in the game right now. Eight more are planned but not yet built, and one was dropped, so you will not find any of those nine if you go looking, that is expected and not a bug. The status list at the very bottom of this document tells you exactly which is which, so check there first if you are ever unsure whether something should be visible yet.
 
 ## Before you start: where to actually look
 
@@ -204,6 +204,133 @@ You will need at least three captains for this: one to borrow, one to lend, and 
 
 ---
 
+## Feature 6: Bequest Routing
+
+### What it actually does, in plain words
+
+Backing already made the Settlement screen show every outstanding loan in the harbor, not just the two captains directly involved. Bequest Routing builds on that same visibility from the other end: the moment your own voyage ends in bankruptcy, any loan you had lent out that is still unpaid can be redirected, right there on the Bankruptcy screen, to a different, still active captain in the room, so a repayment that comes in after your voyage is already over lands somewhere it can still be spent instead of sitting on an account with no voyage left to use it in.
+
+This only ever changes who receives the Gold when the loan is eventually repaid. It never changes who is owed the debt, how much they owe, or when it is due; the borrower still repays the same amount, at the same time, exactly as they always would have.
+
+### Where to find it and how to use it
+
+The moment your own voyage ends in bankruptcy, look at the Silent Partner section on your own Bankruptcy screen, the same section that already lists every loan still owed to you. Underneath each one, if there is at least one other captain currently in the harbor to redirect it to, you will see a small "Send repayment to" dropdown, defaulting to "myself." Choose another captain's name to redirect that specific loan; choose "myself" again at any time to undo it.
+
+### What you will actually see on screen
+
+- The dropdown is per loan, not room wide: you can redirect one outstanding loan to one captain and leave another loan pointed at yourself, if you have more than one still open.
+- Redirecting is silent and immediate, no toast, since it is purely a choice you are making about your own account, not something that has happened yet.
+- When the loan is actually repaid, the captain you redirected it to sees their own Gold rise by the repaid amount, with the same kind of quiet log entry an ordinary loan repayment already produces for a lender.
+- Your own Bankruptcy screen, meanwhile, simply stops listing that loan once it closes: you do not receive the Gold, since you chose to send it elsewhere, but you also are not left staring at a debt that looks unpaid forever after it has actually been settled.
+
+### Step by step: how to confirm it is working
+
+You will need three captains for this: one to eventually go bankrupt after lending Gold out, one to borrow it, and a third to receive the redirected repayment.
+
+1. Have the first captain lend Gold to the second through Financial Aid on the Settlement screen, same as any ordinary loan.
+2. Play the first captain (the lender) down to bankruptcy, deliberately if you need to, by letting their Gold run out before wages and maintenance are covered.
+3. On the bankrupt captain's own Bankruptcy screen, find the loan in the Silent Partner section and use its "Send repayment to" dropdown to choose the third captain instead of leaving it on "myself."
+4. Have the borrower repay the loan, either voluntarily on the Settlement screen or by letting it ride to the forced settlement at the end of the voyage's final round.
+5. Confirm the third captain's own Gold rises by the repaid amount, not the bankrupt captain's. Confirm the bankrupt captain's own loan entry disappears from their Silent Partner list once it settles, exactly as it would if they had been repaid directly themselves.
+6. To confirm a redirect can be changed before it matters, repeat the test but switch the dropdown back to "myself" before the loan is repaid. Confirm the Gold lands back on the original bankrupt captain's own account in that case, not the third captain's.
+
+---
+
+## Feature 7: Harbor Watch
+
+### What it actually does, in plain words
+
+Before this, the only tool a host had for dealing with one disruptive captain in room chat was restarting the entire voyage, resetting everyone's progress, not just the one person causing trouble. Harbor Watch gives the host a much smaller, much more targeted tool instead: silencing one specific captain's room chat for the rest of the current voyage, without touching their Gold, cargo, ship, or progress in any way. A muted captain keeps playing normally; they simply cannot post to room chat until the voyage ends or the host lifts the mute.
+
+Direct messages are completely unaffected. A mute only ever applies to the shared room channel everyone in the harbor reads.
+
+### Where to find it and how to use it
+
+Only the host sees this control. On the Harbor Roster, hover the row of any captain other than yourself, and a small speaker icon appears on the right side of their row. Click it to mute them; the icon changes to a crossed out speaker, and clicking it again unmutes them.
+
+### What you will actually see on screen
+
+- A muted captain's row on the Harbor Roster, visible to every captain in the room, not just the host, shows a small red "muted" tag next to their name.
+- If you are the muted captain yourself, your own room chat's message box is replaced with a short note explaining that the host has muted you for the rest of this voyage, in place of the usual text field and send button. Direct messages still work normally.
+- If you try to send a room chat message from a stale tab or an old page state while muted, nothing appears in the chat log for anyone; the attempt is silently rejected.
+- Unmuting immediately restores the normal message box for that captain, no reload required.
+
+### Step by step: how to confirm it is working
+
+You will need at least two captains, one of whom is the host, and it helps to have a third to confirm what an uninvolved captain sees.
+
+1. As the host, hover a non-host captain's row on the Harbor Roster and click the speaker icon to mute them.
+2. Confirm every captain in the room, not just the host, sees the "muted" tag appear on that captain's roster row.
+3. On the muted captain's own screen, confirm their room chat input is replaced with the explanatory note, and confirm they cannot send a room chat message.
+4. Confirm the muted captain can still send and receive direct messages normally, and confirm they can still read the room chat that others post, they simply cannot post to it themselves.
+5. As the host, click the speaker icon again to unmute them. Confirm their message box returns to normal immediately, and confirm the "muted" tag disappears from their roster row for everyone.
+6. To confirm this is host only, try to find a mute control on a non-host captain's own view of the roster. There should not be one, on any row, including their own.
+7. To confirm a mute does not survive a restart, mute a captain, then have the host restart the voyage. Confirm the newly started voyage shows nobody as muted.
+
+---
+
+## Feature 8: Colorblind Safe Palette
+
+### What it actually does, in plain words
+
+Every good in the game, Hemp, Silk, Tea, and everything crafted from them, is normally shown in a fixed color wherever its name appears: your cargo hold, the trade board, barter offers, and so on. Two of those colors, Silk's crimson red and Tea's forest green, sit close enough together on the color wheel that a red green colorblind captain, the most common form of color vision deficiency by a wide margin, can have real trouble telling them apart at a glance. This feature adds a second, complete color mapping for the same set of goods, built specifically so every good stays distinguishable under the common forms of colorblindness, and lets any player switch to it whenever they like.
+
+This only ever changes how your own client draws colors already being shown to you. It never changes game rules, balance, or what any other captain sees; two captains in the same room can even have it toggled differently from each other with no effect on the game itself.
+
+### Where to find it and how to use it
+
+In the game room's header, next to the notification bell, is a small palette icon button. Click it to switch to the colorblind safe palette; click it again to switch back to the default colors. The icon itself changes color to show which mode is currently active.
+
+### What you will actually see on screen
+
+- Every place a good's name is shown in color, your cargo hold, the Port Purchase board, Bartering, Worker Management, Trade Transaction, and any captain's detail popup, switches to the new palette the instant you click the toggle, with no page reload.
+- Your choice is remembered on your own device: it stays on the next time you open the game, and it applies in every room you join, not just the one you were in when you turned it on.
+- Nobody else in the room sees any difference on their own screen when you toggle yours; it is entirely personal to your own client.
+
+### Step by step: how to confirm it is working
+
+A single captain can fully confirm this alone; no second player is required.
+
+1. Open your cargo hold (your own status panel's Hold tab) and note the colors shown for Silk and Tea specifically, the pair this feature exists to fix.
+2. Click the palette icon in the header. Confirm the icon itself changes appearance to show the colorblind safe palette is now active.
+3. Look at Silk and Tea again in the same place. Confirm both colors changed, and confirm the two are now clearly different from each other, not just subtly shifted.
+4. Check a few other places the same goods are shown in color, the Port Purchase board and a Bartering offer are good spots, and confirm the new palette is applied consistently everywhere, not just in the one place you first checked.
+5. Click the palette icon again to switch back. Confirm every place you checked returns to the original colors.
+6. Reload the page (or leave the room and come back) with the colorblind safe palette left on. Confirm it is still on after reloading, since the choice is meant to persist.
+
+---
+
+## Feature 9: Fleet Ticker
+
+### What it actually does, in plain words
+
+The Harbor Roster already shows every captain's live round, phase, Gold, and Reputation at a glance, but on a phone or a narrow browser window it sits at the very bottom of the page, behind the phase panel you are actively playing in, so seeing it means scrolling past everything else first. Fleet Ticker adds a second, much smaller summary of the exact same information, a slim strip pinned directly under the room's header, visible on every screen size without scrolling past anything.
+
+This is not a replacement for the Harbor Roster, which still has the fuller per-captain detail, the mute control, and the click through to each captain's full detail popup. It exists specifically to close the gap the roster's own scrolling position leaves open on a small screen.
+
+### Where to find it and how to use it
+
+It is always there, directly below the room name and code at the top of the screen, above the main three column layout. There is nothing to click or turn on; it is a passive display only.
+
+### What you will actually see on screen
+
+- One small chip per captain in the room, showing their avatar, their name (or "You" for your own), their current phase, and their Gold and Reputation, laid out in a single horizontal row.
+- A captain who has gone bankrupt shows a plain "Bankrupt" label in their chip instead of Gold and Reputation, the same as the Harbor Roster already does.
+- If the room has more captains than fit on screen at once, the strip scrolls horizontally rather than wrapping to a second line, keeping it a single slim row regardless of room size.
+- With only one captain in the room (nobody to compare against yet), the strip does not appear at all, since there is nothing for it to summarize.
+
+### Step by step: how to confirm it is working
+
+You will need at least two captains in the harbor; with only one, the strip is not shown at all, which is itself worth confirming.
+
+1. With a single captain in the room, confirm the strip does not appear anywhere under the header.
+2. Have a second captain join. Confirm the strip now appears, showing a chip for each captain, including one labeled "You" on your own screen and showing that same captain by name on the other captain's screen.
+3. Have one captain buy something or complete a trade. Confirm their chip's Gold and phase update for everyone watching, without anyone needing to refresh or click anything.
+4. Narrow your browser window (or check on an actual phone) and confirm the strip stays visible directly under the header the whole time, never disappearing behind the phase panel the way the fuller roster does on a narrow screen.
+5. Let one captain go bankrupt. Confirm their chip switches to the plain "Bankrupt" label instead of showing Gold and Reputation, matching what the Harbor Roster already shows for the same captain.
+
+---
+
 ## Also new: Direct Barter Offers
 
 This one is not part of the numbered eighteen, it is a small addition to the Bartering system the game already had. It is worth knowing about anyway, since it fixes a real, easy to run into problem: the original Bartering board is open to the whole harbor, so if you and a friend agree in chat to make a specific trade, there was nothing stopping a third captain from seeing that same offer on the board and accepting it themselves, a moment before your friend got to it.
@@ -234,19 +361,23 @@ You will need three captains for the most convincing version of this test, thoug
 
 ## Quick reference: what to watch for, side by side
 
-| Feature           | Who sees it                                                                                  | Where it shows up                                                                                                                                                                                                                               | How often it can happen                                                                                                                                    |
-| ----------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The Harbor Pulse  | Everyone, but silently                                                                       | Only visible as a subtle price shift on the Port Purchase board, no toast or chat message at all                                                                                                                                                | Every round from Round 2 onward, recalculated fresh each time                                                                                              |
-| Word on the Docks | Everyone, but the winner sees something different from everyone else                         | A toast for every captain (green and Gold plus 25 for the winner, a plainer one naming the winner for everyone else), plus one shared chat message for the whole room                                                                           | Once per voyage, whoever gets there first                                                                                                                  |
-| Tidewatch Alerts  | Everyone, identically                                                                        | A toast for every captain in the room, plus one shared chat message, plus one extra card on the Port Purchase board from then on                                                                                                                | Once per voyage, the moment the room's combined Reputation crosses 500                                                                                     |
-| Convoy Ventures   | Only contributors get a personal toast, but everyone sees the shared chat message either way | A progress bar per open venture in the Dues tab of your captain's rail, a toast on fill, failure, or cancellation for contributors, a shared chat message for the whole room, and a locked out post form once the voyage's one venture is spent | Only one venture can ever fill per voyage, room wide; once that happens every other open venture is cancelled and posting is disabled until a fresh voyage |
-| Backing           | Every captain sees every outstanding loan, not just the two directly involved                | A "Loans You Could Back" section on the Settlement screen, and each backer's own Gold and Reputation totals updating silently the moment a backed loan settles                                                                                  | Any time a loan is outstanding, until it is repaid or backed by someone; one backer per loan, and it clears automatically at the end of every voyage       |
+| Feature                 | Who sees it                                                                                  | Where it shows up                                                                                                                                                                                                                               | How often it can happen                                                                                                                                    |
+| ----------------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The Harbor Pulse        | Everyone, but silently                                                                       | Only visible as a subtle price shift on the Port Purchase board, no toast or chat message at all                                                                                                                                                | Every round from Round 2 onward, recalculated fresh each time                                                                                              |
+| Word on the Docks       | Everyone, but the winner sees something different from everyone else                         | A toast for every captain (green and Gold plus 25 for the winner, a plainer one naming the winner for everyone else), plus one shared chat message for the whole room                                                                           | Once per voyage, whoever gets there first                                                                                                                  |
+| Tidewatch Alerts        | Everyone, identically                                                                        | A toast for every captain in the room, plus one shared chat message, plus one extra card on the Port Purchase board from then on                                                                                                                | Once per voyage, the moment the room's combined Reputation crosses 500                                                                                     |
+| Convoy Ventures         | Only contributors get a personal toast, but everyone sees the shared chat message either way | A progress bar per open venture in the Dues tab of your captain's rail, a toast on fill, failure, or cancellation for contributors, a shared chat message for the whole room, and a locked out post form once the voyage's one venture is spent | Only one venture can ever fill per voyage, room wide; once that happens every other open venture is cancelled and posting is disabled until a fresh voyage |
+| Backing                 | Every captain sees every outstanding loan, not just the two directly involved                | A "Loans You Could Back" section on the Settlement screen, and each backer's own Gold and Reputation totals updating silently the moment a backed loan settles                                                                                  | Any time a loan is outstanding, until it is repaid or backed by someone; one backer per loan, and it clears automatically at the end of every voyage       |
+| Bequest Routing         | Only the bankrupt lender chooses it; only the redirect target sees the eventual Gold         | A "Send repayment to" dropdown per loan on the Bankruptcy screen's Silent Partner section                                                                                                                                                       | Any time you are bankrupt with an outstanding loan still owed to you; changeable at any point before that loan is actually repaid                          |
+| Harbor Watch            | Everyone sees the "muted" tag; only the muted captain sees the disabled chat input           | A speaker icon on the Harbor Roster (host only), a "muted" tag on the roster row, and a disabled chat input for the muted captain                                                                                                               | Toggled by the host at any time; clears automatically when the host restarts the voyage                                                                    |
+| Colorblind Safe Palette | Entirely personal; nobody else in the room sees your choice                                  | A palette icon in the game room header, and every place a good's name is shown in color everywhere else                                                                                                                                         | Toggled at any time, remembered on your own device across rooms and sessions                                                                               |
+| Fleet Ticker            | Everyone in the room, identically                                                            | A slim strip directly under the header, always visible on every screen size                                                                                                                                                                     | Continuously, the moment there are at least two captains in the room                                                                                       |
 
 ---
 
 ## Status: what exists in the game right now versus what is still planned
 
-This document only covers the five features that actually exist in the game as of this writing. Twelve more are planned and one has been dropped, so please do not go looking for them; if you do not see something described here, it almost certainly just has not been built yet rather than being broken.
+This document now covers the nine features that actually exist in the game as of this writing. Eight more are planned and one has been dropped, so please do not go looking for those eight, if you do not see something described here, it almost certainly just has not been built yet rather than being broken.
 
 The design source for all eighteen, with what each one does and why, now lives in [HARBOR_MANIFEST.md](HARBOR_MANIFEST.md) alongside this file. Where the two disagree, that file is right about intent and this one is right about what is actually playable.
 
@@ -257,24 +388,24 @@ The design source for all eighteen, with what each one does and why, now lives i
 3. Tidewatch Alerts
 4. Convoy Ventures
 5. Backing
+6. Bequest Routing
+7. Harbor Watch
+8. Colorblind Safe Palette
+9. Fleet Ticker
 
 **Planned, not yet built:**
 
-6. Partial Sight
-7. Bequest Routing
-8. Trading Houses
-9. House Rally
-10. Ages of the Ledger
-11. Captain's Rival
-12. Voyage Chronicle
-13. Ledger Integrity Pass
-14. Harbor Watch
-15. Colorblind Safe Palette
-16. Quick Start Match
-17. Fleet Ticker
+10. Partial Sight
+11. Trading Houses
+12. House Rally
+13. Ages of the Ledger
+14. Captain's Rival
+15. Voyage Chronicle
+16. Ledger Integrity Pass
+17. Quick Start Match
 
 **Dropped, not pending:** Bilingual Harbor, which was entry 15 in the original manifest. English and Chinese localization was built in full and then removed at the project owner's request, so it is not outstanding work and should not be picked back up without a fresh decision.
 
-The manifest also recommends an order that is not this numeric one, since it sequences by dependency instead. Of what remains, Fleet Ticker, Colorblind Safe Palette, Harbor Watch and Bequest Routing are the four with no blockers at all.
+The manifest also recommends an order that is not this numeric one, since it sequences by dependency instead. Of what remains, Ledger Integrity Pass, Quick Start Match, and Voyage Chronicle are the three with no blockers at all; the other five each need either a dependency they build on or a design decision (a balance session, a banding numbers pass, a rollover cadence, an eligibility rule) answered first, all called out in the manifest's own open questions section.
 
 As each of the remaining twelve gets built, this document should grow a matching section for it, written the same way: what it does in plain words, exactly what you will see on screen, and a step by step way to confirm it yourself while actually playing.

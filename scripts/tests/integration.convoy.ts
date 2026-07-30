@@ -309,6 +309,11 @@ test("a solo funded fill is now impossible end to end: the per contributor cap a
     0,
     CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE,
   );
+  assertEqual(
+    acceptedA,
+    capA,
+    "A's own contribution is held exactly at the per-contributor cap, not the full target",
+  );
   const contributions: VentureContributions = {
     a: { name: "A", amount: acceptedA },
     b: { name: "B", amount: acceptedB },
