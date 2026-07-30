@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { COLORS, PRODUCTS, RESOURCES } from "@/lib/game/constants";
+import { PRODUCTS, RESOURCES } from "@/lib/game/constants";
 import {
   completePhase1,
   explainCardPrice,
@@ -11,6 +11,7 @@ import {
 } from "@/lib/game/engine";
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
+import { itemColorResolver } from "@/lib/use-color-preference";
 import { Anchor } from "lucide-react";
 import type { PublicUser } from "@/lib/api";
 import { Term } from "../../Term";
@@ -74,7 +75,7 @@ export function Purchase({
   // plain COLORS lookup when a caller hasn't wired useColorPreference in.
   colorFor?: (item: string) => string | undefined;
 }) {
-  const resolveColor = colorFor ?? ((item: string) => COLORS[item]);
+  const resolveColor = itemColorResolver(colorFor);
   return (
     <div>
       <div className="flex items-center justify-between mb-4">

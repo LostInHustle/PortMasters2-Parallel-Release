@@ -9,6 +9,18 @@ import { COLORS, COLORS_COLORBLIND_SAFE } from "@/lib/game/constants";
 // new trust boundary, since this never changes what any other captain sees.
 const COLORBLIND_SAFE_KEY = "portmasters_colorblind_safe";
 
+// Every panel that colours a good's name takes `colorFor` as an optional
+// prop, so a caller that has not wired the preference through still renders
+// correctly. Each one used to inline the same fallback expression, which put
+// six copies of "the default palette is COLORS" across the components and
+// made each of them import COLORS purely for that. This keeps the default in
+// one place, next to the palettes it chooses between.
+export function itemColorResolver(
+  colorFor?: (item: string) => string | undefined,
+): (item: string) => string | undefined {
+  return colorFor ?? ((item: string) => COLORS[item]);
+}
+
 export function useColorPreference() {
   const [colorblindSafe, setColorblindSafeState] = useState(false);
 

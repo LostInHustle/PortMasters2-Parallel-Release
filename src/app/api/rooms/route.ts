@@ -2,7 +2,7 @@
 // POST /api/rooms: create a room
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { db } from "@/lib/db";
+import { db, PUBLIC_USER_SELECT } from "@/lib/db";
 import { getCurrentUser, generateRoomCode, publicUser } from "@/lib/api-auth";
 import { normalizeRoomName } from "@/lib/utils";
 import { normalizeDifficulty } from "@/lib/game/difficulty";
@@ -18,22 +18,12 @@ export async function GET() {
       members: {
         include: {
           user: {
-            select: {
-              id: true,
-              username: true,
-              displayName: true,
-              avatarHue: true,
-            },
+            select: PUBLIC_USER_SELECT,
           },
         },
       },
       host: {
-        select: {
-          id: true,
-          username: true,
-          displayName: true,
-          avatarHue: true,
-        },
+        select: PUBLIC_USER_SELECT,
       },
     },
     orderBy: { createdAt: "desc" },
@@ -104,22 +94,12 @@ export async function POST(req: NextRequest) {
       members: {
         include: {
           user: {
-            select: {
-              id: true,
-              username: true,
-              displayName: true,
-              avatarHue: true,
-            },
+            select: PUBLIC_USER_SELECT,
           },
         },
       },
       host: {
-        select: {
-          id: true,
-          username: true,
-          displayName: true,
-          avatarHue: true,
-        },
+        select: PUBLIC_USER_SELECT,
       },
     },
   });

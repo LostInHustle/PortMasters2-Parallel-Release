@@ -1,6 +1,6 @@
 // GET /api/messages/dm/[otherUserId]: direct message history with another user
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { db, PUBLIC_USER_SELECT } from "@/lib/db";
 import { getCurrentUser, publicUser } from "@/lib/api-auth";
 
 export async function GET(
@@ -18,7 +18,7 @@ export async function GET(
 
   const other = await db.user.findUnique({
     where: { id: otherUserId },
-    select: { id: true, username: true, displayName: true, avatarHue: true },
+    select: PUBLIC_USER_SELECT,
   });
   if (!other)
     return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -34,12 +34,7 @@ export async function GET(
     take: 200,
     include: {
       sender: {
-        select: {
-          id: true,
-          username: true,
-          displayName: true,
-          avatarHue: true,
-        },
+        select: PUBLIC_USER_SELECT,
       },
     },
   });

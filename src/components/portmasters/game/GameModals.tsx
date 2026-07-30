@@ -16,7 +16,6 @@ import {
   guideText,
   tipsText,
   tutorialSteps,
-  COLORS,
 } from "@/lib/game/constants";
 import type { Difficulty } from "@/lib/game/difficulty";
 import {
@@ -30,6 +29,7 @@ import type { PlayerDetailData } from "@/lib/use-player-detail";
 import type { PublicUser } from "@/lib/api";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import { cn } from "@/lib/utils";
+import { itemColorResolver } from "@/lib/use-color-preference";
 import { Avatar, Pill, ItemIcon } from "../shared";
 import { CaptainLegacyCard } from "../CaptainLegacyCard";
 import {
@@ -461,7 +461,7 @@ export function PlayerDetailModal({
   // plain COLORS lookup when a caller hasn't wired useColorPreference in.
   colorFor?: (item: string) => string | undefined;
 }) {
-  const resolveColor = colorFor ?? ((item: string) => COLORS[item]);
+  const resolveColor = itemColorResolver(colorFor);
   // Only artisans this voyage has actually unlocked, and each group reports
   // how many are trained. Difficulty is a room property so the viewer's own
   // tier is authoritative for everyone; the round comes from the subject's own

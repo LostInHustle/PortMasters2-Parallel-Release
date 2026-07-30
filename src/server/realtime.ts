@@ -22,7 +22,7 @@
 // =====================================================================
 import type { Server as HttpServer } from "http";
 import { Server } from "socket.io";
-import { db } from "../lib/db";
+import { db, PUBLIC_USER_SELECT } from "../lib/db";
 import { leaveRoomForUser, roomMemberIds } from "../lib/rooms";
 import {
   levelForRenownXP,
@@ -73,6 +73,26 @@ type SocketState = {
   user: PublicUser;
   roomId: string | null;
   authed: boolean;
+};
+
+// One captain's last reported status, as cached per room and rebroadcast on
+// the "game:status" channel. Mirrors GameStatusUpdate in src/lib/realtime.ts
+// rather than importing it, for the same reason `publicUser` is duplicated
+// below: that module is a client entry point that pulls in socket.io-client,
+// which has no business inside this Node server. Spelled out here instead of
+// left as `any`, so the several readers that reach for `.phase` or
+// `.reputation` are checked rather than trusted.
+type CaptainStatus = {
+  roomId: string;
+  user: PublicUser;
+  round: number;
+  phase: number | string;
+  phaseLabel: string;
+  gold: number;
+  reputation: number;
+  shipLevel: number;
+  gameOver: boolean;
+  at: number;
 };
 
 export function attachRealtime(httpServer: HttpServer): Server {
@@ -173,9 +193,9 @@ export function attachRealtime(httpServer: HttpServer): Server {
 
   // Last-known game status per (room, user) so late joiners can hydrate the
   // roster immediately instead of seeing "loading…" until the next broadcast.
-  const roomStatuses = new Map<string, Map<string, any>>();
+  const roomStatuses = new Map<string, Map<string, CaptainStatus>>();
 
-  function rememberStatus(roomId: string, payload: any) {
+  function rememberStatus(roomId: string, payload: CaptainStatus) {
     let m = roomStatuses.get(roomId);
     if (!m) {
       m = new Map();
@@ -456,8 +476,15 @@ export function attachRealtime(httpServer: HttpServer): Server {
     }[] = [];
     for (const id of memberIds) {
       const st = statuses.get(id);
+      // A member with no cached status at all has certainly not finished, so
+      // they are "still out at sea" exactly like one mid voyage. That was
+      // already the behaviour, reached indirectly: a missing status produced
+      // an empty phase string, which matched neither terminal phase and so
+      // returned below. Saying it outright keeps the invariant visible to the
+      // reader, and lets the compiler see that `st` is present past this line
+      // rather than leaving the field reads below to be taken on trust.
       const phase = st ? String(st.phase) : "";
-      if (phase !== "endgame" && phase !== "bankruptcy") return; // someone is still out at sea
+      if (!st || (phase !== "endgame" && phase !== "bankruptcy")) return;
       finished.push({
         userId: id,
         user: st.user,
@@ -1273,24 +1300,6 @@ export function attachRealtime(httpServer: HttpServer): Server {
       broadcastPresence();
     });
 
-    socket.on("room:leave", (payload: { roomId?: string }) => {
-      const s = requireAuth();
-      if (!s) return;
-      const roomId = payload?.roomId ?? s.roomId;
-      if (!roomId) return;
-      socket.leave(`room:${roomId}`);
-      if (s.roomId === roomId) s.roomId = null;
-      forgetStatus(roomId, s.userId);
-      removeUserBarterOffers(roomId, s.userId);
-      removeUserAidRequest(roomId, s.userId);
-      io.to(`room:${roomId}`).emit("room:system", {
-        roomId,
-        content: `${s.user.displayName} left the harbor`,
-      });
-      emitRoomMembers(roomId);
-      broadcastPresence();
-    });
-
     socket.on(
       "game:status",
       async (payload: {
@@ -1822,7 +1831,6 @@ export function attachRealtime(httpServer: HttpServer): Server {
       "barter:post",
       async (payload: {
         roomId?: string;
-        tempId?: string;
         offerItem?: string;
         offerAmount?: number;
         requestItem?: string;
@@ -1848,7 +1856,6 @@ export function attachRealtime(httpServer: HttpServer): Server {
         ) {
           socket.emit("barter:error", {
             roomId,
-            tempId: payload?.tempId,
             error: "Invalid barter offer",
           });
           return;
@@ -1859,7 +1866,6 @@ export function attachRealtime(httpServer: HttpServer): Server {
           if (payload.targetUserId === s.userId) {
             socket.emit("barter:error", {
               roomId,
-              tempId: payload?.tempId,
               error: "You can't direct an offer to yourself.",
             });
             return;
@@ -1873,7 +1879,6 @@ export function attachRealtime(httpServer: HttpServer): Server {
           if (!targetMember) {
             socket.emit("barter:error", {
               roomId,
-              tempId: payload?.tempId,
               error: "That captain isn't in this harbor.",
             });
             return;
@@ -1892,11 +1897,12 @@ export function attachRealtime(httpServer: HttpServer): Server {
           ...(targetUserId ? { targetUserId, targetName } : {}),
         };
         roomBarterOffers.set(roomId, [...barterList(roomId), offer]);
-        socket.emit("barter:posted", {
-          roomId,
-          tempId: payload?.tempId,
-          offer,
-        });
+        // No separate ack to the poster: broadcastBarter below already sends
+        // the whole board, including this offer, to every captain in the room
+        // and the poster with it. There used to be a "barter:posted" emit here
+        // carrying a client supplied tempId, the usual optimistic insert
+        // handshake, but the client half was never built: nothing ever sent a
+        // tempId and nothing ever listened for the ack.
         broadcastBarter(roomId);
       },
     );
@@ -2405,12 +2411,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
           data: { roomId, senderId: s.userId, recipientId: null, content },
           include: {
             sender: {
-              select: {
-                id: true,
-                username: true,
-                displayName: true,
-                avatarHue: true,
-              },
+              select: PUBLIC_USER_SELECT,
             },
           },
         });
@@ -2440,20 +2441,10 @@ export function attachRealtime(httpServer: HttpServer): Server {
           data: { roomId: null, senderId: s.userId, recipientId, content },
           include: {
             sender: {
-              select: {
-                id: true,
-                username: true,
-                displayName: true,
-                avatarHue: true,
-              },
+              select: PUBLIC_USER_SELECT,
             },
             recipient: {
-              select: {
-                id: true,
-                username: true,
-                displayName: true,
-                avatarHue: true,
-              },
+              select: PUBLIC_USER_SELECT,
             },
           },
         });

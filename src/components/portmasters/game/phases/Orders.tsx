@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { QuantityInput } from "@/components/ui/quantity-input";
 import {
   BROKERS_FAVOR_UNLOCK_LEVEL,
-  COLORS,
   PRODUCTS,
   RESOURCES,
 } from "@/lib/game/constants";
@@ -21,6 +20,7 @@ import {
 } from "@/lib/game/engine";
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
+import { itemColorResolver } from "@/lib/use-color-preference";
 import { Coins } from "lucide-react";
 import type { PublicUser } from "@/lib/api";
 import { Term } from "../../Term";
@@ -43,7 +43,7 @@ export function Orders({
   // plain COLORS lookup when a caller hasn't wired useColorPreference in.
   colorFor?: (item: string) => string | undefined;
 }) {
-  const resolveColor = colorFor ?? ((item: string) => COLORS[item]);
+  const resolveColor = itemColorResolver(colorFor);
   const [favorOpen, setFavorOpen] = useState(false);
   const [favorItem, setFavorItem] = useState<string | null>(null);
   const [favorQty, setFavorQty] = useState(1);

@@ -23,7 +23,7 @@
 // up to a hundred rows on every single page load for a caller that throws
 // them away.
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { db, PUBLIC_USER_SELECT } from "@/lib/db";
 import { getCurrentUser, publicUser } from "@/lib/api-auth";
 
 export async function GET() {
@@ -47,22 +47,12 @@ export async function GET() {
       members: {
         include: {
           user: {
-            select: {
-              id: true,
-              username: true,
-              displayName: true,
-              avatarHue: true,
-            },
+            select: PUBLIC_USER_SELECT,
           },
         },
       },
       host: {
-        select: {
-          id: true,
-          username: true,
-          displayName: true,
-          avatarHue: true,
-        },
+        select: PUBLIC_USER_SELECT,
       },
     },
   });

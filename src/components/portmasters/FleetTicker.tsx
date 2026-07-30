@@ -1,14 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import type { Socket } from "socket.io-client";
-import type { GameStatusUpdate, RoomMemberLive } from "@/lib/realtime";
 import type { PublicUser } from "@/lib/api";
+import { useRoomRoster } from "@/lib/use-room-roster";
 import { Avatar } from "./shared";
 import { cn } from "@/lib/utils";
 import { Coins, Trophy, SkullIcon } from "lucide-react";
-
-type StatusMap = Record<string, GameStatusUpdate>;
 
 /**
  * [MANIFEST 18: Fleet Ticker] A glance at the whole harbor without opening
@@ -18,10 +15,9 @@ type StatusMap = Record<string, GameStatusUpdate>;
  * to the very bottom of the page behind the phase panel and the roster's
  * own scroll. This strip sits directly under the header instead, full
  * width, on every screen size, so the room's state is visible without
- * scrolling past anything. It self subscribes to the same room:members and
- * game:status broadcasts MembersPanel already does, the same self
- * contained pattern, rather than threading a second copy of that state
- * down from GameRoom.
+ * scrolling past anything. The live roster comes from useRoomRoster, the
+ * same hook MembersPanel uses, rather than threading a second copy of that
+ * state down from GameRoom.
  */
 export function FleetTicker({
   socket,
@@ -34,44 +30,7 @@ export function FleetTicker({
   me: PublicUser;
   initialMembers: (PublicUser & { joinedAt?: string })[];
 }) {
-  const [members, setMembers] = useState<RoomMemberLive[]>(initialMembers);
-  const [statuses, setStatuses] = useState<StatusMap>({});
-
-  useEffect(() => {
-    if (!socket) return;
-
-    const onMembers = (data: { roomId: string; members: RoomMemberLive[] }) => {
-      if (data.roomId !== roomId) return;
-      const seen = new Set<string>();
-      const filtered = data.members.filter((m) =>
-        seen.has(m.id) ? false : (seen.add(m.id), true),
-      );
-      setMembers(filtered);
-      const memberIds = new Set(filtered.map((m) => m.id));
-      setStatuses((prev) => {
-        let changed = false;
-        const next: StatusMap = {};
-        for (const [id, st] of Object.entries(prev)) {
-          if (memberIds.has(id)) {
-            next[id] = st;
-          } else {
-            changed = true;
-          }
-        }
-        return changed ? next : prev;
-      });
-    };
-    const onStatus = (u: GameStatusUpdate) => {
-      if (u.roomId !== roomId) return;
-      setStatuses((prev) => ({ ...prev, [u.user.id]: u }));
-    };
-    socket.on("room:members", onMembers);
-    socket.on("game:status", onStatus);
-    return () => {
-      socket.off("room:members", onMembers);
-      socket.off("game:status", onStatus);
-    };
-  }, [socket, roomId]);
+  const { members, statuses } = useRoomRoster(socket, roomId, initialMembers);
 
   // Me first, same ordering rule MembersPanel already uses, so a captain
   // finds their own chip in the same spot in both places.

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { QuantityInput } from "@/components/ui/quantity-input";
-import { BARTER_ITEMS, COLORS, ICONS } from "@/lib/game/constants";
+import { BARTER_ITEMS, ICONS } from "@/lib/game/constants";
 import {
   completeBarterPhase,
   getOwnedAmount,
@@ -12,6 +12,7 @@ import {
 } from "@/lib/game/engine";
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
+import { itemColorResolver } from "@/lib/use-color-preference";
 import { Handshake, X } from "lucide-react";
 import type { PublicUser } from "@/lib/api";
 import type { BarterOffer } from "@/lib/use-barter";
@@ -38,7 +39,7 @@ export function BarterPhase({
   // plain COLORS lookup when a caller hasn't wired useColorPreference in.
   colorFor?: (item: string) => string | undefined;
 }) {
-  const resolveColor = colorFor ?? ((item: string) => COLORS[item]);
+  const resolveColor = itemColorResolver(colorFor);
   const items = BARTER_ITEMS as readonly string[];
   const [offerItem, setOfferItem] = useState<string>("Hemp");
   const [offerAmount, setOfferAmount] = useState(1);

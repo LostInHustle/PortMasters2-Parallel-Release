@@ -7,7 +7,6 @@ import {
   CONVOY_VENTURE_MAX_TARGET,
   CONVOY_VENTURE_MIN_ROUNDS_AHEAD,
   CONVOY_VENTURE_MIN_TARGET,
-  COLORS,
 } from "@/lib/game/constants";
 import { getHireCost } from "@/lib/game/engine";
 import type { GameState } from "@/lib/game/types";
@@ -19,6 +18,7 @@ import {
 } from "@/lib/game/pools";
 import type { ConvoyVenture } from "@/lib/use-convoy";
 import { cn } from "@/lib/utils";
+import { itemColorResolver } from "@/lib/use-color-preference";
 import { Term } from "../Term";
 import { priceAwareTermContent } from "./PriceTooltips";
 import { GameLogPanel } from "./GameLogPanel";
@@ -79,7 +79,7 @@ export function GameStatusPanel({
   // used before the palette became player selectable.
   colorFor?: (item: string) => string | undefined;
 }) {
-  const resolveColor = colorFor ?? ((item: string) => COLORS[item]);
+  const resolveColor = itemColorResolver(colorFor);
   const discount = game.shipLevel * 5;
   const showObligations = ![0, 5, "endgame", "bankruptcy"].includes(game.phase);
 
