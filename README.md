@@ -5,9 +5,14 @@ A browser based multiplayer trading game set on the maritime Silk Road. Captains
 ## Quick start
 
 ```bash
-npm install      # installs and generates the Prisma client
-npm run db:push  # creates the SQLite tables
-npm run dev      # http://localhost:2232
+# Install dependencies, and generate the Prisma client
+npm install
+
+# Create the SQLite tables
+npm run db:push
+
+# Serve everything at http://localhost:2232
+npm run dev
 ```
 
 Register a captain and look around. To try the multiplayer side, open a second browser or a private window rather than a second tab, since tabs in the same browser share one cookie jar and one session.
@@ -146,14 +151,19 @@ Then run `npm run db:push` once. It is tempting to skip and assume the database 
 ### Tests
 
 ```bash
-npm test              # all six suites
-npm run test:unit     # pure game rules
-npm run test:effects  # audit that every boon and module effect actually fires
-npm run test:integration   # a full voyage end to end
-npm run test:harbor        # harbor pulse, word on the docks, tidewatch
-npm run test:convoy        # convoy venture math and its exploit guards
-npm run test:backing       # backing resolution, escrow and payout
+npm test
 ```
+
+That runs all six suites in sequence. Each also runs on its own, as `npm run <suite>`:
+
+| Suite              | What it covers                                                                                                       |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| `test:unit`        | The pure game rules                                                                                                  |
+| `test:effects`     | Every boon and every ship module, audited against the live data rather than a hand copied assumption of what they do |
+| `test:integration` | A full voyage, end to end                                                                                            |
+| `test:harbor`      | Harbor Pulse, Word on the Docks, Tidewatch Alerts                                                                    |
+| `test:convoy`      | Convoy venture math and its exploit guards                                                                           |
+| `test:backing`     | Backing resolution, escrow and payout                                                                                |
 
 They are plain `tsx` scripts sharing a small harness, with no test runner, no database and no live server. Everything they touch is pure logic that imports neither Prisma nor React, which is exactly why the Gold math for convoy and backing was pulled out of the socket closures in `src/server/realtime.ts` and into their own modules: a regression there now shows up in a fast deterministic test instead of only in a live room.
 
@@ -172,7 +182,7 @@ On Windows, `start` sets `NODE_ENV=production` inline, which is a Unix shell con
 
 One variable matters locally, and it is already committed in `.env`:
 
-```
+```ini
 DATABASE_URL=file:./prisma/dev.db
 ```
 
@@ -208,7 +218,9 @@ To skip volumes entirely, `prisma/schema.prisma` can swap its provider from `sql
 
 ```bash
 rm -rf node_modules package-lock.json && npm install
-grep -c '"node_modules/lightningcss-' package-lock.json   # expect 11, not 1
+
+# Expect 11, one per supported platform, not 1
+grep -c '"node_modules/lightningcss-' package-lock.json
 ```
 
 **`EADDRINUSE` on 2232.** Usually a previous `npm run dev` that never shut down. `lsof -i :2232` will find it.
