@@ -285,6 +285,9 @@ export function attachRealtime(httpServer: HttpServer): Server {
         roomStatuses.delete(roomId);
         roomBarterOffers.delete(roomId);
         roomAidRequests.delete(roomId);
+        // Straight to the Map, deliberately not through clearLoans: the room
+        // row is already gone, so the Loan rows went with it on cascade, and
+        // there is nobody left in the channel to broadcast an empty ledger to.
         roomOutstandingLoans.delete(roomId);
         roomPulseTallies.delete(roomId);
         roomDocksWinners.delete(roomId);
@@ -937,6 +940,22 @@ export function attachRealtime(httpServer: HttpServer): Server {
     redirectToUserId?: string;
     redirectToName?: string;
   };
+  // The in-process copy stays the read path, so every handler below reads a
+  // loan synchronously exactly as it always did. What changed is that the
+  // Map is no longer the only copy: every mutation is written through to the
+  // Loan table, and the Map is rebuilt from that table when the process
+  // starts (see hydrateLoans below).
+  //
+  // Why a cache and not a straight database read: this file is a single
+  // process with no horizontal scaling, the same assumption every other
+  // per-room structure here already makes, so the Map cannot go stale
+  // against another writer. Reading through it keeps the socket handlers
+  // synchronous, which matters because a loan is read in the middle of
+  // settlement paths that already have their own ordering to get right.
+  //
+  // Why persist at all, when the mute list and the price tallies do not:
+  // a backer's pledge leaves their purse the moment it is accepted. Losing a
+  // mute costs nothing. Losing a loan destroys Gold a captain actually paid.
   const roomOutstandingLoans = new Map<string, LoanRecord[]>();
 
   function loanList(roomId: string): LoanRecord[] {
@@ -950,9 +969,73 @@ export function attachRealtime(httpServer: HttpServer): Server {
     });
   }
 
+  // Every write below is deliberately not awaited by its caller. The Map is
+  // already correct the instant the caller continues, so awaiting would only
+  // delay a socket handler on a write nothing reads back. A failure is
+  // logged rather than thrown for the same reason: losing durability for one
+  // loan must never take down the settlement that was mid flight.
+  function persistLoanWrite(what: string, work: Promise<unknown>) {
+    void work.catch((err) => {
+      console.error(`[loans] failed to persist ${what}:`, err);
+    });
+  }
+
+  // The voyage epoch is read inside the write rather than passed in, so the
+  // caller stays synchronous and gains no database round trip on a path that
+  // is already mid settlement. The Map is correct before this resolves.
+  function rememberLoan(roomId: string, loan: LoanRecord) {
+    roomOutstandingLoans.set(roomId, [...loanList(roomId), loan]);
+    persistLoanWrite(
+      `loan ${loan.debtId}`,
+      (async () => {
+        const room = await db.room.findUnique({
+          where: { id: roomId },
+          select: { voyageEpoch: true },
+        });
+        if (!room) return;
+        await db.loan.create({
+          data: {
+            id: loan.debtId,
+            roomId,
+            voyageEpoch: room.voyageEpoch,
+            borrowerId: loan.borrowerId,
+            borrowerName: loan.borrowerName,
+            lenderId: loan.lenderId,
+            lenderName: loan.lenderName,
+            amount: loan.amount,
+            round: loan.round,
+          },
+        });
+      })(),
+    );
+  }
+
+  // Called whenever a backer or a redirect is attached to a loan already on
+  // the ledger. The Map holds the same object the handler just mutated, so
+  // only the database needs catching up.
+  function updateLoan(loan: LoanRecord) {
+    persistLoanWrite(
+      `loan ${loan.debtId}`,
+      db.loan.update({
+        where: { id: loan.debtId },
+        data: {
+          backerId: loan.backerId ?? null,
+          backerName: loan.backerName ?? null,
+          backedAmount: loan.backedAmount ?? null,
+          redirectToUserId: loan.redirectToUserId ?? null,
+          redirectToName: loan.redirectToName ?? null,
+        },
+      }),
+    );
+  }
+
   function clearLoans(roomId: string) {
     if (!roomOutstandingLoans.has(roomId)) return;
     roomOutstandingLoans.delete(roomId);
+    persistLoanWrite(
+      `clear for room ${roomId}`,
+      db.loan.deleteMany({ where: { roomId } }),
+    );
     broadcastLoans(roomId);
   }
 
@@ -962,7 +1045,67 @@ export function attachRealtime(httpServer: HttpServer): Server {
     const next = list.filter((l) => l.debtId !== debtId);
     if (next.length) roomOutstandingLoans.set(roomId, next);
     else roomOutstandingLoans.delete(roomId);
+    persistLoanWrite(
+      `settlement of ${debtId}`,
+      db.loan.deleteMany({ where: { id: debtId } }),
+    );
   }
+
+  // Rebuilds the ledger when the process starts. Without this the table
+  // would be write only and the durability it exists for would never arrive:
+  // a restart mid voyage would still forget every loan, every pledge and
+  // every redirect. Loans whose room has moved on to a later voyage are
+  // dropped rather than restored, the same scoping ConvoyVenture uses, so a
+  // restarted voyage never inherits the last one's debts.
+  async function hydrateLoans() {
+    try {
+      const rows = await db.loan.findMany({
+        include: { room: { select: { voyageEpoch: true } } },
+      });
+      let restored = 0;
+      const stale: string[] = [];
+      for (const row of rows) {
+        if (row.voyageEpoch !== row.room.voyageEpoch) {
+          stale.push(row.id);
+          continue;
+        }
+        const record: LoanRecord = {
+          debtId: row.id,
+          borrowerId: row.borrowerId,
+          borrowerName: row.borrowerName,
+          lenderId: row.lenderId,
+          lenderName: row.lenderName,
+          amount: row.amount,
+          round: row.round,
+          ...(row.backerId ? { backerId: row.backerId } : {}),
+          ...(row.backerName ? { backerName: row.backerName } : {}),
+          ...(row.backedAmount !== null
+            ? { backedAmount: row.backedAmount }
+            : {}),
+          ...(row.redirectToUserId
+            ? { redirectToUserId: row.redirectToUserId }
+            : {}),
+          ...(row.redirectToName ? { redirectToName: row.redirectToName } : {}),
+        };
+        roomOutstandingLoans.set(row.roomId, [
+          ...(roomOutstandingLoans.get(row.roomId) ?? []),
+          record,
+        ]);
+        restored++;
+      }
+      if (stale.length) {
+        await db.loan.deleteMany({ where: { id: { in: stale } } });
+      }
+      if (restored || stale.length) {
+        console.log(
+          `[loans] restored ${restored} outstanding loan(s), dropped ${stale.length} from an earlier voyage`,
+        );
+      }
+    } catch (err) {
+      console.error("[loans] failed to restore the ledger on startup:", err);
+    }
+  }
+  void hydrateLoans();
 
   // ---------- The Harbor Pulse ----------
   // [MANIFEST 01] Every client already knows what it bought this round; this
@@ -2173,18 +2316,15 @@ export function attachRealtime(httpServer: HttpServer): Server {
         // [MANIFEST 05: Backing] The request just became a real debt; from
         // here it's tracked room wide until it's repaid, so a third captain
         // can back it (see backing:offer below).
-        roomOutstandingLoans.set(roomId, [
-          ...loanList(roomId),
-          {
-            debtId: request.id,
-            borrowerId: request.fromUserId,
-            borrowerName: request.fromName,
-            lenderId: s.userId,
-            lenderName: s.user.displayName,
-            amount: request.amount,
-            round: request.round,
-          },
-        ]);
+        rememberLoan(roomId, {
+          debtId: request.id,
+          borrowerId: request.fromUserId,
+          borrowerName: request.fromName,
+          lenderId: s.userId,
+          lenderName: s.user.displayName,
+          amount: request.amount,
+          round: request.round,
+        });
         broadcastLoans(roomId);
         socket.emit("aid:granted", granted);
         const borrowerSockets = userSockets.get(request.fromUserId);
@@ -2342,6 +2482,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         if (!targetUserId) {
           delete loan.redirectToUserId;
           delete loan.redirectToName;
+          updateLoan(loan);
           broadcastLoans(roomId);
           return;
         }
@@ -2351,6 +2492,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         if (!target) return;
         loan.redirectToUserId = target.id;
         loan.redirectToName = target.displayName;
+        updateLoan(loan);
         broadcastLoans(roomId);
       },
     );
@@ -2413,6 +2555,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         loan.backerId = s.userId;
         loan.backerName = s.user.displayName;
         loan.backedAmount = accepted;
+        updateLoan(loan);
         broadcastLoans(roomId);
         const acceptedEvent = { ...loan, roomId };
         const backerSockets = userSockets.get(s.userId);

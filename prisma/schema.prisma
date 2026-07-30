@@ -104,6 +104,7 @@ model Room {
   messages       Message[]
   gameStates     GameState[]
   convoyVentures ConvoyVenture[]
+  loans          Loan[]
 
   @@index([hostId])
 }
@@ -269,4 +270,47 @@ model Message {
 
   @@index([roomId, createdAt])
   @@index([senderId, recipientId, createdAt])
+}
+
+// [MANIFEST 05/07] An aid loan still outstanding, with whatever Backing
+// pledge and Bequest Routing redirect has been attached to it.
+//
+// This lived in a plain in-process Map until now, the same shape every other
+// per-voyage structure in src/server/realtime.ts uses. That was fine for a
+// mute list or a price tally, which cost nothing to lose. A loan is not that:
+// a backer's pledge leaves their purse the instant it is accepted, so a
+// restart in the middle of a voyage destroyed Gold a captain had genuinely
+// paid, with no record it ever existed. Convoy Ventures got a table for
+// exactly this reason and this is the same argument.
+//
+// Scoped by voyageEpoch alongside roomId, the way ConvoyVenture is, so a
+// restart's loans can never resurrect into the voyage that follows them.
+model Loan {
+  id           String @id
+  roomId       String
+  voyageEpoch  Int
+  borrowerId   String
+  borrowerName String
+  lenderId     String
+  lenderName   String
+  amount       Int
+  round        Int
+
+  // [MANIFEST 05: Backing] Set once a third captain pledges against this
+  // loan. Only one backer is ever allowed, which is why these sit on the
+  // loan itself rather than in a table of their own.
+  backerId     String?
+  backerName   String?
+  backedAmount Int?
+
+  // [MANIFEST 07: Bequest Routing] Set only by the lender, and only ever
+  // changes who receives the repayment, never who was owed the debt.
+  redirectToUserId String?
+  redirectToName   String?
+
+  createdAt DateTime @default(now())
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, voyageEpoch])
 }
