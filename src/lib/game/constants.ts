@@ -336,6 +336,47 @@ export const WAGES: Record<string, number> = Object.fromEntries(
 // worth something.
 export const AID_REPUTATION_PER_GOLD = 1 / 5;
 
+// The most Reputation one captain can earn in a single voyage from helping
+// others, counting lending (AID_REPUTATION_PER_GOLD above) and backing
+// (BACKING_REPUTATION_PER_GOLD below) together.
+//
+// Why there is a ceiling at all: without one this was the only exploit in
+// the game that needed no tampering. Two captains agree in chat, one
+// requests a large loan, the other grants it and banks a fifth of it as
+// Reputation, and the borrower hands the Gold straight back. aid:post
+// accepts any whole number, so the pair could repeat that until Reputation
+// stopped meaning anything. Capping the total rather than a single loan is
+// what closes it: splitting one large loan into ten small ones earns
+// exactly the same.
+//
+// Why it is derived rather than written down: a sixteen round Monsoon
+// voyage offers twice the chances to help that an eight round Fair Winds
+// one does, and holds far more Gold by its midpoint. One fixed number for
+// all three tiers is either mean to the long voyage or generous to the
+// short one. Scaling with the tier's own length lets the ceiling breathe,
+// and means a tier added later gets a sensible allowance without anyone
+// remembering to come back here.
+//
+// The base covers a captain who is generous early in a short voyage; the
+// per round term is what a long voyage adds on top. At the shipped tiers
+// that works out to 96, 120 and 144, each worth five times its own number
+// in Gold lent, or ten times in Gold pledged and returned whole.
+//
+// On the longest tier this does pass 100, the Successful Merchant rating.
+// That is deliberate and not the loophole it looks like: Reputation earned
+// this way requires Gold, and Gold has to be traded for first. A captain
+// cannot lend their way up the ladder without having earned the stake to
+// lend, so the ladder still measures trading.
+const HELPER_REPUTATION_BASE = 48;
+const HELPER_REPUTATION_PER_ROUND = 6;
+
+export function helperReputationCapFor(difficulty: unknown): number {
+  return (
+    HELPER_REPUTATION_BASE +
+    HELPER_REPUTATION_PER_ROUND * difficultyConfig(difficulty).rounds
+  );
+}
+
 export type Boon = {
   id: string;
   name: string;

@@ -2,7 +2,7 @@
 
 This document is written for a player sitting down to actually play the game, not for a developer reading code. It explains each new feature in plain language, tells you exactly where to look on screen, and walks through a specific set of steps you (and a friend, since most of these need two or more captains in the same harbor) can follow to confirm each one is really working while you play.
 
-Nine of these features exist in the game right now. Eight more are planned but not yet built, and one was dropped, so you will not find any of those nine if you go looking, that is expected and not a bug. The status list at the very bottom of this document tells you exactly which is which, so check there first if you are ever unsure whether something should be visible yet.
+Ten of these features exist in the game right now. Seven more are planned but not yet built, and one was dropped, so you will not find any of those eight if you go looking, that is expected and not a bug. The status list at the very bottom of this document tells you exactly which is which, so check there first if you are ever unsure whether something should be visible yet.
 
 ## Before you start: where to actually look
 
@@ -178,6 +178,8 @@ The pledge comes out of your own Gold the instant it is accepted, exactly the sa
 If instead the borrower comes up short, your pledge is what covers the gap, up to whatever you pledged and not a Gold coin more. The lender still eats any shortfall bigger than your pledge; backing narrows the lender's risk, it does not erase it. Whatever part of your pledge was not actually needed comes back to you regardless, you are never left worse off than the amount that genuinely had to cover the shortfall.
 
 Only one captain can back any given loan, and you cannot back a loan you are already the lender or the borrower on, since you already have your own stake in how that one turns out.
+
+One ceiling covers both sides of helping. Across a whole voyage, everything you earn from lending Gold and from backing someone else's loan is capped together, and the cap depends on how long the voyage is: 96 Reputation on Fair Winds, 120 on Open Waters, 144 on Monsoon Season. A longer voyage offers more chances to help and holds far more Gold by its midpoint, so one fixed number for all three would have been mean to the long tier and generous to the short one. Each of those is worth five times its own number in Gold lent, so even the shortest tier covers three sizeable bailouts without cutting you off. The ceiling exists because without it two captains could agree in chat to pass one large loan back and forth, banking a fifth of it as Reputation each time. Without that ceiling, two captains could agree in chat to pass one large loan back and forth, banking a fifth of it as Reputation each time, which is why it exists.
 
 ### Where to find it and how to use it
 
@@ -359,6 +361,44 @@ You will need three captains for the most convincing version of this test, thoug
 
 ---
 
+## Feature 10: Ledger Integrity Pass
+
+### What it actually does, in plain words
+
+Every captain's browser works out its own Gold and Reputation and then posts the result to the server to be saved. Until now the server checked only that the message had the right shape, never that the numbers inside it could have come from a real voyage, so a doctored save was written exactly as sent.
+
+This adds one check at that save endpoint. When a save arrives claiming more Gold or Reputation than the game could possibly have produced by the round the room has actually reached, the save is still written, but the row is marked as suspect and a line is logged on the server.
+
+It deliberately never rejects a save or interrupts a voyage. A captain halfway through a game must never lose it to a mistaken guard, so the ceiling is set from the theoretical maximum rather than from what real play looks like: it allows several times the top merchant rating in a single round. It catches a figure claiming millions. It will not catch one quietly padded by fifty, and it is not meant to.
+
+There are two bands. **Suspect** is a tenth of the way to the ceiling: still far past a genuine high scoring round, so it proves nothing on its own. It is recorded and nothing else happens, and it exists so there is real data to tighten the upper band with later. **Impossible** is over the ceiling itself, or a figure that is broken outright such as a negative or a NaN. Only that band has a consequence.
+
+That consequence lands at the end of the voyage rather than during it. A captain who finishes on an impossible figure still finishes, still appears in the final standings, and keeps whatever happened inside that voyage. What they do not get is anything that outlives it: no Renown XP, no merits, and no Sea Master crown. They are also taken out of the running for the crown entirely rather than crowned and then stripped, so an invented score can never deny the crown to the captain who actually earned it.
+
+This matters more than the save check on its own, because the save endpoint is not how a voyage's numbers become permanent. The conclusion reads the live status every client reports a few times a minute, and never opens the saved game at all. A client that kept its saves ordinary and only inflated that status would have banked Renown with nothing in its way.
+
+The reason it exists now rather than later is that Trading Houses, Ages of the Ledger and Captain's Rival all read account level standings. A forged score used to spoil one voyage. Once those three exist, it would spoil a permanent record everyone else can see.
+
+### What you will actually see on screen
+
+Nothing, in ordinary play. This is the one feature here with no interface at all. A normal voyage never approaches the ceiling, the response to a save is unchanged whether or not it tripped, and a captain who does trip it is told nothing, deliberately, so that a tampering client learns nothing about the guard.
+
+The only visible trace is server side: a `[integrity]` warning in the process log, and `integritySuspect` set on that captain's row in the `GameState` table.
+
+### Step by step: how to confirm it is working
+
+You need a way to send a request directly, since the game itself will never produce a tripping save.
+
+1. Register a captain, create a room, and have a second captain join so the voyage can start. Play a round or two normally, then confirm nothing has been flagged: `integritySuspect` on your `GameState` row is still false, and the server log is quiet.
+2. With the same session cookie, `PUT /api/game/state` with that room's id and a data object containing `money` set to 9999999. Confirm the response is the ordinary success, identical in shape to a normal save.
+3. Confirm the server log now carries one `[integrity]` line naming the field, the claimed value and the ceiling it exceeded.
+4. Confirm `integritySuspect` on that row is now true and `integrityNote` records what tripped.
+5. Save normally again, and confirm the flag stays true. It is never cleared automatically, since the point is that the account claimed it at least once.
+6. To confirm the guard cannot fire on real play, finish a voyage at the top merchant rating and confirm the flag is still false.
+7. To confirm the consequence, have one captain report an impossible Reputation and finish the voyage. Confirm they still appear in the standings, confirm their Renown XP for that voyage is zero, confirm no new merits were granted, and confirm the crown went to the highest scoring honest captain rather than to nobody.
+
+---
+
 ## Quick reference: what to watch for, side by side
 
 | Feature                 | Who sees it                                                                                  | Where it shows up                                                                                                                                                                                                                               | How often it can happen                                                                                                                                    |
@@ -377,7 +417,7 @@ You will need three captains for the most convincing version of this test, thoug
 
 ## Status: what exists in the game right now versus what is still planned
 
-This document now covers the nine features that actually exist in the game as of this writing. Eight more are planned and one has been dropped, so please do not go looking for those eight, if you do not see something described here, it almost certainly just has not been built yet rather than being broken.
+This document now covers the ten features that actually exist in the game as of this writing. Seven more are planned and one has been dropped, so please do not go looking for those eight, if you do not see something described here, it almost certainly just has not been built yet rather than being broken.
 
 The design source for all eighteen, with what each one does and why, now lives in [HARBOR_MANIFEST.md](HARBOR_MANIFEST.md) alongside this file. Where the two disagree, that file is right about intent and this one is right about what is actually playable.
 
@@ -392,20 +432,20 @@ The design source for all eighteen, with what each one does and why, now lives i
 7. Harbor Watch
 8. Colorblind Safe Palette
 9. Fleet Ticker
+10. Ledger Integrity Pass
 
 **Planned, not yet built:**
 
-10. Partial Sight
-11. Trading Houses
-12. House Rally
-13. Ages of the Ledger
-14. Captain's Rival
-15. Voyage Chronicle
-16. Ledger Integrity Pass
+11. Partial Sight
+12. Trading Houses
+13. House Rally
+14. Ages of the Ledger
+15. Captain's Rival
+16. Voyage Chronicle
 17. Quick Start Match
 
 **Dropped, not pending:** Bilingual Harbor, which was entry 15 in the original manifest. English and Chinese localization was built in full and then removed at the project owner's request, so it is not outstanding work and should not be picked back up without a fresh decision.
 
-The manifest also recommends an order that is not this numeric one, since it sequences by dependency instead. Of what remains, Ledger Integrity Pass, Quick Start Match, and Voyage Chronicle are the three with no blockers at all; the other five each need either a dependency they build on or a design decision (a balance session, a banding numbers pass, a rollover cadence, an eligibility rule) answered first, all called out in the manifest's own open questions section.
+The manifest also recommends an order that is not this numeric one, since it sequences by dependency instead. Of what remains, Quick Start Match and Voyage Chronicle are the two with no blockers at all; the other five each need either a dependency they build on or a design decision (a balance session, a banding numbers pass, a rollover cadence, an eligibility rule) answered first, all called out in the manifest's own open questions section.
 
-As each of the remaining twelve gets built, this document should grow a matching section for it, written the same way: what it does in plain words, exactly what you will see on screen, and a step by step way to confirm it yourself while actually playing.
+As each of the remaining seven gets built, this document should grow a matching section for it, written the same way: what it does in plain words, exactly what you will see on screen, and a step by step way to confirm it yourself while actually playing.

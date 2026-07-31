@@ -131,6 +131,9 @@ export type GameState = {
   completedOrders: number[];
   purchaseCount: number;
   orderCount: number;
+  // Reputation already earned this voyage from lending and backing, kept
+  // so both can share one ceiling (see HELPER_REPUTATION_VOYAGE_CAP).
+  helperReputationEarned: number;
   // [MANIFEST 02: Word on the Docks] Trade orders completed across the whole
   // voyage, never reset per round the way orderCount is, only by a fresh
   // voyage (createInitialGameState). completeOrder increments this alongside
@@ -354,6 +357,7 @@ export function createInitialGameState(
     completedOrders: [],
     purchaseCount: 0,
     orderCount: 0,
+    helperReputationEarned: 0,
     totalOrdersCompleted: 0,
     gameOver: false,
     modifierFlags: {},

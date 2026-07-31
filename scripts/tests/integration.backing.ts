@@ -19,8 +19,10 @@ import { computeBackingResolution } from "../../src/lib/game/backing";
 import {
   AID_REPUTATION_PER_GOLD,
   BACKING_REPUTATION_PER_GOLD,
+  helperReputationCapFor,
 } from "../../src/lib/game/constants";
 import {
+  grantLoan,
   pledgeBacking,
   receiveBackedCoverage,
   receiveBackingOutcome,
@@ -218,6 +220,144 @@ test("a borrower who can cover the debt reports it in full and does not default"
   );
   assertEqual(calledAmount, 0, "the pledge is never called on");
   assertEqual(refundAmount, 20, "the pledge comes back whole");
+});
+
+// ---------- The helper Reputation ceiling ----------
+// The exploit this closes needed no tampering at all: two captains agree in
+// chat, one requests a large loan, the other grants it and banks a fifth of
+// it as Reputation, and the Gold goes straight back. aid:post accepts any
+// whole number, so the pair could repeat that indefinitely. Lending and
+// backing share one ceiling, since two separate ones would only move the
+// exploit to whichever was not capped.
+suite("Helping other captains earns Reputation, but only up to a ceiling");
+
+function lender(gold: number) {
+  const s = createInitialGameState(0, 1, 0, "fair_winds");
+  s.money = gold;
+  return s;
+}
+
+test("an ordinary loan still pays the documented rate", () => {
+  const s = lender(1000);
+  const before = s.score;
+  grantLoan(
+    s,
+    { id: "d1", borrowerId: "b", borrowerName: "B", amount: 100 },
+    [],
+  );
+  assertEqual(
+    s.score - before,
+    Math.floor(100 * AID_REPUTATION_PER_GOLD),
+    "twenty percent of the loan, exactly as before",
+  );
+});
+
+test("one enormous loan cannot earn more than the voyage's whole ceiling", () => {
+  const s = lender(1_000_000);
+  const before = s.score;
+  grantLoan(
+    s,
+    { id: "d1", borrowerId: "b", borrowerName: "B", amount: 1_000_000 },
+    [],
+  );
+  assertEqual(
+    s.score - before,
+    helperReputationCapFor("fair_winds"),
+    "a million Gold loan earns the ceiling and not a point more",
+  );
+});
+
+test("splitting one loan into many earns exactly the same as one large one", () => {
+  const s = lender(1_000_000);
+  const before = s.score;
+  for (let i = 0; i < 40; i++) {
+    grantLoan(
+      s,
+      { id: `d${i}`, borrowerId: "b", borrowerName: "B", amount: 500 },
+      [],
+    );
+  }
+  assertEqual(
+    s.score - before,
+    helperReputationCapFor("fair_winds"),
+    "forty loans and one loan reach the same ceiling, which is what closes the farm",
+  );
+});
+
+test("backing draws on the same ceiling as lending, not a second one", () => {
+  const s = lender(1_000_000);
+  const before = s.score;
+  grantLoan(
+    s,
+    { id: "d1", borrowerId: "b", borrowerName: "B", amount: 1_000_000 },
+    [],
+  );
+  receiveBackingOutcome(s, 1_000_000, 0, []);
+  assertEqual(
+    s.score - before,
+    helperReputationCapFor("fair_winds"),
+    "the ceiling is shared, so backing cannot top up an exhausted allowance",
+  );
+});
+
+test("the ceiling scales with the tier's own voyage length", () => {
+  const fair = helperReputationCapFor("fair_winds");
+  const open = helperReputationCapFor("open_waters");
+  const monsoon = helperReputationCapFor("monsoon");
+  assert(fair < open && open < monsoon, "a longer voyage allows more helping");
+  assertEqual(fair, 96, "eight rounds");
+  assertEqual(open, 120, "twelve rounds");
+  assertEqual(monsoon, 144, "sixteen rounds");
+});
+
+test("an unknown tier still returns a usable ceiling rather than nothing", () => {
+  assert(
+    helperReputationCapFor("not_a_tier") > 0,
+    "difficultyConfig falls back to the default tier, so the cap never lands at zero",
+  );
+});
+
+test("three sizeable bailouts pay in full on every tier", () => {
+  const s = lender(2000);
+  const before = s.score;
+  for (const id of ["d1", "d2", "d3"]) {
+    grantLoan(s, { id, borrowerId: "b", borrowerName: "B", amount: 150 }, []);
+  }
+  assertEqual(
+    s.score - before,
+    90,
+    "450 Gold of genuine lending is paid in full, under even the shortest tier's ceiling",
+  );
+});
+
+test("a long voyage allows more helping than a short one, at the same loans", () => {
+  const long = createInitialGameState(0, 1, 0, "monsoon");
+  long.money = 1_000_000;
+  const shortV = createInitialGameState(0, 1, 0, "fair_winds");
+  shortV.money = 1_000_000;
+  for (const st of [long, shortV]) {
+    for (let i = 0; i < 60; i++) {
+      grantLoan(
+        st,
+        { id: `d${i}`, borrowerId: "b", borrowerName: "B", amount: 500 },
+        [],
+      );
+    }
+  }
+  assertEqual(
+    long.helperReputationEarned,
+    helperReputationCapFor("monsoon"),
+    "sixteen rounds reach the monsoon ceiling",
+  );
+  assertEqual(
+    shortV.helperReputationEarned,
+    helperReputationCapFor("fair_winds"),
+    "eight rounds stop at the shorter one",
+  );
+  assert(
+    long.helperReputationEarned > shortV.helperReputationEarned,
+    "which is the whole point of deriving it from the tier",
+  );
 });
 
 // ---------- Constant sanity ----------

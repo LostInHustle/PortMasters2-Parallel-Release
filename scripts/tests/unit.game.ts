@@ -77,6 +77,13 @@ import {
 } from "../../src/lib/game/legacy";
 import { qualifyingMerits } from "../../src/lib/game/merits";
 import { computeHarborPulse, PULSE_CAP } from "../../src/lib/game/harborPulse";
+import {
+  checkSave,
+  describeFindings,
+  plausibleCeiling,
+  snapshotFromSave,
+  MAX_PLAUSIBLE_GOLD_PER_ROUND,
+} from "../../src/lib/game/integrity";
 
 function freshState(
   difficulty: "fair_winds" | "open_waters" | "monsoon" = "fair_winds",
@@ -1120,6 +1127,142 @@ test("clearRedirectedLoan only removes the matching debt, leaving any other outs
   clearRedirectedLoan(s, "debt1", "Captain Ally", []);
   assertEqual(s.loansGiven.length, 1, "only debt1 was removed");
   assertEqual(s.loansGiven[0].id, "debt2", "debt2 is still tracked");
+});
+
+// ---------- [MANIFEST 13] Ledger Integrity Pass ----------
+// The guard only ever flags, never rejects, so the property that actually
+// matters is that ordinary play can never trip it. These pin both ends: a
+// real voyage's numbers stay plausible, and a forged one does not.
+suite("Ledger Integrity: implausible saves are flagged, real ones never are");
+
+test("the three bands are ordered: ok, then suspect, then impossible", () => {
+  const ceiling = plausibleCeiling(MAX_PLAUSIBLE_GOLD_PER_ROUND, 4);
+  assertEqual(
+    checkSave({ money: 500, score: 300 }, 4).severity,
+    "ok",
+    "ordinary play is ok",
+  );
+  assertEqual(
+    checkSave({ money: Math.floor(ceiling / 2), score: 0 }, 4).severity,
+    "suspect",
+    "well past normal but under the ceiling only records",
+  );
+  assertEqual(
+    checkSave({ money: ceiling + 1, score: 0 }, 4).severity,
+    "impossible",
+    "over the ceiling is the band that acts",
+  );
+});
+
+test("only the impossible band is ever acted on, so suspect stays a recording band", () => {
+  const ceiling = plausibleCeiling(MAX_PLAUSIBLE_GOLD_PER_ROUND, 8);
+  const suspect = checkSave({ money: Math.floor(ceiling / 2), score: 0 }, 8);
+  assert(!suspect.plausible, "a suspect save is still reported");
+  assert(
+    suspect.severity !== "impossible",
+    "but it is never escalated to the band that costs a captain their Renown",
+  );
+});
+
+test("corruption is always impossible, never merely suspect", () => {
+  assertEqual(
+    checkSave({ money: NaN, score: 0 }, 3).severity,
+    "impossible",
+    "NaN cannot be explained by a good round",
+  );
+  assertEqual(
+    checkSave({ money: -5, score: 0 }, 3).severity,
+    "impossible",
+    "negative Gold cannot either",
+  );
+});
+
+test("a save from an ordinary voyage is plausible at every round", () => {
+  for (let round = 1; round <= 16; round++) {
+    const v = checkSave({ money: 400, score: 300 }, round);
+    assert(v.plausible, `round ${round} of ordinary play stays plausible`);
+  }
+});
+
+test("the top merchant rating is nowhere near the ceiling, even in round one", () => {
+  const v = checkSave({ money: 1000, score: 300 }, 1);
+  assert(
+    v.plausible,
+    "a whole voyage's best score is still plausible in a single round, by design",
+  );
+});
+
+test("a forged fortune is flagged, naming the field and the ceiling", () => {
+  const v = checkSave({ money: 9_999_999, score: 300 }, 4);
+  assert(!v.plausible, "millions of Gold by round four is not plausible");
+  assertEqual(v.findings.length, 1, "only the offending field is reported");
+  assertEqual(v.findings[0].field, "money", "the Gold field is named");
+  assert(
+    describeFindings(v.findings).includes("money=9999999"),
+    "the description carries the claimed value",
+  );
+});
+
+test("both fields are reported when both are forged", () => {
+  const v = checkSave({ money: 9_999_999, score: 9_999_999 }, 2);
+  assertEqual(v.findings.length, 2, "Gold and Reputation are both named");
+});
+
+test("corrupt values are caught, not just large ones", () => {
+  assert(!checkSave({ money: NaN, score: 0 }, 3).plausible, "NaN is flagged");
+  assert(
+    !checkSave({ money: Infinity, score: 0 }, 3).plausible,
+    "Infinity is flagged",
+  );
+  assert(
+    !checkSave({ money: -5, score: 0 }, 3).plausible,
+    "negative Gold is flagged",
+  );
+});
+
+test("the ceiling grows with the rounds actually elapsed on the server", () => {
+  const early = plausibleCeiling(MAX_PLAUSIBLE_GOLD_PER_ROUND, 1);
+  const late = plausibleCeiling(MAX_PLAUSIBLE_GOLD_PER_ROUND, 12);
+  assert(late > early, "a longer voyage allows more");
+  const forged = { money: late - 1, score: 0 };
+  assertEqual(
+    checkSave(forged, 1).severity,
+    "impossible",
+    "a round twelve fortune claimed in round one is impossible",
+  );
+  assertEqual(
+    checkSave(forged, 12).severity,
+    "suspect",
+    "the same figure at round twelve is under the ceiling, so it records without acting",
+  );
+});
+
+test("a round count of zero or nonsense still allows one full round", () => {
+  assertEqual(
+    plausibleCeiling(100, 0),
+    plausibleCeiling(100, 1),
+    "zero rounds is treated as one",
+  );
+});
+
+test("snapshotFromSave reads only real numbers, and rejects everything else", () => {
+  assertEqual(
+    snapshotFromSave({ money: 10, score: 20 })?.money,
+    10,
+    "a well formed save is read",
+  );
+  assertEqual(snapshotFromSave(null), null, "null is not a save");
+  assertEqual(snapshotFromSave([1, 2]), null, "an array is not a save");
+  assertEqual(
+    snapshotFromSave({ money: "10", score: 20 }),
+    null,
+    "a stringified number is not trusted",
+  );
+  assertEqual(
+    snapshotFromSave({ score: 20 }),
+    null,
+    "a save missing Gold is not comparable",
+  );
 });
 
 const ok = summary();
