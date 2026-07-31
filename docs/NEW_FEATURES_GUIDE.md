@@ -371,7 +371,9 @@ This adds one check at that save endpoint. When a save arrives claiming more Gol
 
 It deliberately never rejects a save or interrupts a voyage. A captain halfway through a game must never lose it to a mistaken guard, so the ceiling is set from the theoretical maximum rather than from what real play looks like: it allows several times the top merchant rating in a single round. It catches a figure claiming millions. It will not catch one quietly padded by fifty, and it is not meant to.
 
-There are two bands. **Suspect** is a tenth of the way to the ceiling: still far past a genuine high scoring round, so it proves nothing on its own. It is recorded and nothing else happens, and it exists so there is real data to tighten the upper band with later. **Impossible** is over the ceiling itself, or a figure that is broken outright such as a negative or a NaN. Only that band has a consequence.
+There are two bands. **Suspect** is a tenth of the way to the ceiling: still far past a genuine high scoring round, so it proves nothing on its own. It is recorded and nothing else happens, and it exists so there is real data to tighten the upper band with later. **Impossible** is over the ceiling itself, or a figure that is broken outright such as a NaN. Only that band has a consequence.
+
+A captain in the red is never flagged. Gold and Reputation can both go negative in ordinary play: the Tax Evasion Ledger's audit takes its 20 Gold whether or not you have it, and a trade order whose transport outruns its reward costs you Reputation. That is bad luck or bad judgement, not tampering, and there is nothing to gain by forging a negative anyway.
 
 That consequence lands at the end of the voyage rather than during it. A captain who finishes on an impossible figure still finishes, still appears in the final standings, and keeps whatever happened inside that voyage. What they do not get is anything that outlives it: no Renown XP, no merits, and no Sea Master crown. They are also taken out of the running for the crown entirely rather than crowned and then stripped, so an invented score can never deny the crown to the captain who actually earned it.
 

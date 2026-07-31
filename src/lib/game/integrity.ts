@@ -74,14 +74,21 @@ export const MAX_PLAUSIBLE_SCORE_PER_ROUND = MAX_PLAUSIBLE_GOLD_PER_ROUND;
 // allowance always covers one extra round and a starting purse.
 const STARTING_ALLOWANCE = 500;
 
-// Deliberately loose. It is set from the theoretical maximum rather than
-// from observed play, so it cannot produce a false positive: a whole voyage
-// at the top merchant rating is 300 Reputation (see MERCHANT_RATINGS),
-// which this allows many times over in a single round. That is the right
-// first pass for something that only ever flags. It catches a save claiming
-// millions, not one quietly padded by fifty. Tighten by lowering
-// MODIFIER_STACK_CEILING and WIDEST_ORDER_BOARD once there is real data on
-// what a genuine high scoring round actually reaches.
+// Deliberately loose, set from the theoretical maximum rather than from
+// observed play: a whole voyage at the top merchant rating is 300 Reputation
+// (see MERCHANT_RATINGS), which this allows many times over in a single
+// round. It catches a save claiming millions, not one quietly padded by
+// fifty. Tighten by lowering MODIFIER_STACK_CEILING and WIDEST_ORDER_BOARD
+// once there is real data on what a genuine high scoring round reaches.
+//
+// This comment used to claim the ceiling therefore "cannot produce a false
+// positive". It could, and it did. Being loose at the top says nothing about
+// the other end: the guard also treated any negative figure as impossible,
+// and the game produces those honestly (see the note on checkSave below), so
+// unlucky captains were losing their Renown. The claim is what stopped
+// anyone looking. A high ceiling makes a false positive unlikely from above
+// and says nothing about every other assumption in here, so treat the rules
+// below as the thing to re-examine, not this paragraph.
 export function plausibleCeiling(perRound: number, roundsElapsed: number) {
   const rounds = Math.max(1, Math.floor(roundsElapsed));
   return perRound * (rounds + 1) + STARTING_ALLOWANCE;
@@ -114,11 +121,11 @@ export type IntegritySeverity = "ok" | "suspect" | "impossible";
 // whatever is not is passed over.
 export type SaveSnapshot = { money?: number; score?: number };
 
-// A save is a free-form JSON blob written by a client, so every field here
-// is treated as untrusted input rather than as a number. Anything missing or
-// unreadable returns null, which the caller treats as "nothing to compare"
-// rather than as a failure: an unreadable save is the client's own problem
-// at load time, not something this guard should reject.
+// A save is a free-form JSON blob written by a client, so every field here is
+// treated as untrusted input rather than as a number. Null is returned only
+// when the payload is not an object at all, since there is then nothing to
+// read; a payload that is an object always yields a snapshot, carrying
+// whichever of the two fields were readable and omitting the rest.
 export function snapshotFromSave(data: unknown): SaveSnapshot | null {
   if (!data || typeof data !== "object" || Array.isArray(data)) return null;
   const d = data as Record<string, unknown>;
