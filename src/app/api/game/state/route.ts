@@ -116,7 +116,6 @@ export async function PUT(req: NextRequest) {
   const flag = verdict.plausible
     ? {}
     : {
-        integritySuspect: true,
         integritySeverity: verdict.severity,
         integrityNote: describeFindings(verdict.findings),
       };

@@ -106,7 +106,13 @@ const SUSPECT_FRACTION = 10;
 export type IntegritySeverity = "ok" | "suspect" | "impossible";
 
 // ---------- Reading a save ----------
-export type SaveSnapshot = { money: number; score: number };
+// Both fields are optional, and that is the point. An earlier version
+// required both and returned null if either was missing or the wrong type,
+// which meant a save could skip the guard entirely simply by leaving one of
+// them out: { money: 9999999 } with no score was never judged at all, and the
+// forged Gold was written exactly as sent. Whatever is readable is judged;
+// whatever is not is passed over.
+export type SaveSnapshot = { money?: number; score?: number };
 
 // A save is a free-form JSON blob written by a client, so every field here
 // is treated as untrusted input rather than as a number. Anything missing or
@@ -116,10 +122,10 @@ export type SaveSnapshot = { money: number; score: number };
 export function snapshotFromSave(data: unknown): SaveSnapshot | null {
   if (!data || typeof data !== "object" || Array.isArray(data)) return null;
   const d = data as Record<string, unknown>;
-  const money = d.money;
-  const score = d.score;
-  if (typeof money !== "number" || typeof score !== "number") return null;
-  return { money, score };
+  const snapshot: SaveSnapshot = {};
+  if (typeof d.money === "number") snapshot.money = d.money;
+  if (typeof d.score === "number") snapshot.score = d.score;
+  return snapshot;
 }
 
 export type IntegrityFinding = {
@@ -144,9 +150,18 @@ export type IntegrityVerdict = {
 // that save came from the same client; an absolute ceiling keyed to the
 // server's own round survives a client that has been lying since round one.
 //
-// A value that is not finite, or is negative where the game never goes
-// negative, is reported too. Those are not cheating so much as corruption,
-// but a save carrying NaN would poison every later comparison silently.
+// A value that is not finite is reported too. That is corruption rather than
+// cheating, but a save carrying NaN would poison every later comparison
+// silently, and NaN is exactly what a missing field produces once it reaches
+// arithmetic.
+//
+// Negative values are deliberately NOT flagged. An earlier version treated
+// them as impossible, on the assumption the game never goes below zero. It
+// does: the Tax Evasion Ledger's audit deducts a flat 20 Gold with no
+// affordability check, and a trade order whose transport exceeds its reward
+// moves Reputation down by the difference. An unlucky honest captain can
+// finish a round in the red, and flagging that cost them their Renown for
+// playing badly. Nothing is gained by forging a negative number anyway.
 export function checkSave(
   snapshot: SaveSnapshot,
   roundsElapsed: number,
@@ -154,7 +169,7 @@ export function checkSave(
   const findings: IntegrityFinding[] = [];
   const checks: {
     field: "money" | "score";
-    value: number;
+    value: number | undefined;
     perRound: number;
   }[] = [
     {
@@ -170,8 +185,11 @@ export function checkSave(
   ];
   let severity: IntegritySeverity = "ok";
   for (const c of checks) {
+    // A field the save never carried is passed over rather than treated as
+    // zero, so an absent field is neither judged nor a way around the guard.
+    if (c.value === undefined) continue;
     const ceiling = plausibleCeiling(c.perRound, roundsElapsed);
-    const broken = !Number.isFinite(c.value) || c.value < 0;
+    const broken = !Number.isFinite(c.value);
     if (broken || c.value > ceiling) {
       severity = "impossible";
       findings.push({ field: c.field, value: c.value, threshold: ceiling });

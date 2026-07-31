@@ -969,9 +969,37 @@ export function attachRealtime(httpServer: HttpServer): Server {
   // delay a socket handler on a write nothing reads back. A failure is
   // logged rather than thrown for the same reason: losing durability for one
   // loan must never take down the settlement that was mid flight.
-  function persistLoanWrite(what: string, work: Promise<unknown>) {
-    void work.catch((err) => {
-      console.error(`[loans] failed to persist ${what}:`, err);
+  // Writes for a room are chained rather than fired independently, because
+  // each one is two round trips and they are not commutative. Two races were
+  // reachable without this. A loan granted and repaid in quick succession
+  // issued its delete while its own create was still in flight, so the delete
+  // matched nothing and the create landed afterwards, leaving a settled loan
+  // in the table to be restored as a phantom debt on the next restart. And a
+  // pledge accepted immediately after the loan was granted issued an update
+  // against a row that did not exist yet, which Prisma rejects, so the
+  // backer's Gold silently stopped being tracked, which is the exact loss
+  // this table was added to prevent.
+  //
+  // Keyed by room rather than by loan: the volume is a handful of writes per
+  // voyage, so the coarser key costs nothing and also orders clearLoans,
+  // which deletes by room and has no single loan to key on.
+  const loanWriteChain = new Map<string, Promise<unknown>>();
+
+  function persistLoanWrite(
+    roomId: string,
+    what: string,
+    work: () => Promise<unknown>,
+  ) {
+    const previous = loanWriteChain.get(roomId) ?? Promise.resolve();
+    const next = previous
+      .catch(() => {})
+      .then(work)
+      .catch((err) => {
+        console.error(`[loans] failed to persist ${what}:`, err);
+      });
+    loanWriteChain.set(roomId, next);
+    void next.then(() => {
+      if (loanWriteChain.get(roomId) === next) loanWriteChain.delete(roomId);
     });
   }
 
@@ -980,37 +1008,33 @@ export function attachRealtime(httpServer: HttpServer): Server {
   // is already mid settlement. The Map is correct before this resolves.
   function rememberLoan(roomId: string, loan: LoanRecord) {
     roomOutstandingLoans.set(roomId, [...loanList(roomId), loan]);
-    persistLoanWrite(
-      `loan ${loan.debtId}`,
-      (async () => {
-        const room = await db.room.findUnique({
-          where: { id: roomId },
-          select: { voyageEpoch: true },
-        });
-        if (!room) return;
-        await db.loan.create({
-          data: {
-            id: loan.debtId,
-            roomId,
-            voyageEpoch: room.voyageEpoch,
-            borrowerId: loan.borrowerId,
-            borrowerName: loan.borrowerName,
-            lenderId: loan.lenderId,
-            lenderName: loan.lenderName,
-            amount: loan.amount,
-            round: loan.round,
-          },
-        });
-      })(),
-    );
+    persistLoanWrite(roomId, `loan ${loan.debtId}`, async () => {
+      const room = await db.room.findUnique({
+        where: { id: roomId },
+        select: { voyageEpoch: true },
+      });
+      if (!room) return;
+      await db.loan.create({
+        data: {
+          id: loan.debtId,
+          roomId,
+          voyageEpoch: room.voyageEpoch,
+          borrowerId: loan.borrowerId,
+          borrowerName: loan.borrowerName,
+          lenderId: loan.lenderId,
+          lenderName: loan.lenderName,
+          amount: loan.amount,
+          round: loan.round,
+        },
+      });
+    });
   }
 
   // Called whenever a backer or a redirect is attached to a loan already on
   // the ledger. The Map holds the same object the handler just mutated, so
   // only the database needs catching up.
-  function updateLoan(loan: LoanRecord) {
-    persistLoanWrite(
-      `loan ${loan.debtId}`,
+  function updateLoan(roomId: string, loan: LoanRecord) {
+    persistLoanWrite(roomId, `loan ${loan.debtId}`, () =>
       db.loan.update({
         where: { id: loan.debtId },
         data: {
@@ -1027,8 +1051,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
   function clearLoans(roomId: string) {
     if (!roomOutstandingLoans.has(roomId)) return;
     roomOutstandingLoans.delete(roomId);
-    persistLoanWrite(
-      `clear for room ${roomId}`,
+    persistLoanWrite(roomId, `clear for room ${roomId}`, () =>
       db.loan.deleteMany({ where: { roomId } }),
     );
     broadcastLoans(roomId);
@@ -1040,8 +1063,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
     const next = list.filter((l) => l.debtId !== debtId);
     if (next.length) roomOutstandingLoans.set(roomId, next);
     else roomOutstandingLoans.delete(roomId);
-    persistLoanWrite(
-      `settlement of ${debtId}`,
+    persistLoanWrite(roomId, `settlement of ${debtId}`, () =>
       db.loan.deleteMany({ where: { id: debtId } }),
     );
   }
@@ -2505,7 +2527,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         if (!targetUserId) {
           delete loan.redirectToUserId;
           delete loan.redirectToName;
-          updateLoan(loan);
+          updateLoan(roomId, loan);
           broadcastLoans(roomId);
           return;
         }
@@ -2515,7 +2537,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         if (!target) return;
         loan.redirectToUserId = target.id;
         loan.redirectToName = target.displayName;
-        updateLoan(loan);
+        updateLoan(roomId, loan);
         broadcastLoans(roomId);
       },
     );
@@ -2578,7 +2600,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         loan.backerId = s.userId;
         loan.backerName = s.user.displayName;
         loan.backedAmount = accepted;
-        updateLoan(loan);
+        updateLoan(roomId, loan);
         broadcastLoans(roomId);
         const acceptedEvent = { ...loan, roomId };
         const backerSockets = userSockets.get(s.userId);

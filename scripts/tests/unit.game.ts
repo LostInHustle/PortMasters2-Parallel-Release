@@ -1171,9 +1171,30 @@ test("corruption is always impossible, never merely suspect", () => {
     "NaN cannot be explained by a good round",
   );
   assertEqual(
-    checkSave({ money: -5, score: 0 }, 3).severity,
+    checkSave({ money: Infinity, score: 0 }, 3).severity,
     "impossible",
-    "negative Gold cannot either",
+    "nor can an infinite figure",
+  );
+});
+
+test("a captain in the red is never treated as a forger", () => {
+  // Both of these are ordinary bad luck, not tampering. The Tax Evasion
+  // Ledger's audit takes a flat 20 Gold whether or not the captain has it,
+  // and an order whose transport outruns its reward moves Reputation down.
+  assertEqual(
+    checkSave({ money: -15, score: 30 }, 4).severity,
+    "ok",
+    "an audit suffered while poor leaves honest Gold below zero",
+  );
+  assertEqual(
+    checkSave({ money: 100, score: -18 }, 4).severity,
+    "ok",
+    "a badly judged order leaves honest Reputation below zero",
+  );
+  assertEqual(
+    checkSave({ money: -999999, score: -999999 }, 4).severity,
+    "ok",
+    "and there is nothing to gain by forging a negative anyway",
   );
 });
 
@@ -1215,8 +1236,8 @@ test("corrupt values are caught, not just large ones", () => {
     "Infinity is flagged",
   );
   assert(
-    !checkSave({ money: -5, score: 0 }, 3).plausible,
-    "negative Gold is flagged",
+    checkSave({ money: -5, score: 0 }, 3).plausible,
+    "a captain in the red is honest bad luck, not corruption",
   );
 });
 
@@ -1245,6 +1266,31 @@ test("a round count of zero or nonsense still allows one full round", () => {
   );
 });
 
+test("leaving a field out is not a way around the guard", () => {
+  // The hole this closes: requiring both fields meant a save could skip the
+  // check entirely by omitting one, and the forged half was written as sent.
+  assertEqual(
+    checkSave({ money: 9_999_999 }, 2).severity,
+    "impossible",
+    "forged Gold is caught even with no Reputation alongside it",
+  );
+  assertEqual(
+    checkSave({ score: 9_999_999 }, 2).severity,
+    "impossible",
+    "and the same the other way round",
+  );
+  assertEqual(
+    checkSave({ money: 200 }, 2).severity,
+    "ok",
+    "an honest partial save is still fine",
+  );
+  assertEqual(
+    checkSave({}, 2).severity,
+    "ok",
+    "a save carrying neither field has nothing to judge",
+  );
+});
+
 test("snapshotFromSave reads only real numbers, and rejects everything else", () => {
   assertEqual(
     snapshotFromSave({ money: 10, score: 20 })?.money,
@@ -1254,14 +1300,19 @@ test("snapshotFromSave reads only real numbers, and rejects everything else", ()
   assertEqual(snapshotFromSave(null), null, "null is not a save");
   assertEqual(snapshotFromSave([1, 2]), null, "an array is not a save");
   assertEqual(
-    snapshotFromSave({ money: "10", score: 20 }),
-    null,
-    "a stringified number is not trusted",
+    snapshotFromSave({ money: "10", score: 20 })?.money,
+    undefined,
+    "a stringified number is not trusted, and is simply not judged",
   );
   assertEqual(
-    snapshotFromSave({ score: 20 }),
-    null,
-    "a save missing Gold is not comparable",
+    snapshotFromSave({ money: "10", score: 20 })?.score,
+    20,
+    "while the readable field beside it still is",
+  );
+  assertEqual(
+    snapshotFromSave({ score: 20 })?.money,
+    undefined,
+    "a save missing Gold carries no Gold to judge",
   );
 });
 
