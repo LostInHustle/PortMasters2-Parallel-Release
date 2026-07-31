@@ -650,30 +650,53 @@ export function attachRealtime(httpServer: HttpServer): Server {
       const brokersFavorUnlocked =
         priorLevel < BROKERS_FAVOR_UNLOCK_LEVEL &&
         newLevel >= BROKERS_FAVOR_UNLOCK_LEVEL;
-      const newBestScore = Math.max(prior?.bestScore ?? 0, f.reputation);
-      const newVoyagesCompleted = (prior?.voyagesCompleted ?? 0) + 1;
+      // [MANIFEST 13] A forged finish contributes nothing permanent at all,
+      // not merely no Renown. Withholding the XP, the merits and the crown
+      // while still writing these was a hole big enough to drive the whole
+      // exploit through: bestScore is the headline account statistic, so an
+      // invented Reputation was being recorded as a personal best forever,
+      // and the two counters below feed the Century Club and Iron Hull
+      // merits, so a forged voyage still pushed a captain toward earning
+      // them on some later honest one.
+      //
+      // Every field therefore holds at its prior value. The captain keeps
+      // the voyage they played; the account simply does not remember it.
+      const newBestScore = forged
+        ? (prior?.bestScore ?? 0)
+        : Math.max(prior?.bestScore ?? 0, f.reputation);
+      const newVoyagesCompleted =
+        (prior?.voyagesCompleted ?? 0) + (forged ? 0 : 1);
       // Resets on any bankruptcy rather than only incrementing on a clean
       // finish, so a single defaulted voyage costs the whole streak, the
       // same "start over" feel as the streak-shaped systems this project
-      // already has (a missed pirate roll undoing an escort-free run).
-      const newConsecutiveSolventVoyages = bankrupt
-        ? 0
-        : (prior?.consecutiveSolventVoyages ?? 0) + 1;
+      // already has (a missed pirate roll undoing an escort-free run). A
+      // forged finish neither extends the streak nor breaks it, since
+      // breaking it would be a punishment beyond simply not counting.
+      const newConsecutiveSolventVoyages = forged
+        ? (prior?.consecutiveSolventVoyages ?? 0)
+        : bankrupt
+          ? 0
+          : (prior?.consecutiveSolventVoyages ?? 0) + 1;
       // The per tier breakdown behind the all-tier totals above, so a crown or
       // a high score can be attributed to the waters it was earned on (see
       // statsByDifficulty in prisma/schema.prisma).
-      const newStatsByDifficulty = recordVoyageInStats(
-        parseStatsByDifficulty(prior?.statsByDifficulty),
-        roomDifficulty,
-        { crowned, reputation: f.reputation },
-      );
+      const priorStats = parseStatsByDifficulty(prior?.statsByDifficulty);
+      const newStatsByDifficulty = forged
+        ? priorStats
+        : recordVoyageInStats(priorStats, roomDifficulty, {
+            crowned,
+            reputation: f.reputation,
+          });
       await db.captainLegacy.upsert({
         where: { userId: f.userId },
         create: {
           userId: f.userId,
           renownXP: newXP,
           renownLevel: newLevel,
-          voyagesCompleted: 1,
+          // Written from the gated figure rather than a literal 1, so a
+          // forged first voyage does not create the account already credited
+          // with having completed one.
+          voyagesCompleted: newVoyagesCompleted,
           seaMasterCrowns: crowned ? 1 : 0,
           bestScore: newBestScore,
           consecutiveSolventVoyages: newConsecutiveSolventVoyages,
@@ -682,7 +705,10 @@ export function attachRealtime(httpServer: HttpServer): Server {
         update: {
           renownXP: newXP,
           renownLevel: newLevel,
-          voyagesCompleted: { increment: 1 },
+          // Still an increment rather than a set, so two rooms concluding for
+          // the same captain at once cannot lose a count, but skipped
+          // entirely for a forged finish.
+          ...(forged ? {} : { voyagesCompleted: { increment: 1 } }),
           ...(crowned ? { seaMasterCrowns: { increment: 1 } } : {}),
           bestScore: newBestScore,
           consecutiveSolventVoyages: newConsecutiveSolventVoyages,
