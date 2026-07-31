@@ -556,21 +556,39 @@ export function attachRealtime(httpServer: HttpServer): Server {
     // leaving them in would let an impossible score deny the crown to the
     // captain who actually earned it, since the winner is whoever reported the
     // highest Reputation.
-    const integrityByUser = new Map<string, ReturnType<typeof checkSave>>();
+    //
+    // Two sources, because the live figures alone are not enough. A captain
+    // who forged a save at round three, spent the Gold down, and reports an
+    // ordinary total at the end would pass a check that only ever looks at
+    // what they finish holding. The mark left on their saved state is the
+    // memory of what they already claimed, so both are consulted and either
+    // one is enough to disqualify.
+    const forgedUsers = new Set<string>();
     for (const f of finished) {
       const verdict = checkSave(
         { money: f.gold, score: f.reputation },
         roundsFor(roomDifficulty),
       );
-      integrityByUser.set(f.userId, verdict);
       if (verdict.severity !== "ok") {
         console.warn(
           `[integrity] ${verdict.severity} finish user=${f.userId} room=${roomId} ${describeFindings(verdict.findings)}`,
         );
       }
+      if (verdict.severity === "impossible") forgedUsers.add(f.userId);
     }
-    const isForged = (userId: string) =>
-      integrityByUser.get(userId)?.severity === "impossible";
+    const marked = await db.gameState.findMany({
+      where: { roomId, integritySeverity: "impossible" },
+      select: { userId: true, integrityNote: true },
+    });
+    for (const row of marked) {
+      if (!forgedUsers.has(row.userId)) {
+        console.warn(
+          `[integrity] finish disqualified by an earlier save user=${row.userId} room=${roomId} ${row.integrityNote ?? ""}`,
+        );
+      }
+      forgedUsers.add(row.userId);
+    }
+    const isForged = (userId: string) => forgedUsers.has(userId);
 
     const crownable = finished.filter(
       (f) => f.phase === "endgame" && !isForged(f.userId),

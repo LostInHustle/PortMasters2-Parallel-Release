@@ -135,8 +135,15 @@ model GameState {
   // records that it was implausible, so the entries that later read account
   // level standings can decline to trust it. Never cleared automatically,
   // since the point is that this account claimed it at least once.
-  integritySuspect Boolean @default(false)
-  integrityNote    String?
+  integritySuspect  Boolean @default(false)
+  integrityNote     String?
+  // Which band the worst finding reached, "suspect" or "impossible" (see
+  // IntegritySeverity in src/lib/game/integrity.ts). Kept as its own column
+  // rather than parsed back out of the note, because the voyage conclusion
+  // acts on it: only "impossible" costs a captain their Renown, and deciding
+  // that by string matching on a human readable note is exactly the kind of
+  // thing that breaks the day someone reworded the note.
+  integritySeverity String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
