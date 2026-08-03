@@ -371,11 +371,15 @@ This adds one check at that save endpoint. When a save arrives claiming more Gol
 
 It deliberately never rejects a save or interrupts a voyage. A captain halfway through a game must never lose it to a mistaken guard, so the ceiling is set from the theoretical maximum rather than from what real play looks like: it allows several times the top merchant rating in a single round. It catches a figure claiming millions. It will not catch one quietly padded by fifty, and it is not meant to.
 
-There are two bands. **Suspect** is a tenth of the way to the ceiling: still far past a genuine high scoring round, so it proves nothing on its own. It is recorded and nothing else happens, and it exists so there is real data to tighten the upper band with later. **Impossible** is over the ceiling itself, or a figure that is broken outright such as a negative or a NaN. Only that band has a consequence.
+There are two bands. **Suspect** is a tenth of the way to the ceiling: still far past a genuine high scoring round, so it proves nothing on its own. It is recorded and nothing else happens, and it exists so there is real data to tighten the upper band with later. **Impossible** is over the ceiling itself, or a figure that is broken outright such as a NaN. Only that band has a consequence.
+
+A captain in the red is never flagged. Gold and Reputation can both go negative in ordinary play: the Tax Evasion Ledger's audit takes its 20 Gold whether or not you have it, and a trade order whose transport outruns its reward costs you Reputation. That is bad luck or bad judgement, not tampering, and there is nothing to gain by forging a negative anyway.
 
 That consequence lands at the end of the voyage rather than during it. A captain who finishes on an impossible figure still finishes, still appears in the final standings, and keeps whatever happened inside that voyage. What they do not get is anything that outlives it: no Renown XP, no merits, and no Sea Master crown. They are also taken out of the running for the crown entirely rather than crowned and then stripped, so an invented score can never deny the crown to the captain who actually earned it.
 
-This matters more than the save check on its own, because the save endpoint is not how a voyage's numbers become permanent. The conclusion reads the live status every client reports a few times a minute, and never opens the saved game at all. A client that kept its saves ordinary and only inflated that status would have banked Renown with nothing in its way.
+This matters more than the save check on its own, because the save endpoint is not how a voyage's numbers become permanent. The conclusion reads the live status every client reports a few times a minute. A client that kept its saves ordinary and only inflated that status would otherwise have banked Renown with nothing in its way.
+
+The reverse also had to be closed. A captain could forge a save early in a voyage, spend the Gold down, and finish reporting perfectly ordinary figures, which a check that only looks at the final total would wave through. So the conclusion consults two things and either one is enough to disqualify: what you finish holding, and whether any save you sent during the voyage was already marked impossible. The mark is never cleared, so the game remembers what was claimed even after the evidence has been spent.
 
 The reason it exists now rather than later is that Trading Houses, Ages of the Ledger and Captain's Rival all read account level standings. A forged score used to spoil one voyage. Once those three exist, it would spoil a permanent record everyone else can see.
 
@@ -396,6 +400,7 @@ You need a way to send a request directly, since the game itself will never prod
 5. Save normally again, and confirm the flag stays true. It is never cleared automatically, since the point is that the account claimed it at least once.
 6. To confirm the guard cannot fire on real play, finish a voyage at the top merchant rating and confirm the flag is still false.
 7. To confirm the consequence, have one captain report an impossible Reputation and finish the voyage. Confirm they still appear in the standings, confirm their Renown XP for that voyage is zero, confirm no new merits were granted, and confirm the crown went to the highest scoring honest captain rather than to nobody.
+8. To confirm the memory, do the same thing in reverse. Send one impossible save early in a voyage, then play on and finish with entirely ordinary Gold and Reputation. The figures you finish on would pass on their own, so this is the case the stored mark exists for: confirm the voyage still banks no Renown and no merits, and that the server log names an earlier save as the reason rather than the final total.
 
 ---
 

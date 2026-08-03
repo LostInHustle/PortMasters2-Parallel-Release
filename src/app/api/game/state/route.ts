@@ -110,12 +110,14 @@ export async function PUT(req: NextRequest) {
   const json = JSON.stringify(data);
   // Only ever set the mark, never clear it. A save that was implausible once
   // stays flagged even if every later save looks ordinary, since the point
-  // is that this account claimed it at all.
+  // is that this account claimed it at all. The severity rides alongside so
+  // the voyage conclusion can act on an impossible one without having to
+  // read the note (see maybeConcludeVoyage in src/server/realtime.ts).
   const flag = verdict.plausible
     ? {}
     : {
-        integritySuspect: true,
-        integrityNote: `${verdict.severity}: ${describeFindings(verdict.findings)}`,
+        integritySeverity: verdict.severity,
+        integrityNote: describeFindings(verdict.findings),
       };
 
   if (!verdict.plausible) {

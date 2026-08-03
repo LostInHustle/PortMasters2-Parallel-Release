@@ -187,6 +187,13 @@ export function useGameSession(
             ? renownLevel
             : (game.renownLevel ?? 1);
           game.brokersFavorUsed = game.brokersFavorUsed ?? false;
+          // A save written before helping other captains had a per-voyage
+          // ceiling has no tally at all, and the ceiling is arithmetic:
+          // cap minus undefined is NaN, which would then be added straight
+          // into score the first time that captain lent anyone Gold. A NaN
+          // score is not merely wrong, it reads as impossible to the Ledger
+          // Integrity Pass and would cost an innocent captain their Renown.
+          game.helperReputationEarned = game.helperReputationEarned ?? 0;
           // Old saves predate per-voyage seeding; default their epoch to 0.
           // Their already-generated cards restore from the blob untouched, so
           // only a future round would reseed, which is fine.

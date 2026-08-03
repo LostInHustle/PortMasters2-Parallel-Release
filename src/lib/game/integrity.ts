@@ -74,14 +74,21 @@ export const MAX_PLAUSIBLE_SCORE_PER_ROUND = MAX_PLAUSIBLE_GOLD_PER_ROUND;
 // allowance always covers one extra round and a starting purse.
 const STARTING_ALLOWANCE = 500;
 
-// Deliberately loose. It is set from the theoretical maximum rather than
-// from observed play, so it cannot produce a false positive: a whole voyage
-// at the top merchant rating is 300 Reputation (see MERCHANT_RATINGS),
-// which this allows many times over in a single round. That is the right
-// first pass for something that only ever flags. It catches a save claiming
-// millions, not one quietly padded by fifty. Tighten by lowering
-// MODIFIER_STACK_CEILING and WIDEST_ORDER_BOARD once there is real data on
-// what a genuine high scoring round actually reaches.
+// Deliberately loose, set from the theoretical maximum rather than from
+// observed play: a whole voyage at the top merchant rating is 300 Reputation
+// (see MERCHANT_RATINGS), which this allows many times over in a single
+// round. It catches a save claiming millions, not one quietly padded by
+// fifty. Tighten by lowering MODIFIER_STACK_CEILING and WIDEST_ORDER_BOARD
+// once there is real data on what a genuine high scoring round reaches.
+//
+// This comment used to claim the ceiling therefore "cannot produce a false
+// positive". It could, and it did. Being loose at the top says nothing about
+// the other end: the guard also treated any negative figure as impossible,
+// and the game produces those honestly (see the note on checkSave below), so
+// unlucky captains were losing their Renown. The claim is what stopped
+// anyone looking. A high ceiling makes a false positive unlikely from above
+// and says nothing about every other assumption in here, so treat the rules
+// below as the thing to re-examine, not this paragraph.
 export function plausibleCeiling(perRound: number, roundsElapsed: number) {
   const rounds = Math.max(1, Math.floor(roundsElapsed));
   return perRound * (rounds + 1) + STARTING_ALLOWANCE;
@@ -106,20 +113,26 @@ const SUSPECT_FRACTION = 10;
 export type IntegritySeverity = "ok" | "suspect" | "impossible";
 
 // ---------- Reading a save ----------
-export type SaveSnapshot = { money: number; score: number };
+// Both fields are optional, and that is the point. An earlier version
+// required both and returned null if either was missing or the wrong type,
+// which meant a save could skip the guard entirely simply by leaving one of
+// them out: { money: 9999999 } with no score was never judged at all, and the
+// forged Gold was written exactly as sent. Whatever is readable is judged;
+// whatever is not is passed over.
+export type SaveSnapshot = { money?: number; score?: number };
 
-// A save is a free-form JSON blob written by a client, so every field here
-// is treated as untrusted input rather than as a number. Anything missing or
-// unreadable returns null, which the caller treats as "nothing to compare"
-// rather than as a failure: an unreadable save is the client's own problem
-// at load time, not something this guard should reject.
+// A save is a free-form JSON blob written by a client, so every field here is
+// treated as untrusted input rather than as a number. Null is returned only
+// when the payload is not an object at all, since there is then nothing to
+// read; a payload that is an object always yields a snapshot, carrying
+// whichever of the two fields were readable and omitting the rest.
 export function snapshotFromSave(data: unknown): SaveSnapshot | null {
   if (!data || typeof data !== "object" || Array.isArray(data)) return null;
   const d = data as Record<string, unknown>;
-  const money = d.money;
-  const score = d.score;
-  if (typeof money !== "number" || typeof score !== "number") return null;
-  return { money, score };
+  const snapshot: SaveSnapshot = {};
+  if (typeof d.money === "number") snapshot.money = d.money;
+  if (typeof d.score === "number") snapshot.score = d.score;
+  return snapshot;
 }
 
 export type IntegrityFinding = {
@@ -144,9 +157,18 @@ export type IntegrityVerdict = {
 // that save came from the same client; an absolute ceiling keyed to the
 // server's own round survives a client that has been lying since round one.
 //
-// A value that is not finite, or is negative where the game never goes
-// negative, is reported too. Those are not cheating so much as corruption,
-// but a save carrying NaN would poison every later comparison silently.
+// A value that is not finite is reported too. That is corruption rather than
+// cheating, but a save carrying NaN would poison every later comparison
+// silently, and NaN is exactly what a missing field produces once it reaches
+// arithmetic.
+//
+// Negative values are deliberately NOT flagged. An earlier version treated
+// them as impossible, on the assumption the game never goes below zero. It
+// does: the Tax Evasion Ledger's audit deducts a flat 20 Gold with no
+// affordability check, and a trade order whose transport exceeds its reward
+// moves Reputation down by the difference. An unlucky honest captain can
+// finish a round in the red, and flagging that cost them their Renown for
+// playing badly. Nothing is gained by forging a negative number anyway.
 export function checkSave(
   snapshot: SaveSnapshot,
   roundsElapsed: number,
@@ -154,7 +176,7 @@ export function checkSave(
   const findings: IntegrityFinding[] = [];
   const checks: {
     field: "money" | "score";
-    value: number;
+    value: number | undefined;
     perRound: number;
   }[] = [
     {
@@ -170,8 +192,11 @@ export function checkSave(
   ];
   let severity: IntegritySeverity = "ok";
   for (const c of checks) {
+    // A field the save never carried is passed over rather than treated as
+    // zero, so an absent field is neither judged nor a way around the guard.
+    if (c.value === undefined) continue;
     const ceiling = plausibleCeiling(c.perRound, roundsElapsed);
-    const broken = !Number.isFinite(c.value) || c.value < 0;
+    const broken = !Number.isFinite(c.value);
     if (broken || c.value > ceiling) {
       severity = "impossible";
       findings.push({ field: c.field, value: c.value, threshold: ceiling });

@@ -129,14 +129,22 @@ model GameState {
   data      String // JSON blob of the full per-player game state
   updatedAt DateTime @updatedAt
 
-  // [MANIFEST 13: Ledger Integrity Pass] Set when a save arrives carrying
-  // numbers no real voyage could have produced (see checkSave in
-  // src/lib/game/integrity.ts). The save is still written: this only ever
-  // records that it was implausible, so the entries that later read account
-  // level standings can decline to trust it. Never cleared automatically,
-  // since the point is that this account claimed it at least once.
-  integritySuspect Boolean @default(false)
-  integrityNote    String?
+  // [MANIFEST 13: Ledger Integrity Pass] Which band the worst finding on any
+  // save for this voyage reached, "suspect" or "impossible" (see
+  // IntegritySeverity in src/lib/game/integrity.ts), or null when nothing has
+  // ever tripped. The save itself is always written either way; this only
+  // records what was claimed.
+  //
+  // Its own column rather than something parsed back out of the note below,
+  // because the voyage conclusion acts on it: only "impossible" costs a
+  // captain their Renown, and deciding that by string matching on a human
+  // readable note is the kind of thing that breaks the day someone rewords it.
+  //
+  // Never cleared automatically, since the point is that this account claimed
+  // it at least once, and a captain who forged a save early and normalised
+  // before the end is exactly who this is remembering.
+  integritySeverity String?
+  integrityNote     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)

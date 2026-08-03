@@ -556,21 +556,39 @@ export function attachRealtime(httpServer: HttpServer): Server {
     // leaving them in would let an impossible score deny the crown to the
     // captain who actually earned it, since the winner is whoever reported the
     // highest Reputation.
-    const integrityByUser = new Map<string, ReturnType<typeof checkSave>>();
+    //
+    // Two sources, because the live figures alone are not enough. A captain
+    // who forged a save at round three, spent the Gold down, and reports an
+    // ordinary total at the end would pass a check that only ever looks at
+    // what they finish holding. The mark left on their saved state is the
+    // memory of what they already claimed, so both are consulted and either
+    // one is enough to disqualify.
+    const forgedUsers = new Set<string>();
     for (const f of finished) {
       const verdict = checkSave(
         { money: f.gold, score: f.reputation },
         roundsFor(roomDifficulty),
       );
-      integrityByUser.set(f.userId, verdict);
       if (verdict.severity !== "ok") {
         console.warn(
           `[integrity] ${verdict.severity} finish user=${f.userId} room=${roomId} ${describeFindings(verdict.findings)}`,
         );
       }
+      if (verdict.severity === "impossible") forgedUsers.add(f.userId);
     }
-    const isForged = (userId: string) =>
-      integrityByUser.get(userId)?.severity === "impossible";
+    const marked = await db.gameState.findMany({
+      where: { roomId, integritySeverity: "impossible" },
+      select: { userId: true, integrityNote: true },
+    });
+    for (const row of marked) {
+      if (!forgedUsers.has(row.userId)) {
+        console.warn(
+          `[integrity] finish disqualified by an earlier save user=${row.userId} room=${roomId} ${row.integrityNote ?? ""}`,
+        );
+      }
+      forgedUsers.add(row.userId);
+    }
+    const isForged = (userId: string) => forgedUsers.has(userId);
 
     const crownable = finished.filter(
       (f) => f.phase === "endgame" && !isForged(f.userId),
@@ -632,30 +650,53 @@ export function attachRealtime(httpServer: HttpServer): Server {
       const brokersFavorUnlocked =
         priorLevel < BROKERS_FAVOR_UNLOCK_LEVEL &&
         newLevel >= BROKERS_FAVOR_UNLOCK_LEVEL;
-      const newBestScore = Math.max(prior?.bestScore ?? 0, f.reputation);
-      const newVoyagesCompleted = (prior?.voyagesCompleted ?? 0) + 1;
+      // [MANIFEST 13] A forged finish contributes nothing permanent at all,
+      // not merely no Renown. Withholding the XP, the merits and the crown
+      // while still writing these was a hole big enough to drive the whole
+      // exploit through: bestScore is the headline account statistic, so an
+      // invented Reputation was being recorded as a personal best forever,
+      // and the two counters below feed the Century Club and Iron Hull
+      // merits, so a forged voyage still pushed a captain toward earning
+      // them on some later honest one.
+      //
+      // Every field therefore holds at its prior value. The captain keeps
+      // the voyage they played; the account simply does not remember it.
+      const newBestScore = forged
+        ? (prior?.bestScore ?? 0)
+        : Math.max(prior?.bestScore ?? 0, f.reputation);
+      const newVoyagesCompleted =
+        (prior?.voyagesCompleted ?? 0) + (forged ? 0 : 1);
       // Resets on any bankruptcy rather than only incrementing on a clean
       // finish, so a single defaulted voyage costs the whole streak, the
       // same "start over" feel as the streak-shaped systems this project
-      // already has (a missed pirate roll undoing an escort-free run).
-      const newConsecutiveSolventVoyages = bankrupt
-        ? 0
-        : (prior?.consecutiveSolventVoyages ?? 0) + 1;
+      // already has (a missed pirate roll undoing an escort-free run). A
+      // forged finish neither extends the streak nor breaks it, since
+      // breaking it would be a punishment beyond simply not counting.
+      const newConsecutiveSolventVoyages = forged
+        ? (prior?.consecutiveSolventVoyages ?? 0)
+        : bankrupt
+          ? 0
+          : (prior?.consecutiveSolventVoyages ?? 0) + 1;
       // The per tier breakdown behind the all-tier totals above, so a crown or
       // a high score can be attributed to the waters it was earned on (see
       // statsByDifficulty in prisma/schema.prisma).
-      const newStatsByDifficulty = recordVoyageInStats(
-        parseStatsByDifficulty(prior?.statsByDifficulty),
-        roomDifficulty,
-        { crowned, reputation: f.reputation },
-      );
+      const priorStats = parseStatsByDifficulty(prior?.statsByDifficulty);
+      const newStatsByDifficulty = forged
+        ? priorStats
+        : recordVoyageInStats(priorStats, roomDifficulty, {
+            crowned,
+            reputation: f.reputation,
+          });
       await db.captainLegacy.upsert({
         where: { userId: f.userId },
         create: {
           userId: f.userId,
           renownXP: newXP,
           renownLevel: newLevel,
-          voyagesCompleted: 1,
+          // Written from the gated figure rather than a literal 1, so a
+          // forged first voyage does not create the account already credited
+          // with having completed one.
+          voyagesCompleted: newVoyagesCompleted,
           seaMasterCrowns: crowned ? 1 : 0,
           bestScore: newBestScore,
           consecutiveSolventVoyages: newConsecutiveSolventVoyages,
@@ -664,7 +705,10 @@ export function attachRealtime(httpServer: HttpServer): Server {
         update: {
           renownXP: newXP,
           renownLevel: newLevel,
-          voyagesCompleted: { increment: 1 },
+          // Still an increment rather than a set, so two rooms concluding for
+          // the same captain at once cannot lose a count, but skipped
+          // entirely for a forged finish.
+          ...(forged ? {} : { voyagesCompleted: { increment: 1 } }),
           ...(crowned ? { seaMasterCrowns: { increment: 1 } } : {}),
           bestScore: newBestScore,
           consecutiveSolventVoyages: newConsecutiveSolventVoyages,
@@ -951,9 +995,37 @@ export function attachRealtime(httpServer: HttpServer): Server {
   // delay a socket handler on a write nothing reads back. A failure is
   // logged rather than thrown for the same reason: losing durability for one
   // loan must never take down the settlement that was mid flight.
-  function persistLoanWrite(what: string, work: Promise<unknown>) {
-    void work.catch((err) => {
-      console.error(`[loans] failed to persist ${what}:`, err);
+  // Writes for a room are chained rather than fired independently, because
+  // each one is two round trips and they are not commutative. Two races were
+  // reachable without this. A loan granted and repaid in quick succession
+  // issued its delete while its own create was still in flight, so the delete
+  // matched nothing and the create landed afterwards, leaving a settled loan
+  // in the table to be restored as a phantom debt on the next restart. And a
+  // pledge accepted immediately after the loan was granted issued an update
+  // against a row that did not exist yet, which Prisma rejects, so the
+  // backer's Gold silently stopped being tracked, which is the exact loss
+  // this table was added to prevent.
+  //
+  // Keyed by room rather than by loan: the volume is a handful of writes per
+  // voyage, so the coarser key costs nothing and also orders clearLoans,
+  // which deletes by room and has no single loan to key on.
+  const loanWriteChain = new Map<string, Promise<unknown>>();
+
+  function persistLoanWrite(
+    roomId: string,
+    what: string,
+    work: () => Promise<unknown>,
+  ) {
+    const previous = loanWriteChain.get(roomId) ?? Promise.resolve();
+    const next = previous
+      .catch(() => {})
+      .then(work)
+      .catch((err) => {
+        console.error(`[loans] failed to persist ${what}:`, err);
+      });
+    loanWriteChain.set(roomId, next);
+    void next.then(() => {
+      if (loanWriteChain.get(roomId) === next) loanWriteChain.delete(roomId);
     });
   }
 
@@ -962,37 +1034,33 @@ export function attachRealtime(httpServer: HttpServer): Server {
   // is already mid settlement. The Map is correct before this resolves.
   function rememberLoan(roomId: string, loan: LoanRecord) {
     roomOutstandingLoans.set(roomId, [...loanList(roomId), loan]);
-    persistLoanWrite(
-      `loan ${loan.debtId}`,
-      (async () => {
-        const room = await db.room.findUnique({
-          where: { id: roomId },
-          select: { voyageEpoch: true },
-        });
-        if (!room) return;
-        await db.loan.create({
-          data: {
-            id: loan.debtId,
-            roomId,
-            voyageEpoch: room.voyageEpoch,
-            borrowerId: loan.borrowerId,
-            borrowerName: loan.borrowerName,
-            lenderId: loan.lenderId,
-            lenderName: loan.lenderName,
-            amount: loan.amount,
-            round: loan.round,
-          },
-        });
-      })(),
-    );
+    persistLoanWrite(roomId, `loan ${loan.debtId}`, async () => {
+      const room = await db.room.findUnique({
+        where: { id: roomId },
+        select: { voyageEpoch: true },
+      });
+      if (!room) return;
+      await db.loan.create({
+        data: {
+          id: loan.debtId,
+          roomId,
+          voyageEpoch: room.voyageEpoch,
+          borrowerId: loan.borrowerId,
+          borrowerName: loan.borrowerName,
+          lenderId: loan.lenderId,
+          lenderName: loan.lenderName,
+          amount: loan.amount,
+          round: loan.round,
+        },
+      });
+    });
   }
 
   // Called whenever a backer or a redirect is attached to a loan already on
   // the ledger. The Map holds the same object the handler just mutated, so
   // only the database needs catching up.
-  function updateLoan(loan: LoanRecord) {
-    persistLoanWrite(
-      `loan ${loan.debtId}`,
+  function updateLoan(roomId: string, loan: LoanRecord) {
+    persistLoanWrite(roomId, `loan ${loan.debtId}`, () =>
       db.loan.update({
         where: { id: loan.debtId },
         data: {
@@ -1009,8 +1077,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
   function clearLoans(roomId: string) {
     if (!roomOutstandingLoans.has(roomId)) return;
     roomOutstandingLoans.delete(roomId);
-    persistLoanWrite(
-      `clear for room ${roomId}`,
+    persistLoanWrite(roomId, `clear for room ${roomId}`, () =>
       db.loan.deleteMany({ where: { roomId } }),
     );
     broadcastLoans(roomId);
@@ -1022,8 +1089,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
     const next = list.filter((l) => l.debtId !== debtId);
     if (next.length) roomOutstandingLoans.set(roomId, next);
     else roomOutstandingLoans.delete(roomId);
-    persistLoanWrite(
-      `settlement of ${debtId}`,
+    persistLoanWrite(roomId, `settlement of ${debtId}`, () =>
       db.loan.deleteMany({ where: { id: debtId } }),
     );
   }
@@ -2487,7 +2553,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         if (!targetUserId) {
           delete loan.redirectToUserId;
           delete loan.redirectToName;
-          updateLoan(loan);
+          updateLoan(roomId, loan);
           broadcastLoans(roomId);
           return;
         }
@@ -2497,7 +2563,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         if (!target) return;
         loan.redirectToUserId = target.id;
         loan.redirectToName = target.displayName;
-        updateLoan(loan);
+        updateLoan(roomId, loan);
         broadcastLoans(roomId);
       },
     );
@@ -2560,7 +2626,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         loan.backerId = s.userId;
         loan.backerName = s.user.displayName;
         loan.backedAmount = accepted;
-        updateLoan(loan);
+        updateLoan(roomId, loan);
         broadcastLoans(roomId);
         const acceptedEvent = { ...loan, roomId };
         const backerSockets = userSockets.get(s.userId);
