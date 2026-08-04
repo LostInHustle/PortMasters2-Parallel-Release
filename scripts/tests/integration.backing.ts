@@ -26,6 +26,8 @@ import {
   pledgeBacking,
   receiveBackedCoverage,
   receiveBackingOutcome,
+  receiveLoan,
+  repayLoan,
   settleOutstandingDebts,
 } from "../../src/lib/game/engine";
 import { createInitialGameState } from "../../src/lib/game/types";
@@ -368,6 +370,82 @@ test("BACKING_REPUTATION_PER_GOLD is exactly half AID_REPUTATION_PER_GOLD", () =
     BACKING_REPUTATION_PER_GOLD,
     AID_REPUTATION_PER_GOLD / 2,
     "backing is a supporting role, earning half the lender's own rate per Gold",
+  );
+});
+
+// ---------- Voluntary repayment ----------
+// repayLoan is the borrower paying a debt back early, by choice, rather
+// than having it seized at the end of the voyage by settleOutstandingDebts
+// (covered further up). It had no coverage of its own despite being the
+// only path that clears a debt while the captain is still sailing.
+suite("Loans: a borrower repaying voluntarily, before the forced settlement");
+
+function borrowerOwing(amount: number) {
+  const state = createInitialGameState();
+  const logs: string[] = [];
+  receiveLoan(
+    state,
+    { id: "loan-1", fromUserId: "lender-1", fromName: "Lender", amount },
+    logs,
+  );
+  return state;
+}
+
+test("receiving a loan credits the Gold and records the debt", () => {
+  const state = borrowerOwing(60);
+  assertEqual(state.money, 160, "the borrowed Gold should land in the purse");
+  assertEqual(state.debts.length, 1, "and the debt should be recorded");
+  assertEqual(state.debts[0].amount, 60, "for the amount borrowed");
+});
+
+test("repaying clears the debt and takes exactly what was owed", () => {
+  const state = borrowerOwing(60);
+  const logs: string[] = [];
+  repayLoan(state, "loan-1", logs);
+  assertEqual(state.money, 100, "the borrowed Gold should go back out again");
+  assertEqual(state.debts.length, 0, "and the debt should be cleared");
+});
+
+test("a borrower who cannot cover the debt keeps both the Gold and the debt", () => {
+  const state = borrowerOwing(60);
+  const logs: string[] = [];
+  state.money = 59;
+
+  repayLoan(state, "loan-1", logs);
+  assertEqual(state.money, 59, "an unaffordable repayment must take nothing");
+  assertEqual(
+    state.debts.length,
+    1,
+    "and must leave the debt outstanding rather than quietly forgiving it",
+  );
+});
+
+test("repaying an unknown debt id does nothing at all", () => {
+  const state = borrowerOwing(60);
+  const logs: string[] = [];
+  const before = state.money;
+
+  repayLoan(state, "no-such-loan", logs);
+  assertEqual(before, state.money, "no Gold should move for an unknown debt");
+  assertEqual(state.debts.length, 1, "and the real debt should survive");
+});
+
+test("repaying one debt leaves any others outstanding", () => {
+  const state = borrowerOwing(60);
+  const logs: string[] = [];
+  receiveLoan(
+    state,
+    { id: "loan-2", fromUserId: "lender-2", fromName: "Other", amount: 25 },
+    logs,
+  );
+  assertEqual(state.debts.length, 2, "setup: two debts outstanding");
+
+  repayLoan(state, "loan-1", logs);
+  assertEqual(state.debts.length, 1, "only the repaid debt should clear");
+  assertEqual(
+    state.debts[0].id,
+    "loan-2",
+    "and it should be the right one that remains",
   );
 });
 
