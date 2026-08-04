@@ -1,7 +1,7 @@
 // =====================================================================
 // A small async-aware sibling to ../harness.ts, for the E2E scenario
 // suite specifically. The original harness's test() is fire-and-forget
-// synchronous (`fn: () => void`, never awaited by its callers) — every
+// synchronous (`fn: () => void`, never awaited by its callers), and every
 // existing suite relies on that to run instantly and report a truthful
 // summary the moment the script finishes. E2E scenarios need to `await
 // page.click(...)` inside a test body, and making the shared test()

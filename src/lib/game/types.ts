@@ -379,8 +379,8 @@ export function createInitialGameState(
     // Explicitly undefined, not simply omitted: restartGame resets a voyage
     // via Object.assign(state, fresh), which only overwrites keys fresh
     // actually has. An omitted key isn't one of those, so a transient
-    // signal left set from the voyage just abandoned — mid module draft,
-    // say — would otherwise survive the restart untouched and misread by
+    // signal left set from the voyage just abandoned (mid module draft,
+    // say) would otherwise survive the restart untouched and misread by
     // the new voyage (startModuleDrafting treats a non-undefined
     // _draftChoices as "already rolled" and skips rolling a fresh pool).
     _pendingDocksClaim: undefined,

@@ -28,15 +28,15 @@ export async function closeBrowser(): Promise<void> {
 }
 
 // Every captain who hasn't seen the "Welcome aboard" tutorial before (i.e.
-// every fresh browser context, since it's gated on a localStorage flag —
+// every fresh browser context, since it's gated on a localStorage flag;
 // see TUTORIAL_SEEN_KEY in GameRoom.tsx) gets it auto-opened ~600ms after
 // mount. It's a Radix Dialog, which applies aria-hidden to the rest of the
-// page while open — so every getByRole query against the game underneath
+// page while open, so every getByRole query against the game underneath
 // (Start the Voyage, Lock In Boon, Hire Weaver, ...) resolves to nothing
 // until it's dismissed, not because those elements are gone but because
 // they're outside the accessible tree while the dialog sits on top of
 // them. A scenario that doesn't account for this doesn't fail loudly with
-// "there's a dialog in the way" — it just times out waiting on an element
+// "there's a dialog in the way"; it just times out waiting on an element
 // that a screenshot shows is right there. Dismissed here, once, so every
 // scenario using openAuthedPage gets a clean slate without repeating this.
 async function dismissTutorialIfPresent(page: Page): Promise<void> {
@@ -45,7 +45,7 @@ async function dismissTutorialIfPresent(page: Page): Promise<void> {
     await skip.waitFor({ state: "visible", timeout: 2500 });
     await skip.click();
   } catch {
-    // Never appeared in time — nothing to dismiss.
+    // Never appeared in time, so there is nothing to dismiss.
   }
 }
 

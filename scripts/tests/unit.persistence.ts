@@ -7,7 +7,7 @@
 // full voyage, never round-trips a save through the same repair path a
 // real page load (src/lib/use-game-session.ts) or a real restart takes.
 // That's exactly the kind of path where a subtle gap silently corrupts a
-// captain's save rather than crashing loudly — the same failure shape as
+// captain's save rather than crashing loudly, the same failure shape as
 // the notification-toast bug this whole scenario suite exists because of.
 // Run with: npx tsx scripts/tests/unit.persistence.ts
 // =====================================================================
@@ -144,7 +144,7 @@ suite("restartGame :: transient signal fields must not survive a restart");
 // These four fields (_draftChoices, _newModule, _pendingDebtSettlements,
 // _pendingDocksClaim) are optional and meant to be short-lived signals to
 // the React layer. restartGame resets a voyage via
-// Object.assign(state, fresh) — which only overwrites keys `fresh` itself
+// Object.assign(state, fresh), which only overwrites keys `fresh` itself
 // has. Before createInitialGameState explicitly listed these four as
 // `undefined`, they were simply absent from `fresh`, so Object.assign
 // left a stale value from the abandoned voyage in place untouched.

@@ -2,8 +2,9 @@
 // The reducer in src/lib/use-game-session.ts dispatches every action as
 // `{ type: "APPLY", fn }`, and each dispatch's fn always runs against
 // React's current committed state, not a stale closure captured when the
-// button was rendered — in theory immune to the classic "two rapid clicks
-// both read the same pre-update snapshot" race. This scenario checks that
+// button was rendered, so it should in theory be immune to the classic
+// "two rapid clicks both read the same pre-update snapshot" race. This
+// scenario checks that
 // holds under real, near-simultaneous browser events rather than trusting
 // the theory: fire the same "assign a task" action three times back to
 // back with no waiting in between, against three idle workers and only

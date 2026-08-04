@@ -21,20 +21,25 @@ import {
 import { renownStartingGoldBonus } from "@/lib/game/legacy";
 import { normalizeDifficulty, type Difficulty } from "@/lib/game/difficulty";
 
-// Exported (along with Action and reducer below) so the reducer — a pure
-// function with no React dependency — can be unit tested directly without
+// The most log lines a session keeps around at once (see the APPLY case
+// below, the only place this is enforced). Named so the two places that
+// once used a bare 500 stay in sync by construction rather than by habit.
+const LEDGER_LINE_CAP = 500;
+
+// Exported (along with Action and reducer below) so the reducer, a pure
+// function with no React dependency, can be unit tested directly without
 // mounting a component or a browser. See scripts/tests/unit.session.ts.
 export type SessionState = {
   game: GameState;
   logs: string[];
-  // The lines a single APPLY just added, before the 500-entry ledger cap
-  // (below) trims the front. GameRoom's toast effect used to infer "what's
-  // new" by diffing state.logs.length against a remembered count, which
-  // silently stopped working the moment a voyage's ledger hit that cap: once
-  // logs.length pins at 500 forever, length never grows again, so the diff
-  // read as "nothing new" for every action from then on, even though each
-  // one was still landing in the ledger. Handing the actual new lines out
-  // of the reducer sidesteps length entirely.
+  // The lines a single APPLY just added, before the LEDGER_LINE_CAP trim
+  // (below) drops entries off the front. GameRoom's toast effect used to
+  // infer "what's new" by diffing state.logs.length against a remembered
+  // count, which silently stopped working the moment a voyage's ledger hit
+  // that cap: once logs.length pins at the cap forever, length never grows
+  // again, so the diff read as "nothing new" for every action from then on,
+  // even though each one was still landing in the ledger. Handing the
+  // actual new lines out of the reducer sidesteps length entirely.
   newLines: string[];
   loaded: boolean;
   saving: boolean;
@@ -92,7 +97,8 @@ export function reducer(state: SessionState, action: Action): SessionState {
       const before = logs.length;
       action.fn(game, logs);
       const newLines = logs.slice(before);
-      if (logs.length > 500) logs.splice(0, logs.length - 500);
+      if (logs.length > LEDGER_LINE_CAP)
+        logs.splice(0, logs.length - LEDGER_LINE_CAP);
       return { ...state, game, logs, newLines };
     }
     case "SET_SAVING":

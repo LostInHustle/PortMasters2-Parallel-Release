@@ -48,7 +48,7 @@ test("INIT loads the given game and logs, and starts newLines empty", () => {
   assertEqual(
     s.newLines.length,
     0,
-    "INIT must not treat restored history as new — nothing should toast on load",
+    "INIT must not treat restored history as new, so nothing should toast on load",
   );
   assert(s.loaded, "INIT should mark the session loaded");
 });
@@ -65,7 +65,7 @@ test("START_FRESH seeds a welcome message and starts newLines empty", () => {
   assertEqual(
     s.newLines.length,
     0,
-    "a fresh voyage's own welcome message must not toast either — same reasoning as INIT",
+    "a fresh voyage's own welcome message must not toast either, for the same reason as INIT",
   );
   assert(s.loaded, "START_FRESH should mark the session loaded");
 });
@@ -128,7 +128,7 @@ test("APPLY captures every line a single action logs, in one batch", () => {
   );
 });
 
-test("APPLY trims the ledger to 500 entries, but newLines still reports the true delta — the exact bug this reducer was fixed for", () => {
+test("APPLY trims the ledger to 500 entries, but newLines still reports the true delta, the exact bug this reducer was fixed for", () => {
   // Fill the ledger to exactly the 500-entry cap.
   let s: SessionState = reducer(freshState(), {
     type: "INIT",

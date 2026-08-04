@@ -31,8 +31,8 @@ export async function run(baseUrl: string): Promise<void> {
   try {
     await test("host's Start the Voyage arms once a second captain has joined", async () => {
       // Two distinct "Start the Voyage" buttons legitimately coexist once
-      // armed — Welcome.tsx's own big call-to-action and GameControlPanel's
-      // persistent bottom-bar control — so this is deliberately .first(),
+      // armed: Welcome.tsx's own big call-to-action and GameControlPanel's
+      // persistent bottom-bar control, so this is deliberately .first(),
       // not a workaround for duplication that shouldn't be there.
       const btn = pageA
         .getByRole("button", { name: /Start the Voyage/i })
@@ -80,7 +80,7 @@ export async function run(baseUrl: string): Promise<void> {
         .count();
       assert(
         stillPicking > 0,
-        "the second captain should still be choosing a boon while only 1 of 2 is ready — the room advanced early",
+        "the second captain should still be choosing a boon while only 1 of 2 is ready, meaning the room advanced early",
       );
     });
 
