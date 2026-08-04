@@ -589,23 +589,27 @@ export function GameRoom({
   // itself at the same time since state.logs already holds the full
   // history. Rendered as separate stacked lines (not one string joined
   // with "\n") since a toast's default CSS collapses literal newlines.
-  const lastLogCountRef = useRef<number | null>(null);
+  //
+  // Driven by state.newLines (the lines the reducer's own APPLY case just
+  // added) rather than diffing state.logs.length against a remembered
+  // count. The length diff used to be how this worked, and it quietly broke
+  // for good the moment a voyage's ledger reached its 500-entry cap: once
+  // logs.length pins at 500, trimming one entry off the front for every one
+  // pushed onto the back, the length never grows again, so every action
+  // from then on read as "nothing new" and stopped popping a toast at all
+  // (the permanent ledger panel kept recording them the whole time, since
+  // it just renders state.logs directly). newLines already knows exactly
+  // what a given action added, independent of how the array is trimmed.
   useEffect(() => {
     if (!state.loaded) return;
-    const prevCount = lastLogCountRef.current;
-    lastLogCountRef.current = state.logs.length;
-    if (prevCount === null) return; // first observation after load: history, not a new action
-    if (state.logs.length <= prevCount) return; // reset/restart, nothing new to announce
-    const newLines = state.logs
-      .slice(prevCount)
-      .filter((l) => l.trim().length > 0);
-    if (newLines.length === 0) return;
+    const lines = state.newLines.filter((l) => l.trim().length > 0);
+    if (lines.length === 0) return;
     notifications.push({
       icon: "📜",
       title: "Captain's Ledger",
-      lines: newLines,
+      lines,
     });
-  }, [state.logs, state.loaded, notifications.push]);
+  }, [state.newLines, state.loaded, notifications.push]);
 
   // Every room/DM message pops up as its own 15-second notification too,
   // regardless of which chat tab is currently open, so it's never missed.

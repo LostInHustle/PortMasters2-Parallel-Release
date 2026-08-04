@@ -24,6 +24,15 @@ import { normalizeDifficulty, type Difficulty } from "@/lib/game/difficulty";
 type SessionState = {
   game: GameState;
   logs: string[];
+  // The lines a single APPLY just added, before the 500-entry ledger cap
+  // (below) trims the front. GameRoom's toast effect used to infer "what's
+  // new" by diffing state.logs.length against a remembered count, which
+  // silently stopped working the moment a voyage's ledger hit that cap: once
+  // logs.length pins at 500 forever, length never grows again, so the diff
+  // read as "nothing new" for every action from then on, even though each
+  // one was still landing in the ledger. Handing the actual new lines out
+  // of the reducer sidesteps length entirely.
+  newLines: string[];
   loaded: boolean;
   saving: boolean;
   lastSavedAt: number | null;
@@ -50,7 +59,13 @@ type Action =
 function reducer(state: SessionState, action: Action): SessionState {
   switch (action.type) {
     case "INIT":
-      return { ...state, game: action.game, logs: action.logs, loaded: true };
+      return {
+        ...state,
+        game: action.game,
+        logs: action.logs,
+        newLines: [],
+        loaded: true,
+      };
     case "START_FRESH": {
       const g = createInitialGameState(
         action.startingGoldBonus ?? 0,
@@ -66,14 +81,16 @@ function reducer(state: SessionState, action: Action): SessionState {
       if (cp && action.ctx && (cp.round > 1 || cp.phase !== "0")) {
         snapToCheckpoint(g, action.ctx, cp.round, cp.phase, logs);
       }
-      return { ...state, game: g, logs, loaded: true };
+      return { ...state, game: g, logs, newLines: [], loaded: true };
     }
     case "APPLY": {
       const game = structuredClone(state.game) as GameState;
       const logs = [...state.logs];
+      const before = logs.length;
       action.fn(game, logs);
+      const newLines = logs.slice(before);
       if (logs.length > 500) logs.splice(0, logs.length - 500);
-      return { ...state, game, logs };
+      return { ...state, game, logs, newLines };
     }
     case "SET_SAVING":
       return { ...state, saving: action.saving, lastSavedAt: action.at };
@@ -98,6 +115,7 @@ export function useGameSession(
   const [state, dispatch] = useReducer(reducer, {
     game: createInitialGameState(),
     logs: [],
+    newLines: [],
     loaded: false,
     saving: false,
     lastSavedAt: null,

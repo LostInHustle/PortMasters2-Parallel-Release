@@ -1047,7 +1047,18 @@ export function assignTask(
           break;
         }
       if (!can) {
-        logs.push(`❌ Material shortage to produce ${task}!`);
+        // Names every material the recipe needs against what's actually on
+        // hand, flagging the short ones, instead of just naming the good
+        // that failed to start. The check right above already knows exactly
+        // which material and by how much; throwing that away here left the
+        // player to go compare the recipe against their inventory by hand.
+        const short = Object.entries(recipe.materials)
+          .map(([m, a]) => {
+            const have = state.inventory[m] || 0;
+            return `${ICONS[m]}${m} ${have}/${a}${have < a ? " ⚠️" : ""}`;
+          })
+          .join(" + ");
+        logs.push(`❌ Material shortage to produce ${task}! (Have: ${short})`);
         return;
       }
       for (const [m, a] of Object.entries(recipe.materials))
