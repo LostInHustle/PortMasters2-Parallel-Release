@@ -21,7 +21,10 @@ import {
 import { renownStartingGoldBonus } from "@/lib/game/legacy";
 import { normalizeDifficulty, type Difficulty } from "@/lib/game/difficulty";
 
-type SessionState = {
+// Exported (along with Action and reducer below) so the reducer — a pure
+// function with no React dependency — can be unit tested directly without
+// mounting a component or a browser. See scripts/tests/unit.session.ts.
+export type SessionState = {
   game: GameState;
   logs: string[];
   // The lines a single APPLY just added, before the 500-entry ledger cap
@@ -38,7 +41,7 @@ type SessionState = {
   lastSavedAt: number | null;
 };
 
-type Action =
+export type Action =
   | { type: "INIT"; game: GameState; logs: string[] }
   | {
       type: "APPLY";
@@ -56,7 +59,7 @@ type Action =
     }
   | { type: "SET_SAVING"; saving: boolean; at: number };
 
-function reducer(state: SessionState, action: Action): SessionState {
+export function reducer(state: SessionState, action: Action): SessionState {
   switch (action.type) {
     case "INIT":
       return {
