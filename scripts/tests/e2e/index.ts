@@ -13,6 +13,7 @@ import { run as notificationCap } from "./scenarios/notification-cap";
 import { run as multiplayerReadyGate } from "./scenarios/multiplayer-ready-gate";
 import { run as reloadMidVoyage } from "./scenarios/reload-midvoyage";
 import { run as rapidActions } from "./scenarios/rapid-actions";
+import { run as barterAndChat } from "./scenarios/barter-and-chat";
 
 async function main() {
   console.log("Starting an isolated app instance for the E2E suite...");
@@ -24,6 +25,7 @@ async function main() {
     await multiplayerReadyGate(server.baseUrl);
     await reloadMidVoyage(server.baseUrl);
     await rapidActions(server.baseUrl);
+    await barterAndChat(server.baseUrl);
   } finally {
     await closeBrowser();
     await server.stop();
