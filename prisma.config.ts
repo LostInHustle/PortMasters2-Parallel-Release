@@ -5,7 +5,7 @@
 // src/lib/db.ts); this is the same value, just for the CLI's own use.
 import { defineConfig, env } from "prisma/config";
 
-// Unlike the old schema-based env(), loading prisma.config.ts doesn't pull
+// Unlike the old schema based env(), loading prisma.config.ts doesn't pull
 // in .env on its own. Locally that file exists and carries DATABASE_URL;
 // in production (Railway) DATABASE_URL is set directly in the environment
 // and there's no .env file at all, so a missing file here is expected and

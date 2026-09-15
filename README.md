@@ -1,6 +1,6 @@
 # PortMasters 2 Parallel Release
 
-A browser based multiplayer trading game set on the maritime Silk Road. Captains gather in a shared harbor, and once at least two of them are in the room the host sets sail. Everyone then plays the same voyage in lockstep: draft a boon, buy at port, barter with the other captains, put artisans to work, fill trade orders, settle wages and pirates, refit at the shipyard. Whoever ends the voyage with the highest Reputation is crowned Sea Master.
+A browser based multiplayer trading game set on the maritime Silk Road. Captains gather in a shared harbor, and once at least two of them are in the room the host sets sail. Everyone then plays the same voyage in lockstep: draft a boon, buy at port, barter with the other captains, put artisans to work, fill trade orders, settle wages and pirates, refit at the shipyard. Whoever ends the voyage with the highest Reputation is crowned Sea Master. Progression carries across voyages, three difficulty tiers change how hard the sea pushes back, and a small moderation console keeps the harbor civil.
 
 ## Quick start
 
@@ -29,12 +29,12 @@ Three separate codebases carry the PortMasters 2 name. This is the third, and it
 | [PortMasters2-ReactApp](https://github.com/LostInHustle/PortMasters2-ReactApp) | A full TypeScript rebuild of that game as an npm workspaces monorepo: a Node WebSocket backend with a React 19 and Vite frontend. Same rules, new engine. Two captains per game.                                                 |
 | **This repo**                                                                  | A separate attempt at taking the original single player game online, started by Joe Zhou and Aaron Zhu. One Next.js process serves the site, the API and the realtime layer. A harbor holds as many captains as want to sail it. |
 
-All three descend from the same single player prototype, kept unmodified at [docs/original-single-player-game.html](docs/original-single-player-game.html) so it stays useful as a reference for the original wording, prices and balance. From that shared ancestor this project goes its own way: its own server architecture, realtime layer, database schema, difficulty tiers and progression systems. Treat it as its own thing rather than a fork that has to stay in sync with the other two.
+All three descend from the same single player prototype, kept unmodified at [docs/originalSinglePlayerGame.html](docs/originalSinglePlayerGame.html) so it stays useful as a reference for the original wording, prices and balance. From that shared ancestor this project goes its own way: its own server architecture, realtime layer, database schema, difficulty tiers and progression systems. Treat it as its own thing rather than a fork that has to stay in sync with the other two.
 
 <details>
 <summary>Why some internal names still say "portmasters"</summary>
 
-The source folder `src/components/portmasters` and a few `localStorage` keys such as `portmasters_tutorial_seen` kept their original names on purpose. Renaming the folder means rewriting every import path that touches it for no benefit, since nobody outside the codebase sees a folder name, and renaming the storage keys would pop the tutorial open again for everyone who had already dismissed it. Everywhere the name is actually visible (page title, in game banner, log messages, docs) it reads PortMasters 2 Parallel Release. The deliberate exception is `docs/original-single-player-game.html`, which is kept as an unmodified snapshot; renaming things inside it would defeat the point of keeping it.
+The source folder `src/components/portmasters` and a few `localStorage` keys such as `portmasters_tutorial_seen` kept their original names on purpose. Renaming the folder means rewriting every import path that touches it for no benefit, since nobody outside the codebase sees a folder name, and renaming the storage keys would pop the tutorial open again for everyone who had already dismissed it. Everywhere the name is actually visible (page title, in game banner, log messages, docs) it reads PortMasters 2 Parallel Release. The deliberate exception is `docs/originalSinglePlayerGame.html`, which is kept as an unmodified snapshot; renaming things inside it would defeat the point of keeping it.
 
 </details>
 
@@ -64,7 +64,7 @@ The host picks a tier when creating the room. It sets the length of the voyage, 
 | 🌊 Open Waters    | 12     | rounds 4 and 8  | 22% rising to 30% | 1.25x  | The charter opens twice and the market swells from six cards to ten, with pirates that bite past the midpoint.                    |
 | ⛈️ Monsoon Season | 16     | rounds 6 and 11 | 28% rising to 38% | 1.6x   | Back loaded and unforgiving. The largest imperial mandates fall late, and a corrupt broker may leak your position to the pirates. |
 
-A charter opens the next tier of goods, ports and artisans mid voyage: porcelain clay and copper ore with their potters and coppersmiths first, then spices and pearls with their perfumers and jewelers. Fair Winds never leaves the founding trade, which is what keeps the entry tier exactly the game it has always been. The full design rationale lives in [docs/DIFFICULTY_MODES_PROPOSAL.md](docs/DIFFICULTY_MODES_PROPOSAL.md).
+A charter opens the next tier of goods, ports and artisans mid voyage: porcelain clay and copper ore with their potters and coppersmiths first, then spices and pearls with their perfumers and jewelers. Fair Winds never leaves the founding trade, which is what keeps the entry tier exactly the game it has always been. The full design rationale lives in [docs/DIFFICULTY_TIERS.md](docs/DIFFICULTY_TIERS.md).
 
 ### Harbor systems
 
@@ -89,6 +89,30 @@ A voyage resets everything inside it. Three things survive:
 - **Merits.** Nine one time badges for firsts and milestones, three of them only reachable on the rougher tiers. They carry bragging rights and nothing else, so the list can grow without touching the voyage economy.
 - **Daily check in.** A seven day cycle of Renown XP rewards (20, 30, 40, 50, 60, 80, then 150) tied to the account rather than any room.
 
+## The Harbor Office
+
+Moderation lives at `/admin`, behind the same sign in as the game. There are three roles.
+
+| Role      | How you get it                                                                  | What you can do                                                                              |
+| --------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Player    | Register                                                                        | Play                                                                                         |
+| Moderator | Appointed by the admin from the console                                         | Open the office, search the roster, ban and unban players, read the moderation log           |
+| Admin     | Be the first to present the `ADMIN_KEY` from the server environment at `/admin` | Everything a moderator can, plus appoint and dismiss moderators and delete accounts outright |
+
+There is exactly one admin, and the seat is claimed exactly once. The first account to present the key becomes the admin for good; from then on the key opens nothing, not for another account and not a second time for the admin themselves, so present it from the account you mean to keep. The claim is a single atomic database statement, so two accounts presenting the key in the same instant still produce one admin. Wrong guesses at the key are throttled per account, five within fifteen minutes, so a signed in captain cannot sit there trying keys.
+
+The one way the seat ever moves is by hand, outside the game, by whoever operates the server. If the admin account is lost, clear its role in the database (`npx prisma studio`, or `UPDATE User SET role = 'player' WHERE role = 'admin'` against the SQLite file) and the key works exactly once more. Nothing in the app or its API can do this.
+
+A ban is immediate and complete. The reason is required and the banned captain sees it the next time they try to sign in. Every one of their sessions is revoked, their seat in any harbor is given up (handing the host crown on if they held it), and the realtime layer drops their sockets with a notice, so a captain sitting in a voyage is back at the sign in screen within a second, told why, and the rest of the room sees who left and why. Banning a moderator also removes their badge. Lifting a ban restores everything except that badge.
+
+Deleting an account is the one thing here that cannot be undone. The account leaves every room first, the same way a voluntary departure does, so a harbor they were hosting is handed to the next captain rather than cascading away with them, and only then is the row removed along with their sessions, saved voyages, chat, Renown and merits.
+
+Every row you are allowed to act on has a checkbox, so a sweep is one selection and one confirmation: ban them all with a single reason, lift their bans, or (admin only) delete them together. The batch is never all or nothing. Each captain in it is judged on their own, the dialog shows beforehand exactly who will be reached and who will be skipped and why (already banned, not banned, a fellow moderator, yourself), and the server answers with the same report after the fact. A batch tops out at 100 captains.
+
+Nobody can act on their own account, moderators cannot touch each other or the admin, and every action is written to a log that outlives the accounts it mentions, with the actor's name, the target's name, and the reason. The admin can clear that log, and the clear writes one last entry recording who did it and how many entries went, so the log can never be wiped without trace. The rules themselves are one pure function, `canModerate` in [src/lib/admin/rules.ts](src/lib/admin/rules.ts), with `bulkEligibility` beside it for selections, both tested in `npm run test:admin`; the console only ever shows a button the server would also allow.
+
+If the server has no `ADMIN_KEY`, the office is closed: the claim page says so, and every console route answers 503 or 403. Once the seat is taken, an ordinary player visiting `/admin` sees a closed door instead of the key form. Nothing else about the game changes.
+
 ## How the pieces fit together
 
 **One process, one port.** [server.ts](server.ts) creates a single HTTP server, hands it to Next.js for the site and the API routes, and attaches Socket.IO to that same server for presence, chat and turn synchronization. There is no separate backend service and no separate realtime server. Port 2232 was chosen so the whole app fits through a single ngrok tunnel.
@@ -96,6 +120,8 @@ A voyage resets everything inside it. Three things survive:
 **One SQLite file**, read and written directly by that same process. No database server to install, no pool to configure.
 
 **The server does not run the game rules.** Every client runs the same deterministic simulation in [src/lib/game/engine.ts](src/lib/game/engine.ts), seeded off the room id, so every captain sees identical markets and orders without the server computing anything. [src/server/realtime.ts](src/server/realtime.ts) does something much narrower: it tracks who has readied up for the round and phase the room is sitting at, and tells everyone to advance once the active players have all readied. It also owns the host only transitions that are not part of that vote (starting and restarting a voyage) and the harbor systems above, which are genuinely shared state and therefore genuinely the server's business.
+
+The API routes and the socket server never call each other, with one deliberate exception. A ban or a deletion has to reach a captain who is connected right now, so the socket server registers a tiny hook on `globalThis` when it attaches ([src/lib/admin/bridge.ts](src/lib/admin/bridge.ts)) and the admin actions call it after the database is already correct. It has to be `globalThis` because Next compiles the routes into their own module graph while `server.ts` loads the socket server through `tsx`: same process, two copies of every module, so an ordinary module level variable set on one side is invisible to the other. The same reason [src/lib/db.ts](src/lib/db.ts) keeps its Prisma client there.
 
 That split is the single most useful thing to know before changing anything: ask which side owns the behavior before you touch it.
 
@@ -112,7 +138,7 @@ Two consequences of the same trade are worth knowing. Gold moved between captain
 ## Tech stack
 
 - Next.js 16 (App Router), React 19, TypeScript
-- Tailwind CSS v4 with shadcn/ui components (new-york style) on Radix primitives, plus framer-motion for phase transitions, lucide-react for icons, sonner for toasts and next-themes for dark mode
+- Tailwind CSS v4 with shadcn/ui components (the New York style) on Radix primitives, plus framer-motion for phase transitions, lucide-react for icons, sonner for toasts and next-themes for dark mode
 - Prisma 7 backed by SQLite through the `@prisma/adapter-better-sqlite3` driver adapter (Prisma 7's default client engine ships no query engine binary, see [Database and Prisma](#database-and-prisma))
 - Socket.IO, wired into a custom server rather than the default Next.js one
 - Zod for request validation on the API routes
@@ -122,22 +148,22 @@ Tailwind v4 is configured entirely in CSS. The theme lives in the `@theme` block
 
 ## Project layout
 
-| Path                                     | What lives there                                                                                                                                                                                                                                                                                                                           |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `server.ts`                              | The entry point. Everything starts here.                                                                                                                                                                                                                                                                                                   |
-| `src/app`                                | App Router tree. The single page UI is `page.tsx`; REST endpoints are under `src/app/api` (auth, rooms, game state, legacy, check in, direct messages).                                                                                                                                                                                    |
-| `src/components/portmasters`             | The game's own UI: auth screen, lobby, game room shell, chat and member panels.                                                                                                                                                                                                                                                            |
-| `src/components/portmasters/game`        | The room's panels: status sidebar, control bar, log, modals, price tooltips.                                                                                                                                                                                                                                                               |
-| `src/components/portmasters/game/phases` | One module per phase screen, from `Welcome` through `Endgame`, dispatched by `GamePhasePanel`.                                                                                                                                                                                                                                             |
-| `src/components/ui`                      | shadcn generated primitives. Treat as generated code.                                                                                                                                                                                                                                                                                      |
-| `src/lib`                                | `auth.ts` and `api-auth.ts` for passwords and sessions, `db.ts` for the Prisma singleton, `rooms.ts` for what leaving a room means, `api.ts` for the typed fetch wrapper, `realtime.ts` for the client Socket.IO singleton, and the `use-*.ts` hooks (phase sync, game session and autosave, barter, aid, backing, convoy, notifications). |
-| `src/lib/game`                           | The simulation and its rules: `engine.ts`, `constants.ts`, `types.ts`, `rng.ts` for seeded randomness, `difficulty.ts` and `pools.ts` for tiers and what they unlock, `glossary.ts`, and one module per persistent or harbor system (`legacy.ts`, `merits.ts`, `checkin.ts`, `harborPulse.ts`, `convoy.ts`, `backing.ts`).                 |
-| `src/server/realtime.ts`                 | Server side Socket.IO: presence, room channels, the ready check protocol, host only actions, harbor systems.                                                                                                                                                                                                                               |
-| `prisma/schema.prisma`                   | The data model: users, sessions, rooms, membership, per player game state, captain legacy and merits, convoy ventures, messages. `prisma/migrations` holds the history.                                                                                                                                                                    |
-| `prisma.config.ts`                       | Where the Prisma CLI reads its connection string. Prisma 7 moved this out of the schema file.                                                                                                                                                                                                                                              |
-| `generated/prisma`                       | Generated client output. Gitignored, rebuilt by `prisma generate`.                                                                                                                                                                                                                                                                         |
-| `scripts/tests`                          | The test suite, plain `tsx` scripts with no runner.                                                                                                                                                                                                                                                                                        |
-| `docs/`                                  | The Harbor Manifest (the design source for all eighteen planned systems), the harbor feature guide, the deployment guide, design proposals, and the original single player snapshot.                                                                                                                                                       |
+| Path                                     | What lives there                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `server.ts`                              | The entry point. Everything starts here.                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `src/app`                                | App Router tree. The game is `page.tsx`, the Harbor Office is `admin/page.tsx`, and REST endpoints are under `src/app/api` (auth, rooms, game state, legacy, check in, direct messages, admin).                                                                                                                                                                                                                                                                                |
+| `src/components/portmasters`             | The game's own UI: auth screen, lobby, game room shell, chat and member panels, and under `admin/` the Harbor Office.                                                                                                                                                                                                                                                                                                                                                          |
+| `src/components/portmasters/game`        | The room's panels: status sidebar, control bar, log, modals, price tooltips.                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `src/components/portmasters/game/phases` | One module per phase screen, from `Welcome` through `Endgame`, dispatched by `GamePhasePanel`.                                                                                                                                                                                                                                                                                                                                                                                 |
+| `src/components/ui`                      | shadcn generated primitives. Treat as generated code.                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `src/lib`                                | `auth.ts` and `apiAuth.ts` for passwords and sessions, `db.ts` for the Prisma client, `publicUser.ts` for what other captains may see of an account, `rooms.ts` for joining, leaving and summarizing rooms, `api.ts` for the typed fetch wrapper, `realtime.ts` for the client Socket.IO singleton, the `use*.ts` hooks (phase sync, game session and autosave, barter, aid, backing, convoy, notifications), and `admin/` for the moderation rules, actions and route guards. |
+| `src/lib/game`                           | The simulation and its rules: `engine.ts`, `constants.ts`, `types.ts`, `rng.ts` for seeded randomness, `difficulty.ts` and `pools.ts` for tiers and what they unlock, `glossary.ts`, and one module per persistent or harbor system (`legacy.ts`, `merits.ts`, `checkin.ts`, `harborPulse.ts`, `convoy.ts`, `backing.ts`).                                                                                                                                                     |
+| `src/server/realtime.ts`                 | Server side Socket.IO: presence, room channels, the ready check protocol, host only actions, harbor systems.                                                                                                                                                                                                                                                                                                                                                                   |
+| `prisma/schema.prisma`                   | The data model: users (with role and ban state), sessions, rooms, membership, per player game state, captain legacy and merits, convoy ventures, loans, messages, and the moderation log. `prisma/migrations` holds the history.                                                                                                                                                                                                                                               |
+| `prisma.config.ts`                       | Where the Prisma CLI reads its connection string. Prisma 7 moved this out of the schema file.                                                                                                                                                                                                                                                                                                                                                                                  |
+| `generated/prisma`                       | Generated client output. Gitignored, rebuilt by `prisma generate`.                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `scripts/tests`                          | The test suite, plain `tsx` scripts with no runner, plus the Playwright scenarios under `e2e/`.                                                                                                                                                                                                                                                                                                                                                                                |
+| `docs/`                                  | The Harbor Manifest (the design source for all eighteen planned systems), the harbor feature guide, the deployment guide, the difficulty tier design record, and the original single player snapshot.                                                                                                                                                                                                                                                                          |
 
 ## Development
 
@@ -149,18 +175,19 @@ Then run `npm run db:push` once. It is tempting to skip and assume the database 
 
 ### Scripts
 
-| Script                | What it does                                                                                                                           |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run dev`         | `tsx watch server.ts`. Site, API and realtime in one process, restarting on server side changes.                                       |
-| `npm run build`       | `prisma generate` then `next build`.                                                                                                   |
-| `npm run start`       | Applies pending migrations with `prisma migrate deploy`, then serves the production build. Does not build for you.                     |
-| `npm run lint`        | ESLint through the flat config in `eslint.config.mjs`.                                                                                 |
-| `npm test`            | The whole suite, six files in sequence.                                                                                                |
-| `npm run db:push`     | Syncs the schema straight to the database without recording a migration. Fastest way to a working local database.                      |
-| `npm run db:migrate`  | `prisma migrate dev`. The right tool once you have actually changed `schema.prisma` and want the change recorded. Prompts for a name.  |
-| `npm run db:generate` | Regenerates the client into `generated/prisma` without touching the database.                                                          |
-| `npm run db:reset`    | `prisma migrate reset`. Genuinely destructive: drops the database and rebuilds from migrations.                                        |
-| `npm run db:clean`    | Wipes test rooms, memberships, saved states and messages, leaving an empty lobby. Takes `--keep-users` to spare accounts and sessions. |
+| Script                | What it does                                                                                                                                                  |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev`         | `tsx watch server.ts`. Site, API and realtime in one process, restarting on server side changes.                                                              |
+| `npm run build`       | `prisma generate` then `next build`.                                                                                                                          |
+| `npm run start`       | Applies pending migrations with `prisma migrate deploy`, then serves the production build. Does not build for you.                                            |
+| `npm run lint`        | ESLint through the flat config in `eslint.config.mjs`.                                                                                                        |
+| `npm test`            | The whole suite, twelve files in sequence.                                                                                                                    |
+| `npm run test:e2e`    | The Playwright scenarios against an isolated instance of the app. Slower, and not part of `npm test`.                                                         |
+| `npm run db:push`     | Syncs the schema straight to the database without recording a migration. Fastest way to a working local database.                                             |
+| `npm run db:migrate`  | `prisma migrate dev`. The right tool once you have actually changed `schema.prisma` and want the change recorded. Prompts for a name.                         |
+| `npm run db:generate` | Regenerates the client into `generated/prisma` without touching the database.                                                                                 |
+| `npm run db:reset`    | `prisma migrate reset`. Genuinely destructive: drops the database and rebuilds from migrations.                                                               |
+| `npm run db:clean`    | Wipes rooms, memberships, saved states, messages and the moderation log, leaving an empty lobby. Takes `--keep-users` to spare accounts, sessions and Renown. |
 
 ### Tests
 
@@ -168,18 +195,26 @@ Then run `npm run db:push` once. It is tempting to skip and assume the database 
 npm test
 ```
 
-That runs all six suites in sequence. Each also runs on its own, as `npm run <suite>`:
+That runs all twelve suites in sequence. Each also runs on its own, as `npm run <suite>`:
 
 | Suite              | What it covers                                                                                                       |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------- |
 | `test:unit`        | The pure game rules                                                                                                  |
+| `test:session`     | The game session reducer behind autosave and the ledger                                                              |
+| `test:persistence` | Loading a saved voyage back, including saves written by older versions                                               |
+| `test:barter`      | Posting, accepting and cancelling offers                                                                             |
+| `test:workers`     | Hiring, assigning and paying artisans                                                                                |
+| `test:drafting`    | Boon and module drafting                                                                                             |
 | `test:effects`     | Every boon and every ship module, audited against the live data rather than a hand copied assumption of what they do |
 | `test:integration` | A full voyage, end to end                                                                                            |
 | `test:harbor`      | Harbor Pulse, Word on the Docks, Tidewatch Alerts                                                                    |
 | `test:convoy`      | Convoy venture math and its exploit guards                                                                           |
 | `test:backing`     | Backing resolution, escrow and payout                                                                                |
+| `test:admin`       | The moderation permission matrix, selection eligibility, ban reasons and the admin key throttle                      |
 
 They are plain `tsx` scripts sharing a small harness, with no test runner, no database and no live server. Everything they touch is pure logic that imports neither Prisma nor React, which is exactly why the Gold math for convoy and backing was pulled out of the socket closures in `src/server/realtime.ts` and into their own modules: a regression there now shows up in a fast deterministic test instead of only in a live room.
+
+`npm run test:e2e` is the slower, heavier layer: it starts an isolated instance of the app on its own SQLite file and port, drives it with a real Chromium through Playwright, and covers what pure logic cannot, such as the ready gate holding across two browsers, a reload mid voyage, bartering and chat over live sockets, and the whole admin console from claiming the seat to deleting an account.
 
 ### Running the production build locally
 
@@ -205,6 +240,8 @@ That file is committed on purpose. It holds no secret, just a relative path, so 
 The path is worth understanding. Under Prisma 6 and earlier, a relative `file:` path resolved against `prisma/schema.prisma`'s own directory, so `file:./dev.db` landed in `prisma/`. Prisma 7 moved the connection string to `prisma.config.ts` at the repository root, and relative paths now resolve against that file's directory instead. Hence the explicit `prisma/` above. If a stray `dev.db` ever appears at the repository root, something pointed `DATABASE_URL` at a bare `file:./dev.db`; fix the value rather than moving the file, or it will reappear. This matters beyond tidiness: `.gitignore` only excludes `*.db` inside `prisma/`, so a root level `dev.db` can be committed by accident.
 
 `PORT` is optional and only matters for deployment. `server.ts` falls back to 2232. Railway sets it automatically.
+
+`ADMIN_KEY` opens the Harbor Office (see [The Harbor Office](#the-harbor-office)). It is not in `.env` and should not be committed anywhere: set it in the server environment when you deploy, or export it in your shell before `npm run dev` to try the console locally. Pick something long and random; it is compared in constant time and never stored. Without it the office simply stays closed.
 
 ## Database and Prisma
 
@@ -245,6 +282,8 @@ grep -c '"node_modules/lightningcss-' package-lock.json
 
 **Two accounts, wrong one logged in.** The session cookie is scoped to the origin and shared across every tab in a browser, so the second login overwrites the first. Use two browsers, or one normal and one private window.
 
+**The Harbor Office says no admin key is configured.** `ADMIN_KEY` was not in the environment when the server started. Set it and restart; there is nothing to run in the database.
+
 **"Start Voyage" does nothing.** A room needs at least two captains. A solo room is not allowed to set sail, since synchronized phases are the entire point.
 
 **A captain who refreshed seems to linger.** Closing a tab does not free the seat immediately. There is a thirty second grace period so a refresh or a flaky connection does not cost someone their spot. A refresh also puts that captain straight back into their own room rather than the Lobby: the active room is read back from durable membership on load (`GET /api/rooms/active`), because the seat surviving is only half of what is needed. The realtime layer builds each checkpoint's required roster from that same membership, so a captain stranded in the Lobby was still being counted and still owed a ready vote they had no way to cast, which froze every other captain in the harbor until they found and rejoined their room by hand.
@@ -261,7 +300,7 @@ The restart bug above is the best case study this codebase has, and the pattern 
 
 **Look for state that only ever moves one way.** One `db.room.update` set `Room.started` to true and nothing ever set it back. Whenever a report sounds like "X used to work and now it is stuck", grep for every place a flag is written, not just read, and check the writers cover every transition the product needs, including the ones that undo an earlier one.
 
-**Do not trust that a button does what its label says.** The old restart button meant a full reset in single player and a local no-op in multiplayer. The join routes were already correct; the fix was giving the button the server side counterpart its label had always implied.
+**Do not trust that a button does what its label says.** The old restart button meant a full reset in single player and did nothing at all in multiplayer. The join routes were already correct; the fix was giving the button the server side counterpart its label had always implied.
 
 **Gate new server actions the way the existing ones are gated.** The restart handler is deliberately shaped almost identically to `room:start` right above it: same auth check, same host only check, same guard against double firing, same broadcast then checkpoint shape. That consistency is what lets the next person read one handler and understand the rest.
 

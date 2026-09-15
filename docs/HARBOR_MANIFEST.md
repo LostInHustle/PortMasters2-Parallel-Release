@@ -1,8 +1,8 @@
 # The Harbor Manifest: eighteen systems for PortMasters 2 Parallel Release
 
-Recovered from an artifact that lived only in a scratch directory and a session transcript, and committed here so it survives. This is the design source for every numbered feature in [NEW_FEATURES_GUIDE.md](NEW_FEATURES_GUIDE.md), which documents only the ones already playable. When the two disagree about what exists, the guide is right about status and this file is right about intent.
+The design source for every numbered harbor system. Each entry records the situation the idea answered, what was proposed, why it fit this game rather than a generic one, and, for the ten that shipped, how the built version differs from the proposal. [NEW_FEATURES_GUIDE.md](NEW_FEATURES_GUIDE.md) is the player facing companion and covers only what is playable. When the two disagree about what exists, the guide is right about status and this file is right about intent. Code comments tagged `[MANIFEST nn]` point back to the entries here.
 
-Every claim in the original about what the project contained was checked against this repository's source rather than assumed, and every file path and function name it references existed at the time of writing. Some have since moved, so treat paths as a starting point rather than gospel.
+The "situation today" paragraphs describe the codebase as it stood when each entry was written, not as it stands now, and are kept because they explain the reasoning. Where the shipped version diverged from the proposal, an "As built" note says so.
 
 ## Status at a glance
 
@@ -37,13 +37,15 @@ _The market remembers what the room just did to it._
 
 New mechanism. Effort: moderate. **Shipped.**
 
-**The situation today.** Every captain's port market is generated from a seed built out of the room id, that captain's own user id, the current voyage epoch, and the round number, inside `genResourceCard` in `src/lib/game/engine.ts`. Two captains in the same harbor see different prices for the same goods on the same round, on purpose, and nothing about what one captain buys ever changes what any other captain sees. The market is private and self contained.
+**The situation today.** Every captain's port market is generated from a seed built out of the room id, that captain's own user id, the current voyage epoch, and the round number, inside `genResourceCard` in `src/lib/game/engine/market.ts`. Two captains in the same harbor see different prices for the same goods on the same round, on purpose, and nothing about what one captain buys ever changes what any other captain sees. The market is private and self contained.
 
 **What we add.** At the moment Phase 1 closes each round, every client already knows exactly what it bought, broken down by good. Relay a single small tally of that, summed across the whole room, once per round, the same way the server already relays a room wide barter board and aid board. At the start of the next round's Phase 1, fold that tally into the price roll `genResourceCard` already runs: a good the room leaned into heavily last round tightens and gets a little pricier, a good nobody touched softens. The effect is a lean, not a shove, and it never overrides the underlying seeded roll, only nudges it.
 
 **Why this fits.** A captain who wants to profit from the pulse has to pay attention to what the rest of the harbor is doing, not to a hidden die roll nobody could ever see coming. That is a genuinely different kind of attention, and it only makes sense in a game where a room of real people already share a table, which is exactly what this game already is.
 
 **System notes.** One new small object relayed by `src/server/realtime.ts` at the top of each round's Phase 1 transition, read by every client's `genResourceCard` call as one more multiplier, alongside the ones already applied there for Boons and modules.
+
+**As built.** Each client reports what it bought over `harbor:pulse:report` as it leaves Phase 1 (see `usePhaseSync`); the server adds the reports up per room and round in `roomPulseTallies`, and hands the finished tally over on the `phase:advance` that opens the next round's Phase 1. The math is `computeHarborPulse` in `src/lib/game/harborPulse.ts`: a good's share of the room's spend against an even split, scaled by 0.6 and clamped to twelve percent either way, applied by `applyHarborPulse` before the client rolls its cards. Nothing is persisted; a server restart costs one round of neutral prices.
 
 ### 02. Word on the Docks
 
@@ -53,11 +55,13 @@ New mechanism. Effort: light to moderate. **Shipped.**
 
 **The situation today.** Open Waters and Monsoon Season already schedule Imperial Mandates, large guaranteed orders that appear on a fixed round every single voyage, defined per tier in `src/lib/game/difficulty.ts`. Those stay exactly as they are. This adds a second, different kind of peak moment alongside them, not instead of them.
 
-**What we add.** A milestone reached through ordinary play, being first in the room to complete three trade orders in one voyage, say, or first to clear a chosen profit total. The check runs on every client alongside the order completion logic already in `engine.ts`. The first client to detect a crossing reports it to the server, which arbitrates exactly the way it already arbitrates who wins a race to accept the same barter offer, first report wins, every later report is quietly ignored. The winner is announced to the whole room over the same `room:system` channel already used for Merit and Renown announcements, and gets first pick of a small reward before the rest of the table can even react.
+**What we add.** A milestone reached through ordinary play, being first in the room to complete a set number of trade orders in one voyage, say, or first to clear a chosen profit total. The check runs on every client alongside the order completion logic already in `src/lib/game/engine/orders.ts`. The first client to detect a crossing reports it to the server, which arbitrates exactly the way it already arbitrates who wins a race to accept the same barter offer, first report wins, every later report is quietly ignored. The winner is announced to the whole room over the same `room:system` channel already used for Merit and Renown announcements, and gets first pick of a small reward before the rest of the table can even react.
 
 **Why this fits.** Which round it lands on and who wins it depends entirely on how this specific table plays this specific voyage, so no two harbors experience it on the same round or see the same captain win it. That unpredictability is only possible because real captains are racing each other in a shared room, something a script reading a difficulty table can never reproduce no matter how it is tuned.
 
 **System notes.** Reuses the exact arbitration pattern already proven in the barter board's accept race, and the exact broadcast channel already used for Merit and Renown system messages, so the amount of genuinely new server code stays small.
+
+**As built.** The threshold is five completed orders (`WORD_ON_THE_DOCKS_THRESHOLD`) and the prize is 25 Gold (`WORD_ON_THE_DOCKS_REWARD`), both in `src/lib/game/constants.ts`. `completeOrder` sets a transient claim flag the moment a captain's own total crosses the line; the client relays it as `docks:claim`, the server keeps one winner per room in `roomDocksWinners`, announces `docks:won`, and only the winner's client credits the Gold through `claimWordOnTheDocksReward`.
 
 ### 03. Tidewatch Alerts
 
@@ -73,6 +77,8 @@ Reworked idea. Effort: moderate. **Shipped.**
 
 **System notes.** One threshold check added to the same per round summed score calculation `src/server/realtime.ts` already performs, gated behind a per voyage flag on the room's in memory checkpoint so it can only fire once.
 
+**As built.** The threshold is a flat 500 combined Reputation (`TIDEWATCH_SURGE_THRESHOLD`) rather than one scaled per tier, checked on every `game:status` report and guarded by `roomSurges`. The reward also grew from the proposal: the extra cargo lot joins every captain's purchase board for the rest of the voyage, not for one round, applied on each client by `applyTidewatchSurge` when `tidewatch:surge` arrives.
+
 ## II. The peer economy
 
 ### 04. Convoy Ventures
@@ -87,7 +93,9 @@ New mechanism. Effort: substantial. **Shipped.**
 
 **Why this fits.** It gives the peer economy this game already leads on a fourth register entirely, pooled stakes rather than one to one trades, something neither this project nor the sibling codebase the source audit compared it against has ever attempted.
 
-**System notes.** A new record scoped to a room and voyage, contributions tracked the same way `loansGiven` already tracks lending in `src/lib/game/types.ts`, settlement resolved deterministically at the deadline round inside `engine.ts`, announced over the existing `room:system` channel. This is the single largest addition on this entire list, and the only one that introduces a genuinely new table to the schema.
+**System notes.** A new record scoped to a room and voyage, contributions tracked the same way `loansGiven` already tracks lending in `src/lib/game/types.ts`, settlement resolved deterministically at the deadline round, announced over the existing `room:system` channel. This is the single largest addition on this entire list, and the first to introduce a genuinely new table to the schema.
+
+**As built.** Ventures live in the `ConvoyVenture` table, scoped by room and voyage epoch, and are settled by the server (`settleVenture` in `src/server/realtime.ts`) rather than by each client, because a venture spans rounds and outlives any one client's session. The pure money math is `src/lib/game/convoy.ts`. Three outcomes exist: filled pays 1.5 times each stake, failed refunds half, and destroyed refunds everything, which happens to every other open venture the instant one fills, since a harbor gets exactly one filled venture per voyage. Two exploit guards were added during the build: no captain may fund more than half of a target, so a venture always needs a second backer, and a deadline can never reach the voyage's final round.
 
 ### 05. Backing
 
@@ -101,7 +109,9 @@ New mechanism. Effort: moderate. **Shipped.**
 
 **Why this fits.** The sibling codebase this game gets compared against has no lending system at all, so there was never anything there to react to. This grows directly out of loan history this project already records and has not yet made socially meaningful.
 
-**System notes.** One additional small record splitting an existing debt entry between two lenders, built on top of the `aid:*` socket events already wired in `src/server/realtime.ts` and `src/lib/use-aid.ts`.
+**System notes.** One additional small record splitting an existing debt entry between two lenders, built on top of the `aid:*` socket events already wired in `src/server/realtime.ts` and `src/lib/useAid.ts`.
+
+**As built.** The "established lending history" gate was dropped: any third captain in the room may back an outstanding loan, one backer per loan, and the pledge leaves their purse the moment it is accepted. Outstanding loans moved from server memory into the `Loan` table so a restart cannot destroy escrowed Gold. Resolution is `computeBackingResolution` in `src/lib/game/backing.ts`: a full repayment returns the pledge with a small Reputation bonus, a shortfall calls the pledge up to its own size and returns the rest. Reputation from lending and backing together is capped per voyage by `helperReputationCapFor`, so two captains cannot farm it by passing one loan back and forth.
 
 ### 06. Partial Sight
 
@@ -129,7 +139,7 @@ Extends a shipped feature. Effort: light. **Shipped.**
 
 **Why this fits.** It respects what already shipped instead of redoing it, and answers the one real gap the shipped version leaves open: gold that currently has nowhere useful to go once its original owner is out of the voyage.
 
-**System notes.** Built as `redirectToUserId`/`redirectToName` on the server's own `LoanRecord`, set only by the lender through a new `loan:redirect` event, checked at the same `aid:repay` settlement point `src/server/realtime.ts` already runs when a debt is repaid. One nuance the original proposal did not anticipate: the original lender's own client still carries the loan in its local `loansGiven` list, and since `aid:repaid` now goes to the redirect target instead of them, they would never otherwise learn it closed. A second, Gold free event, `aid:redirected`, tells their client to stop tracking it (see `clearRedirectedLoan` in `src/lib/game/engine.ts`) without crediting them a second time. The Bankruptcy screen itself gained a `members`/`backing` prop pair to render the picker, both optional so no other caller of that screen needs to change.
+**System notes.** Built as `redirectToUserId`/`redirectToName` on the server's own `LoanRecord`, set only by the lender through a new `loan:redirect` event, checked at the same `aid:repay` settlement point `src/server/realtime.ts` already runs when a debt is repaid. One nuance the original proposal did not anticipate: the original lender's own client still carries the loan in its local `loansGiven` list, and since `aid:repaid` now goes to the redirect target instead of them, they would never otherwise learn it closed. A second, Gold free event, `aid:redirected`, tells their client to stop tracking it (see `clearRedirectedLoan` in `src/lib/game/engine/aid.ts`) without crediting them a second time. The Bankruptcy screen itself gained a `members`/`backing` prop pair to render the picker, both optional so no other caller of that screen needs to change.
 
 ## III. Identity and the long game
 
@@ -217,7 +227,9 @@ New validation logic. Effort: moderate, do this before entries eight, ten, and e
 
 **Why this fits.** This project chose, on purpose, to let every client compute its own state rather than running an authoritative server, and that choice is not being reversed here. It was a reasonable choice when the only thing at stake was one voyage's local score. It stops being reasonable the moment entries eight, ten, and eleven all start reading off account level numbers that a doctored save could inflate, which is exactly why this entry is flagged to ship before those three rather than after.
 
-**System notes.** Confirmed directly by reading the route file before writing this proposal, rather than assumed from the source page alone, since the source page had already proven inaccurate on three other points by the time this section was reached.
+**System notes.** Confirmed directly by reading the route file before writing this proposal, rather than assumed from the source page alone.
+
+**As built.** `src/lib/game/integrity.ts` judges a save against a ceiling derived from the largest Gold or Reputation a single round could produce, multiplied by the round the room itself has reached, which is the one number a client cannot forge. Two bands exist: "suspect" is recorded and nothing else, "impossible" is what acts. The save is always written; what an impossible one earns is a permanent `integritySeverity` and `integrityNote` on the `GameState` row. The consequence lands at voyage conclusion, which consults both the live finishing figures and that stored mark: a forged finisher still finishes and still appears in the standings, but banks no Renown, earns no merits, and is taken out of the running for the crown rather than crowned and stripped.
 
 ### 14. Harbor Watch
 
@@ -231,7 +243,7 @@ New mechanism. Effort: light. **Shipped.**
 
 **Why this fits.** This is a plain gap in this project's own social surface, not a reaction to anything in the sibling codebase. A game whose entire pitch is a small group of real people talking to each other in real time needs some way to handle one disruptive person that costs less than resetting everyone else's progress, and today it has none.
 
-**System notes.** Built as a per-room `Set<userId>` in memory (`roomMutedUsers`), not a schema column: a mute only ever lasts "for the remainder of the voyage," and every other per-voyage-only flag in this file (`roomSurges`, `roomDocksWinners`, and so on) already follows that same in-memory, cleared-on-restart convention. Checked by `chat:room` in `src/server/realtime.ts` before a message is even persisted, host only, gated the same way `room:restart` already is. The muted set rides along on the existing `room:members` broadcast as `mutedUserIds` rather than a new event, so the roster, the host's own mute control, and the muted captain's own client all learn about a change from the one broadcast every client already listens to.
+**System notes.** Built as a per room `Set<userId>` in memory (`roomMutedUsers`), not a schema column: a mute only ever lasts "for the remainder of the voyage," and every other flag that lasts only one voyage in this file (`roomSurges`, `roomDocksWinners`, and so on) already follows that same in memory convention of clearing on restart. Checked by `chat:room` in `src/server/realtime.ts` before a message is even persisted, host only, gated the same way `room:restart` already is. The muted set rides along on the existing `room:members` broadcast as `mutedUserIds` rather than a new event, so the roster, the host's own mute control, and the muted captain's own client all learn about a change from the one broadcast every client already listens to.
 
 ## V. Getting more captains to the table
 
@@ -261,7 +273,7 @@ New mechanism. Effort: light. **Shipped.**
 
 **Why this fits.** It is a small, self contained fix to a specific, confirmed detail already sitting in the constants file, the kind of basic accessibility care that costs very little and excludes nobody who does not choose to use it.
 
-**System notes.** Built as `COLORS_COLORBLIND_SAFE` in `src/lib/game/constants.ts`, shaped exactly like the existing `COLORS` constant, anchored on the Okabe and Ito palette so every hue stays distinguishable under the common forms of color vision deficiency, separated by lightness and saturation as well as hue rather than hue alone. `useColorPreference` in `src/lib/use-color-preference.ts` reads and writes the choice to `localStorage`, matching how the onboarding tutorial's own seen flag already persists; a `colorFor` function it returns threads down as an optional prop through every panel that colors a good's name (`GameStatusPanel`, `PlayerDetailModal`, and the Purchase, Barter, Worker, and Orders phase panels), falling back to the plain `COLORS` lookup for any caller that does not pass it. No engine or database change, exactly as proposed.
+**System notes.** Built as `COLORS_COLORBLIND_SAFE` in `src/lib/game/constants.ts`, shaped exactly like the existing `COLORS` constant, anchored on the Okabe and Ito palette so every hue stays distinguishable under the common forms of color vision deficiency, separated by lightness and saturation as well as hue rather than hue alone. `useColorPreference` in `src/lib/useColorPreference.ts` reads and writes the choice to `localStorage`, matching how the onboarding tutorial's own seen flag already persists; a `colorFor` function it returns threads down as an optional prop through every panel that colors a good's name (`GameStatusPanel`, `PlayerDetailModal`, and the Purchase, Barter, Worker, and Orders phase panels), falling back to the plain `COLORS` lookup for any caller that does not pass it. No engine or database change, exactly as proposed.
 
 ### 17. Quick Start Match
 
@@ -287,11 +299,11 @@ New interface. Effort: light. **Shipped**, with a correction below to what "the 
 
 **The situation today, corrected.** By the time this entry was actually picked up, `MembersPanel.tsx` had already grown a live, always visible roster row per captain (round, phase, gold, Reputation, no click required), built from the same `game:status` broadcast this entry's original proposal assumed was still locked behind a one captain, one click, one modal design. That earlier claim, checked directly against the source rather than assumed, did not hold up. What the roster panel does not solve is layout: it sits in the right column of the three column desktop grid, and on any screen under the `lg` breakpoint it stacks to the very bottom of the page, behind the phase panel, so a captain on a phone has to scroll past everything else to see it.
 
-**What we actually add.** A second, genuinely distinct component: a slim horizontal strip mounted directly under the header, full width, on every screen size, so the whole harbor's headline numbers are visible without scrolling past anything, on desktop and mobile alike. It does not replace the roster panel, which still owns the fuller per-captain view, the click through to the detail popup, and now the Harbor Watch mute control too; it exists specifically to close the mobile-layout gap the roster panel's own stacking order left open.
+**What we actually add.** A second, genuinely distinct component: a slim horizontal strip mounted directly under the header, full width, on every screen size, so the whole harbor's headline numbers are visible without scrolling past anything, on desktop and mobile alike. It does not replace the roster panel, which still owns the fuller view of each captain, the click through to the detail popup, and now the Harbor Watch mute control too; it exists specifically to close the gap in the mobile layout the roster panel's own stacking order left open.
 
 **Why this fits.** It still asks for no new server data. The server already computes and sends everything this needs over `game:status`, exactly as originally proposed; only the actual gap being closed changed, from "there is no glance view at all" to "the glance view that already exists is not always on screen."
 
-**System notes.** `src/components/portmasters/FleetTicker.tsx`, a new component with its own self-contained `room:members`/`game:status` subscription, the same pattern `MembersPanel.tsx` already uses rather than threading a second copy of that state down from `GameRoom.tsx`. No server change required at all.
+**System notes.** `src/components/portmasters/FleetTicker.tsx`, a new component with its own self contained `room:members`/`game:status` subscription, the same pattern `MembersPanel.tsx` already uses rather than threading a second copy of that state down from `GameRoom.tsx`. No server change required at all.
 
 ## Suggested order of work
 

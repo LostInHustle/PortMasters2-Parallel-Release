@@ -8,7 +8,7 @@ import type { PublicUser } from "@/lib/api";
 import { Avatar } from "../../shared";
 import type { PhaseSync } from "./PhaseShared";
 
-// The pre-voyage lobby roster: just avatars and a headcount, no ready/not
+// The pre voyage lobby roster: just avatars and a headcount, no ready/not
 // ready state since there's nothing to ready up for yet. Separate from
 // ReadyBar (used everywhere else) on purpose, since reusing its check
 // marks here would imply a vote that doesn't exist for this screen.
@@ -144,7 +144,7 @@ export function Welcome({
         />
         <InfoCard
           tone="sea"
-          title="💸 Round-End Costs"
+          title="💸 Round End Costs"
           rows={[
             "🔧 Maintenance: 15 Gold (fixed each round)",
             "👥 Wages settled at Phase 3, not on hire",
@@ -154,7 +154,7 @@ export function Welcome({
           tone="rose"
           title="🧾 Taxes Explained"
           rows={[
-            "VAT: 5% of finished-good profit margin",
+            "VAT: 5% of finished good profit margin",
             "Income Tax: 10% of round net profit",
           ]}
         />

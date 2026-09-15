@@ -38,6 +38,10 @@ Railway’s filesystem is cleared on every deploy, so the SQLite file must live 
 2. Set `DATABASE_URL=file:/data/prod.db` on the service.
 3. Deploy. `npm run start` runs `prisma migrate deploy` before starting the server (see `package.json`), so the tables are created automatically the first time the app boots against that volume, no manual step required.
 
+### Opening the Harbor Office
+
+The admin console at `/admin` stays closed until the service has an `ADMIN_KEY` variable. Set it on the Railway service alongside `DATABASE_URL`, using something long and random, then sign in to the deployed game with the account that should run the harbor, open `/admin`, and present the key. That account becomes the one admin, permanently, and can appoint moderators from there. Choose the account with care: the seat is claimed exactly once, and after that the key opens nothing for anyone, the admin included. The key is never written to the database, so rotating it is just changing the variable and redeploying. If the admin account is ever lost, the seat is released only by hand, by clearing that account's `role` column in the database, after which the key works exactly once more.
+
 ### Picking up a schema change
 
 Schema changes are committed as migrations under `prisma/migrations/` (`npm run db:migrate` locally to generate one). `prisma migrate deploy` runs automatically on every boot via the `start` script and only applies migrations that haven't run yet, so it's safe on every deploy and never modifies existing rows. There is nothing extra to run by hand in production.

@@ -10,8 +10,8 @@
 //
 // The explain* functions are deliberate duplicates of their calc*
 // counterparts rather than the calc* functions delegating to them. That
-// keeps the balance-critical math, ported verbatim from the original
-// single-player build, from ever having to change shape to accommodate a
+// keeps the balance critical math, ported verbatim from the original
+// single player build, from ever having to change shape to accommodate a
 // tooltip. The cost of that choice is that a balance change has to be made
 // in two places; the benefit is that a tooltip bug can never become a
 // pricing bug.
@@ -50,7 +50,7 @@ function boonNameForModifierKey(key: string): string {
   return BOONS.find((b) => key in b.modifiers)?.name ?? "Active boon";
 }
 
-// ---------- Transport ----------
+// ========== Transport ==========
 export function calcTransportCost(
   state: GameState,
   totalItems: number,
@@ -72,9 +72,9 @@ export function calcTransportCost(
   return Math.max(0, cost);
 }
 
-// A separate, display-only mirror of calcTransportCost above. Kept as its
+// A separate, display only mirror of calcTransportCost above. Kept as its
 // own function rather than having calcTransportCost delegate to it, so the
-// balance-critical "preserved verbatim" math above never has to change to
+// balance critical "preserved verbatim" math above never has to change to
 // accommodate a tooltip.
 export function explainTransportCost(
   state: GameState,
@@ -136,7 +136,7 @@ export function explainTransportCost(
   return { base, steps, final: Math.max(0, cost) };
 }
 
-// ---------- Taxes ----------
+// ========== Taxes ==========
 export function calcVAT(
   state: GameState,
   product: string,
@@ -160,7 +160,7 @@ export function calcVAT(
   return 0;
 }
 
-// Display-only mirror of calcVAT above, same reasoning as
+// Display only mirror of calcVAT above, same reasoning as
 // explainTransportCost: the tooltip gets its own copy of the math instead
 // of touching the function the actual sale relies on.
 export function explainVAT(
@@ -214,9 +214,9 @@ export function calcIncomeTax(state: GameState, preTax: number): number {
   return tax;
 }
 
-// ---------- Market card pricing ----------
-// The same math as getCardFinalCost, but reported as a step-by-step
-// breakdown so the buying-phase tooltip can show exactly where a price
+// ========== Market card pricing ==========
+// The same math as getCardFinalCost, but reported as a step by step
+// breakdown so the buying phase tooltip can show exactly where a price
 // came from: base cost, then whatever boon or module touched it.
 export function explainCardPrice(
   state: GameState,
@@ -339,14 +339,14 @@ export function explainExpectedPrice(
   return { min, max, isProduct: !isResource, modifiers };
 }
 
-// ---------- Wages ----------
-// The canonical per-worker, per-round wage for a given type, given every
-// currently active modifier. There is no separate one-time "hiring fee"
+// ========== Wages ==========
+// The canonical per worker, per round wage for a given type, given every
+// currently active modifier. There is no separate one time "hiring fee"
 // in this game (see hireWorker, which never touches state.money);
 // the number this returns is what Phase 3 actually charges for that
 // worker, so every place that shows or charges a wage, this function,
 // payWages, and the Pending Payroll preview in WorkerMgmt (GamePhasePanel.tsx),
-// must all read from here rather than re-deriving the formula themselves.
+// must all read from here rather than working the formula out again themselves.
 // Root cause of the Master's Apprentice bug: payWages and that preview
 // used to hardcode WAGES[type] with only the Artisan's Workshop
 // surcharge, so hire_discount silently never reduced the actual wage
@@ -359,7 +359,7 @@ export function getHireCost(state: GameState, type: string): number {
   return wage;
 }
 
-// ---------- Broker's Favor ----------
+// ========== Broker's Favor ==========
 // The Broker's cut on a Broker's Favor order, a saturating curve rather
 // than a flat rate. Net payout climbs almost one for one with reward at
 // first (a small order keeps the feel of a low flat rate) but bends hard as

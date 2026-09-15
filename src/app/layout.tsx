@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: `${APP_NAME}: Lords of the Silk Road Online`,
   description:
-    "A multiplayer maritime trade game. Register, set sail in shared harbors, trade the Silk Road, and race rival captains across eight synchronized voyages.",
+    "A multiplayer maritime trade game. Register, set sail in shared harbors, trade the Silk Road, and race rival captains through a voyage everyone plays in lockstep.",
   keywords: [
     APP_NAME,
     "multiplayer game",

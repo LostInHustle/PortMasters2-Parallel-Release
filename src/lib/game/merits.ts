@@ -1,13 +1,13 @@
 // =====================================================================
 // PortMasters 2 Parallel Release: Captain's Merits
-// One-time, account-wide achievement badges, a third strand of persistent
-// progression alongside Renown (see legacy.ts) and Daily Check-In (see
+// One time, account wide achievement badges, a third strand of persistent
+// progression alongside Renown (see legacy.ts) and Daily Check In (see
 // checkin.ts). Pure functions only (no React, no Prisma), so both the
 // client (the trophy row in CaptainLegacyCard) and the server (the voyage
 // conclusion check in src/server/realtime.ts, the only place a merit is
 // ever granted) share the exact same rules for what counts.
 //
-// Unlike Renown XP and Check-In rewards, a merit carries no gameplay
+// Unlike Renown XP and Check In rewards, a merit carries no gameplay
 // power of its own, purely bragging rights, so this list can grow freely
 // without ever touching the voyage economy.
 // =====================================================================
@@ -22,7 +22,7 @@ const monsoon = DIFFICULTIES.monsoon;
 
 // Reputation bar for the hardest tier's endurance badge. Deliberately below the
 // top merchant rating (see MERCHANT_RATINGS), since surviving sixteen rounds of
-// Monsoon at all is the achievement being recognised here, not out-earning
+// Monsoon at all is the achievement being recognised here, not out earning
 // every other captain.
 const EYE_OF_THE_STORM_REPUTATION = 200;
 

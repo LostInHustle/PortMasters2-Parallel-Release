@@ -2,7 +2,7 @@
 // Bartering: swapping goods and Gold directly with another captain,
 // outside the market entirely.
 //
-// The escrow-on-post design is the important part. Posting an offer takes
+// The escrow on post design is the important part. Posting an offer takes
 // the offered goods out of the hold immediately rather than at accept
 // time, which is what stops a captain from posting the same stock in two
 // offers and having both accepted. Everything that follows (cancel,
@@ -20,7 +20,7 @@ import { addOwnedAmount, getOwnedAmount } from "./core";
 
 // Posting an offer escrows the offered amount immediately (deducted on the
 // spot, the same way buying a card spends gold right away), so a captain
-// can't post the same Hemp in two offers at once and double-spend it once
+// can't post the same Hemp in two offers at once and double spend it once
 // both get accepted. Returns true on success; false (with a log line, no
 // state change) if any of the four barter constraints are violated.
 export function postBarterOffer(

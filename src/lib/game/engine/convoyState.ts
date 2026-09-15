@@ -1,5 +1,5 @@
 // =====================================================================
-// [MANIFEST 04: Convoy Ventures] The client-side Gold effects of backing
+// [MANIFEST 04: Convoy Ventures] The client side Gold effects of backing
 // and settling a convoy venture. The venture's own math (contribution
 // caps, deadline windows, payout rates) is pure and already lives in
 // ../convoy.ts; this file is only the part that moves money.

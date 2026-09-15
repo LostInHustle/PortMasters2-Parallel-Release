@@ -10,8 +10,8 @@ import { GLOSSARY } from "@/lib/game/glossary";
 import { unlockedProducts, unlockedResources } from "@/lib/game/pools";
 
 /**
- * Tooltip bodies for the two price-explanation hovers in the game: an
- * exact step-by-step breakdown for a specific market card or trade order
+ * Tooltip bodies for the two price explanation hovers in the game: an
+ * exact step by step breakdown for a specific market card or trade order
  * (PriceBreakdownTooltip), and a general "what does this usually cost"
  * range for any raw material or product, on or off the current market
  * (ExpectedPriceTooltip, buying phase only, see the Term usages in

@@ -2,7 +2,7 @@
 // The two things a captain chooses rather than earns: the Boon drafted at
 // the head of every round, and the ship Modules bolted on in the shipyard.
 //
-// Both are drafts with a once-per-round reroll, but they are deliberately
+// Both are drafts with a once per round reroll, but they are deliberately
 // priced differently. A Boon reroll costs Gold, because the pool is the
 // only scarce thing about it. A Module reroll is free, because the scarce
 // thing there is the equippable slot, not the offer.
@@ -154,8 +154,8 @@ export function startBoonDrafting(state: GameState, logs: string[]) {
 
 // Rerolls the current boon pool for 10 Gold, once per round. The fee (and
 // the cap) exist so a captain can correct for genuinely bad luck without
-// being able to free-reroll until the pool happens to contain whatever
-// they want, see the matching swapModuleChoices below for the no-cost
+// being able to free reroll until the pool happens to contain whatever
+// they want, see the matching swapModuleChoices below for the free
 // equivalent on the module side, where the scarcity is the equippable
 // slots rather than a gold sink.
 export function swapBoonChoices(state: GameState, logs: string[]) {
@@ -206,7 +206,7 @@ function rollModuleChoices(state: GameState): Module[] {
 // Only rolls a fresh pool the first time this is called for the round
 // (state._draftChoices reset to undefined by startBoonDrafting above).
 // Reopening the draft screen afterwards, including via the
-// Back-to-Shipyard-then-Draft-again loop this whole system exists to
+// back to the Shipyard and then drafting again loop this whole system exists to
 // close off, just reshows whatever the round already has on offer.
 export function startModuleDrafting(state: GameState) {
   if (state._draftChoices === undefined) {
@@ -277,7 +277,7 @@ export function finalizeModuleSwap(
 // A captain joining a room for the first time should drop into the voyage
 // wherever the room currently is rather than back at round 1, otherwise
 // they'd never be able to ready up for the same checkpoint as everyone
-// else (see the ready-check protocol in src/server/realtime.ts). This runs
+// else (see the ready check protocol in src/server/realtime.ts). This runs
 // the same setup calls a normal transition would, just once, up front, so
-// a fresh captain lands on a fully-formed phase (cards generated, etc.)
+// a fresh captain lands on a fully formed phase (cards generated, etc.)
 // instead of an empty one.

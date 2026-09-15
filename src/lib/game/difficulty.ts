@@ -2,7 +2,7 @@
 // PortMasters 2 Parallel Release: difficulty modes
 //
 // One data record defines every difficulty tier, and a thin layer of pure
-// selectors derives each in-game dial from it. This mirrors the original
+// selectors derives each in game dial from it. This mirrors the original
 // PortMasters 2 design (a single DIFFICULTIES record plus difficultyRules
 // helpers), rebuilt around the Parallel Release's own systems.
 //
@@ -18,7 +18,7 @@
 // cards on each board, no mandates and no corrupt brokers. Those numbers used
 // to be flat constants in ./constants; moving them here changed nothing for
 // the existing mode, and it is what lets the two richer tiers vary them.
-// See docs/DIFFICULTY_MODES_PROPOSAL.md.
+// See docs/DIFFICULTY_TIERS.md.
 // =====================================================================
 
 export type Difficulty = "fair_winds" | "open_waters" | "monsoon";
@@ -28,7 +28,7 @@ export const DEFAULT_DIFFICULTY: Difficulty = "fair_winds";
 export interface DifficultyConfig {
   key: Difficulty;
   // Display metadata, read by the lobby switch, the room card chip, and the
-  // in-game status chip, so copy and numbers never drift from one source.
+  // in game status chip, so copy and numbers never drift from one source.
   name: string;
   badge: string;
   icon: string;
@@ -38,14 +38,14 @@ export interface DifficultyConfig {
   // Voyage length. Flows into GameState.maxRounds; the endgame check already
   // reads maxRounds, so a longer voyage needs nothing else.
   rounds: number;
-  // Starting stake and the flat per-round ship maintenance fee.
+  // Starting stake and the flat per round ship maintenance fee.
   startingGold: number;
   maintenance: number;
 
   // Market breadth. Both boards (port purchase and trade orders) start at the
   // base count and gain the same number of extra cards once the voyage reaches
-  // each "charter" round, reproducing the original's widening market without a
-  // new-content library. An empty schedule (fair_winds) is a flat market.
+  // each "charter" round, the same widening market the original had. An empty
+  // schedule (fair_winds) is a flat market.
   purchaseCardsBase: number;
   orderCardsBase: number;
   // Content tier to the round its charter opens (see the tiered pools in
@@ -62,7 +62,7 @@ export interface DifficultyConfig {
   // a raid still takes every coin, faithful to the Parallel Release identity,
   // so difficulty escalates the chance rather than the loss fraction.
   pirateChance: readonly [number] | readonly [number, number];
-  // Escort fee as a fraction of current gold, the guaranteed-safe alternative
+  // Escort fee as a fraction of current gold, the guaranteed safe alternative
   // to risking the raid roll.
   escortCostRate: number;
 
@@ -83,7 +83,7 @@ export interface DifficultyConfig {
 }
 
 // The launch tuning. fair_winds is calibrated to equal the current single
-// mode exactly; open_waters and monsoon follow docs/DIFFICULTY_MODES_PROPOSAL.md.
+// mode exactly; open_waters and monsoon follow docs/DIFFICULTY_TIERS.md.
 export const DIFFICULTIES: Record<Difficulty, DifficultyConfig> = {
   fair_winds: {
     key: "fair_winds",
@@ -164,8 +164,8 @@ export const DIFFICULTY_ORDER: readonly Difficulty[] = [
 ];
 
 // Imperial mandate templates, ordered small to large, indexed by the mandates
-// schedule above. Consumed once mandate injection is wired (later phase); kept
-// here so the whole tier definition lives in one file.
+// schedule above and dealt by startPhase2 in ./engine/orders. Kept here so the
+// whole tier definition lives in one file.
 export interface MandateTemplate {
   size: "small" | "medium" | "large";
   port: string;
@@ -208,7 +208,7 @@ export const MANDATE_TEMPLATES: readonly MandateTemplate[] = [
   },
 ];
 
-// ---------- Selectors (pure) ----------
+// ========== Selectors (pure) ==========
 
 // Any unknown value (a stale save, a malformed request) falls back to the
 // default tier rather than throwing, the same defensive shape the original's
@@ -243,9 +243,6 @@ export function renownMultiplierFor(value: unknown): number {
   return difficultyConfig(value).renownXpMultiplier;
 }
 
-// Card counts for both boards on a given round: the base plus every charter
-// bump the voyage has reached by now. Mirrors the accumulation of the
-// original's tier unlocks / phaseOptionCount, expressed as card density.
 // The highest content tier whose charter has opened by this round. Everything
 // tier gated (goods, ports, artisans, boons, modules, market breadth) keys off
 // this one number, so they can never disagree about what is available.
@@ -272,6 +269,9 @@ export function unlockedPool<T>(
   return out;
 }
 
+// Card counts for both boards on a given round: the base plus every charter
+// bump the voyage has reached by now. Mirrors the accumulation of the
+// original's tier unlocks and phaseOptionCount, expressed as card density.
 export function marketCountsFor(
   value: unknown,
   roundNo: number,
@@ -286,27 +286,15 @@ export function marketCountsFor(
   };
 }
 
-// Which content tier's charter opens on exactly this round, if any, so the
-// caller can announce what actually arrived rather than a generic banner.
-export function charterTierOpeningOn(
-  value: unknown,
-  roundNo: number,
-): number | undefined {
-  for (const [tierStr, openRound] of Object.entries(
-    difficultyConfig(value).tierUnlock,
-  )) {
-    if (roundNo === openRound) return Number(tierStr);
-  }
-  return undefined;
-}
-
+// Whether a content tier's charter opens on exactly this round, which is
+// when startPhase1 announces the busier harbor.
 export function charterOpensOn(value: unknown, roundNo: number): boolean {
-  return charterTierOpeningOn(value, roundNo) !== undefined;
+  return Object.values(difficultyConfig(value).tierUnlock).includes(roundNo);
 }
 
-// Raid probability for this round: the flat toll, or the second-half tier once
+// Raid probability for this round: the flat toll, or the second half tier once
 // the voyage passes its midpoint. Same midpoint rule the original used for its
-// pirate-loss curve (floor(maxRounds / 2)).
+// pirate loss curve (floor(maxRounds / 2)).
 export function pirateChanceFor(
   value: unknown,
   roundNo: number,

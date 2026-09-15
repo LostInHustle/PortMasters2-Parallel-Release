@@ -25,7 +25,7 @@ import {
 } from "./constants";
 import { DIFFICULTIES } from "./difficulty";
 
-// ---------- Deriving the ceiling ----------
+// ========== Deriving the ceiling ==========
 // Every number below is read from the live game data rather than written
 // out by hand, the same reasoning merits.ts follows when it reads its own
 // thresholds from MERCHANT_RATINGS: a charter that adds a richer good or a
@@ -67,7 +67,7 @@ export const MAX_PLAUSIBLE_GOLD_PER_ROUND =
 // Reputation per completed order is floor(reward - transport), so it can
 // never outrun the Gold ceiling above. Lending and backing add a little on
 // top, both a fraction of Gold already counted, so the same number serves.
-export const MAX_PLAUSIBLE_SCORE_PER_ROUND = MAX_PLAUSIBLE_GOLD_PER_ROUND;
+const MAX_PLAUSIBLE_SCORE_PER_ROUND = MAX_PLAUSIBLE_GOLD_PER_ROUND;
 
 // Room to be wrong. A captain begins with a stake plus a Renown bonus, and
 // a room's round can advance while a save is still in flight, so the
@@ -88,7 +88,7 @@ const STARTING_ALLOWANCE = 500;
 // unlucky captains were losing their Renown. The claim is what stopped
 // anyone looking. A high ceiling makes a false positive unlikely from above
 // and says nothing about every other assumption in here, so treat the rules
-// below as the thing to re-examine, not this paragraph.
+// below as the thing to reexamine, not this paragraph.
 export function plausibleCeiling(perRound: number, roundsElapsed: number) {
   const rounds = Math.max(1, Math.floor(roundsElapsed));
   return perRound * (rounds + 1) + STARTING_ALLOWANCE;
@@ -112,7 +112,7 @@ const SUSPECT_FRACTION = 10;
 
 export type IntegritySeverity = "ok" | "suspect" | "impossible";
 
-// ---------- Reading a save ----------
+// ========== Reading a save ==========
 // Both fields are optional, and that is the point. An earlier version
 // required both and returned null if either was missing or the wrong type,
 // which meant a save could skip the guard entirely simply by leaving one of
@@ -121,7 +121,7 @@ export type IntegritySeverity = "ok" | "suspect" | "impossible";
 // whatever is not is passed over.
 export type SaveSnapshot = { money?: number; score?: number };
 
-// A save is a free-form JSON blob written by a client, so every field here is
+// A save is a free form JSON blob written by a client, so every field here is
 // treated as untrusted input rather than as a number. Null is returned only
 // when the payload is not an object at all, since there is then nothing to
 // read; a payload that is an object always yields a snapshot, carrying

@@ -5,7 +5,7 @@
 // Everything here is orchestration. Each function's job is to call into
 // the subsystems in the right order and move state.phase along, which is
 // why this module imports from nearly every sibling and none of them
-// import back. That one-way flow is deliberate: the subsystems stay
+// import back. That one way flow is deliberate: the subsystems stay
 // independently testable, and the sequencing lives in exactly one place.
 //
 // nextPhase and snapToCheckpoint are the two dispatch tables. The first
@@ -40,7 +40,7 @@ export function endRound(state: GameState, logs: string[]) {
   logs.push(`   📦 Materials: ${state.materialCosts} Gold`);
   logs.push(`   👥 Wages: ${state.workerWages} Gold`);
   const preTax = state.roundRevenue - totalCost;
-  logs.push(`📈 Pre-tax Profit: ${preTax} Gold`);
+  logs.push(`📈 Pre tax Profit: ${preTax} Gold`);
   const tax = calcIncomeTax(state, preTax);
   if (tax > 0) {
     state.money -= tax;
@@ -88,7 +88,7 @@ export function startPhase3(state: GameState, logs: string[]) {
   processProduction(state, logs);
 }
 
-// Moved to ./engine/pirates and re-exported so existing imports of
+// Moved to ./engine/pirates and reexported so existing imports of
 // `@/lib/game/engine` keep working. Imported below as well, since
 // nextPhase and snapToCheckpoint still dispatch to resolvePirateAttack.
 
@@ -194,7 +194,7 @@ export function showWelcome(state: GameState, logs: string[]) {
 export function nextPhase(state: GameState, ctx: GameContext, logs: string[]) {
   if (state.phase === 1) completePhase1(state, logs);
   // No refunds here: this generic fallback is only reached via the
-  // control-bar "Next Phase" button / Ctrl+N, which a captain who has
+  // control bar "Next Phase" button / Ctrl+N, which a captain who has
   // actually posted a barter offer wouldn't use without first visiting the
   // Bartering phase panel itself (whose own "Done Bartering" button passes
   // the real refund list, see GamePhasePanel.tsx).
@@ -242,9 +242,9 @@ export function snapToCheckpoint(
   }
 }
 
-// Human-readable label for the current phase (for the multiplayer status
+// Human readable label for the current phase (for the multiplayer status
 // panel and the player detail popup). Takes just the two fields it needs
-// rather than a full GameState so it can also describe the lighter-weight
+// rather than a full GameState so it can also describe the lighter weight
 // snapshot used for someone else's detail popup.
 export function phaseLabel(state: {
   phase: GameState["phase"];

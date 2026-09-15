@@ -2,7 +2,7 @@
 
 import type { Socket } from "socket.io-client";
 import type { PublicUser } from "@/lib/api";
-import { useRoomRoster } from "@/lib/use-room-roster";
+import { useRoomRoster } from "@/lib/useRoomRoster";
 import { Avatar } from "./shared";
 import { cn } from "@/lib/utils";
 import { Coins, Trophy, SkullIcon } from "lucide-react";

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { QuantityInput } from "@/components/ui/quantity-input";
+import { QuantityInput } from "@/components/ui/quantityInput";
 import { BARTER_ITEMS, ICONS } from "@/lib/game/constants";
 import {
   completeBarterPhase,
@@ -12,10 +12,10 @@ import {
 } from "@/lib/game/engine";
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
-import { itemColorResolver } from "@/lib/use-color-preference";
+import { itemColorResolver } from "@/lib/useColorPreference";
 import { Handshake, X } from "lucide-react";
 import type { PublicUser } from "@/lib/api";
-import type { BarterOffer } from "@/lib/use-barter";
+import type { BarterOffer } from "@/lib/useBarter";
 import { Term } from "../../Term";
 import { ItemIcon } from "../../shared";
 import { ReadyFooter, type Barter, type PhaseSync } from "./PhaseShared";

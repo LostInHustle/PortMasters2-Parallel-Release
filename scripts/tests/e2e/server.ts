@@ -17,6 +17,8 @@ export type TestServer = {
   stop: () => Promise<void>;
 };
 
+export const E2E_ADMIN_KEY = "e2e harbor master key";
+
 function waitForServer(url: string, timeoutMs: number): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   return new Promise((resolve, reject) => {
@@ -77,6 +79,9 @@ export async function startTestServer(): Promise<TestServer> {
       DATABASE_URL: databaseUrl,
       PORT: String(port),
       NODE_ENV: "development",
+      // Opens the admin console for the scenario that exercises it. Only
+      // this isolated instance ever sees the value.
+      ADMIN_KEY: E2E_ADMIN_KEY,
     },
     stdio: "pipe",
   });
@@ -91,7 +96,7 @@ export async function startTestServer(): Promise<TestServer> {
   } catch (err) {
     child.kill();
     throw new Error(
-      `${(err as Error).message}\n--- server output ---\n${startupLog.join("")}`,
+      `${(err as Error).message}\n=== server output ===\n${startupLog.join("")}`,
     );
   }
 

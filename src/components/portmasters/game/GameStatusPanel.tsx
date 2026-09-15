@@ -16,9 +16,9 @@ import {
   unlockedResources,
   unlockedWorkerTypes,
 } from "@/lib/game/pools";
-import type { ConvoyVenture } from "@/lib/use-convoy";
+import type { ConvoyVenture } from "@/lib/useConvoy";
 import { cn } from "@/lib/utils";
-import { itemColorResolver } from "@/lib/use-color-preference";
+import { itemColorResolver } from "@/lib/useColorPreference";
 import { Term } from "../Term";
 import { priceAwareTermContent } from "./PriceTooltips";
 import { GameLogPanel } from "./GameLogPanel";
@@ -439,7 +439,7 @@ function SubRow({ label, value }: { label: string; value: string }) {
 }
 
 // [MANIFEST 04: Convoy Ventures] Lives in the Dues tab, right beside
-// Outstanding Loans, since both are peer-to-peer Gold commitments a captain
+// Outstanding Loans, since both are peer to peer Gold commitments a captain
 // is tracking against the rest of the harbor. Deliberately compact: a two
 // field post form, then one card per open venture with its own progress bar
 // and a one field contribute control, matching the density the rest of this

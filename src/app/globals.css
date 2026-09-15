@@ -8,19 +8,6 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -35,8 +22,6 @@
   --color-primary: var(--primary);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -48,8 +33,6 @@
   /* PortMasters 2 Parallel Release maritime palette: seafoam teal + harbour gold */
   --background: oklch(0.975 0.012 195);
   --foreground: oklch(0.22 0.03 220);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.22 0.03 220);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.22 0.03 220);
   --primary: oklch(0.55 0.11 195);
@@ -64,26 +47,11 @@
   --border: oklch(0.9 0.015 195);
   --input: oklch(0.92 0.015 195);
   --ring: oklch(0.55 0.11 195);
-  --chart-1: oklch(0.6 0.13 195);
-  --chart-2: oklch(0.78 0.14 85);
-  --chart-3: oklch(0.62 0.18 150);
-  --chart-4: oklch(0.7 0.15 40);
-  --chart-5: oklch(0.58 0.2 300);
-  --sidebar: oklch(0.98 0.01 195);
-  --sidebar-foreground: oklch(0.22 0.03 220);
-  --sidebar-primary: oklch(0.55 0.11 195);
-  --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(0.95 0.02 195);
-  --sidebar-accent-foreground: oklch(0.3 0.04 200);
-  --sidebar-border: oklch(0.9 0.015 195);
-  --sidebar-ring: oklch(0.55 0.11 195);
 }
 
 .dark {
   --background: oklch(0.17 0.025 225);
   --foreground: oklch(0.96 0.01 200);
-  --card: oklch(0.22 0.03 225);
-  --card-foreground: oklch(0.96 0.01 200);
   --popover: oklch(0.22 0.03 225);
   --popover-foreground: oklch(0.96 0.01 200);
   --primary: oklch(0.7 0.13 190);
@@ -98,19 +66,6 @@
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 14%);
   --ring: oklch(0.7 0.13 190);
-  --chart-1: oklch(0.65 0.14 190);
-  --chart-2: oklch(0.8 0.14 85);
-  --chart-3: oklch(0.66 0.16 150);
-  --chart-4: oklch(0.72 0.15 40);
-  --chart-5: oklch(0.62 0.2 300);
-  --sidebar: oklch(0.2 0.03 225);
-  --sidebar-foreground: oklch(0.96 0.01 200);
-  --sidebar-primary: oklch(0.7 0.13 190);
-  --sidebar-primary-foreground: oklch(0.16 0.03 225);
-  --sidebar-accent: oklch(0.27 0.025 225);
-  --sidebar-accent-foreground: oklch(0.96 0.01 200);
-  --sidebar-border: oklch(1 0 0 / 12%);
-  --sidebar-ring: oklch(0.7 0.13 190);
 }
 
 @layer base {
@@ -126,7 +81,7 @@
    PortMasters 2 Parallel Release: maritime gradient surfaces and utilities
    ===================================================================== */
 @layer utilities {
-  /* App canvas: a soft, naturally-blended sea gradient with harbour glows. */
+  /* App canvas: a soft, naturally blended sea gradient with harbour glows. */
   .pm-canvas {
     background:
       radial-gradient(
@@ -205,7 +160,7 @@
     box-shadow: 0 18px 50px -18px oklch(0.03 0.01 230 / 0.7);
   }
 
-  /* Harbour-gold accent gradient text. */
+  /* Harbour gold accent gradient text. */
   .pm-text-gold {
     background: linear-gradient(
       95deg,
@@ -256,7 +211,7 @@
       oklch(0.76 0.16 70)
     );
   }
-  /* Reserved for the Renown-gated Broker's Favor skill, so a rare, limited
+  /* Reserved for the Renown gated Broker's Favor skill, so a rare, limited
      action reads as distinct from every routine teal / gold / emerald button. */
   .pm-grad-violet {
     background-image: linear-gradient(
@@ -267,10 +222,10 @@
   }
 
   /* Tactile feedback for clickable elements that aren't the <Button>
-     primitive (raw <button> rows, the room-code chip, DM candidate rows).
+     primitive (raw <button> rows, the room code chip, DM candidate rows).
      Same press language as the button: a quick hover lift and an :active
-     scale-down, transform-only so nothing reflows, and a clean opt-out for
-     reduced-motion users. */
+     scale down, transform only so nothing reflows, and a clean way out for
+     users who prefer reduced motion. */
   .pm-pressable {
     transition:
       transform 150ms ease-out,
@@ -327,7 +282,7 @@
     background-clip: content-box;
   }
 
-  /* ---------- Artisan identity palette ----------
+  /* ========== Artisan identity palette ==========
      One hue per artisan type (see WORKER_TYPES in src/lib/game/constants.ts),
      chosen to echo what that craft actually makes: indigo cloth for the
      weavers, brocade violet for the master, sachet rose, copper, celadon,
@@ -346,8 +301,8 @@
      ignored where it isn't understood.
 
      Class names are composed from the worker id at the call site, which is
-     safe because these are hand-written rules rather than scanned Tailwind
-     utilities. The accent rules use two-class selectors so they outrank the
+     safe because these are hand written rules rather than scanned Tailwind
+     utilities. The accent rules use two class selectors so they outrank the
      single-class utilities a Button variant brings with it. */
   .pm-artisan {
     --pm-artisan: 0.52 0.13 200;

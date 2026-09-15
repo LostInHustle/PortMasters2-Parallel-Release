@@ -4,7 +4,7 @@
 //
 // Both move Gold and neither had a direct test. payWages was only ever
 // reached indirectly through finishSettlement in the voyage simulations,
-// which meant its bankruptcy branch and its per-artisan-type billing were
+// which meant its bankruptcy branch and its per artisan type billing were
 // never asserted on their own. fireWorker had no coverage at all.
 //
 // One real inconsistency is pinned down here rather than papered over:
@@ -54,7 +54,7 @@ test("dismissing a worker charges severance and shrinks the roster", () => {
   );
 });
 
-test("an out-of-range index is ignored, charging nothing", () => {
+test("an out of range index is ignored, charging nothing", () => {
   const g = crewed(1);
   const logs: string[] = [];
   const before = g.money;

@@ -11,7 +11,7 @@ import {
 } from "@/lib/game/engine";
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
-import { itemColorResolver } from "@/lib/use-color-preference";
+import { itemColorResolver } from "@/lib/useColorPreference";
 import { Anchor } from "lucide-react";
 import type { PublicUser } from "@/lib/api";
 import { Term } from "../../Term";

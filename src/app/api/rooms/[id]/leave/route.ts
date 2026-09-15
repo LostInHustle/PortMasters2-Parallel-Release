@@ -1,6 +1,6 @@
 // POST /api/rooms/[id]/leave: leave a room
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/api-auth";
+import { getCurrentUser } from "@/lib/apiAuth";
 import { leaveRoomForUser } from "@/lib/rooms";
 
 export async function POST(

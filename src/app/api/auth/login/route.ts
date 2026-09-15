@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { verifyPassword, createSession, sessionCookieMaxAge } from "@/lib/auth";
-import { sessionCookie, publicUser } from "@/lib/api-auth";
+import { authUser, sessionCookie } from "@/lib/apiAuth";
 
 const Schema = z.object({
   username: z.string().min(1).max(20),
@@ -39,16 +39,24 @@ export async function POST(req: NextRequest) {
       { status: 401 },
     );
   }
+  // Checked after the password on purpose: a ban is told to the account's
+  // owner, not to whoever happens to try the name.
+  if (user.bannedAt) {
+    return NextResponse.json(
+      {
+        error: `This account has been banned from the harbor. Reason: ${user.banReason ?? "none given"}.`,
+      },
+      { status: 403 },
+    );
+  }
 
-  // Trim stale expired sessions for this user (housekeeping).
+  // Trim stale expired sessions for this user while we're here.
   await db.session
     .deleteMany({ where: { userId: user.id, expiresAt: { lt: new Date() } } })
     .catch(() => {});
 
   const { token, expiresAt } = await createSession(user.id);
-  // Also handed back in the body (not just the httpOnly cookie) so the browser can
-  // present it to a realtime service hosted on a different domain than this API.
-  const res = NextResponse.json({ user: publicUser(user), expiresAt, token });
+  const res = NextResponse.json({ user: authUser(user), expiresAt });
   res.headers.set("Set-Cookie", sessionCookie(token, sessionCookieMaxAge));
   return res;
 }

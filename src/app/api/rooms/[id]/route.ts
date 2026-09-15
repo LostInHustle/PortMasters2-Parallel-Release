@@ -1,7 +1,9 @@
 // GET /api/rooms/[id]: room detail (members, recent room chat)
 import { NextResponse } from "next/server";
-import { db, PUBLIC_USER_SELECT } from "@/lib/db";
-import { getCurrentUser, publicUser } from "@/lib/api-auth";
+import { db } from "@/lib/db";
+import { getCurrentUser } from "@/lib/apiAuth";
+import { PUBLIC_USER_SELECT, publicUser } from "@/lib/publicUser";
+import { ROOM_SUMMARY_INCLUDE, roomSummary } from "@/lib/rooms";
 
 export async function GET(
   _req: Request,
@@ -15,49 +17,22 @@ export async function GET(
   const room = await db.room.findUnique({
     where: { id },
     include: {
-      members: {
-        include: {
-          user: {
-            select: PUBLIC_USER_SELECT,
-          },
-        },
-      },
-      host: {
-        select: PUBLIC_USER_SELECT,
-      },
+      ...ROOM_SUMMARY_INCLUDE,
       messages: {
         where: { recipientId: null },
         orderBy: { createdAt: "asc" },
         take: 100,
-        include: {
-          sender: {
-            select: PUBLIC_USER_SELECT,
-          },
-        },
+        include: { sender: { select: PUBLIC_USER_SELECT } },
       },
     },
   });
   if (!room)
     return NextResponse.json({ error: "Room not found" }, { status: 404 });
 
-  const isMember = room.members.some((m) => m.userId === user.id);
-
   return NextResponse.json({
     room: {
-      id: room.id,
-      code: room.code,
-      name: room.name,
-      isPublic: room.isPublic,
-      started: room.started,
-      difficulty: room.difficulty,
-      createdAt: room.createdAt,
-      host: publicUser(room.host),
-      memberCount: room.members.length,
-      members: room.members.map((m) => ({
-        ...publicUser(m.user),
-        joinedAt: m.joinedAt,
-      })),
-      isMember,
+      ...roomSummary(room),
+      isMember: room.members.some((m) => m.userId === user.id),
     },
     messages: room.messages.map((m) => ({
       id: m.id,

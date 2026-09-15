@@ -2,12 +2,12 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { NotificationToast } from "./NotificationToast";
-import type { NotificationItem } from "@/lib/use-notifications";
+import type { NotificationItem } from "@/lib/useNotifications";
 
 /**
  * The single floating bubble for whichever notification just arrived.
- * Fixed at bottom-left, the mirror corner of the existing bankruptcy/
- * endgame help button (bottom-right, see GameRoom.tsx), so this never
+ * Fixed at bottom left, the mirror corner of the existing bankruptcy/
+ * endgame help button (bottom right, see GameRoom.tsx), so this never
  * sits over the center game board the way the old stacked sonner toasts
  * did. A new push replaces this outright; nothing is lost since it's
  * also in the notification button's full history.

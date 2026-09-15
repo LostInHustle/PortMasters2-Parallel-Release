@@ -1,6 +1,6 @@
 // =====================================================================
 // Artisans: hiring, dismissal, task assignment, production, and the two
-// round-end bills (wages, then ship maintenance) that can bankrupt a
+// round end bills (wages, then ship maintenance) that can bankrupt a
 // captain who overextended their crew.
 //
 // The roster is driven off WORKER_TYPES rather than a hardcoded branch per
@@ -8,8 +8,8 @@
 // and assignable without touching this file.
 //
 // Wages price through getHireCost in ./pricing, which is the single source
-// of truth for what an artisan actually costs per round. Note that
-// fireWorker's severance does NOT: it reads the raw WAGES table, so with
+// of truth for what an artisan actually costs per round. fireWorker's
+// severance does NOT: it reads the raw WAGES table, so with
 // the Artisan's Workshop module equipped, hiring and payroll cost more
 // while severance does not. That inconsistency predates this split and is
 // pinned by a test in scripts/tests/unit.workers.ts so it cannot change

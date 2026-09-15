@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { api, type PublicUser } from "@/lib/api";
+import { api, type SelfUser } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,17 +12,20 @@ import { APP_NAME } from "@/lib/game/constants";
 
 export function AuthScreen({
   onAuthed,
+  notice,
 }: {
-  onAuthed: (u: PublicUser, token: string) => void;
+  onAuthed: (u: SelfUser) => void;
+  // A line explaining why the captain is looking at this screen when they
+  // did not sign out themselves (see signOutNotice in src/app/page.tsx).
+  notice?: string | null;
 }) {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // shared
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  // register-only
+  // Register only.
   const [displayName, setDisplayName] = useState("");
 
   async function submit(e: React.FormEvent) {
@@ -30,7 +33,7 @@ export function AuthScreen({
     setError(null);
     setLoading(true);
     try {
-      const { user, token } =
+      const { user } =
         mode === "login"
           ? await api.login({ username: username.trim(), password })
           : await api.register({
@@ -38,7 +41,7 @@ export function AuthScreen({
               password,
               displayName: displayName.trim() || undefined,
             });
-      onAuthed(user, token);
+      onAuthed(user);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -90,6 +93,12 @@ export function AuthScreen({
               <Waves className="h-3.5 w-3.5" /> Lords of the Silk Road · Online
             </p>
           </div>
+
+          {notice && (
+            <div className="mb-5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-800 dark:text-amber-200 text-sm px-3.5 py-2.5 leading-relaxed">
+              {notice}
+            </div>
+          )}
 
           <Tabs
             value={mode}

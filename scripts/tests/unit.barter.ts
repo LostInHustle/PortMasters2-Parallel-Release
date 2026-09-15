@@ -14,7 +14,7 @@
 // air or destroys them. The paired posting/accepting tests below check
 // both sides of a completed trade against each other, not just each side
 // in isolation, because a symmetric error (both sides crediting) is
-// exactly what a per-side test would miss.
+// exactly what a per side test would miss.
 //
 // Run with: npx tsx scripts/tests/unit.barter.ts
 // =====================================================================
@@ -47,7 +47,7 @@ test("refuses to barter an item for itself, and changes nothing", () => {
   const logs: string[] = [];
   const before = g.inventory.Hemp;
   const ok = postBarterOffer(g, "Hemp", 2, "Hemp", 3, logs);
-  assertEqual(ok, false, "an item-for-itself offer must be rejected");
+  assertEqual(ok, false, "an item for itself offer must be rejected");
   assertEqual(
     g.inventory.Hemp,
     before,
@@ -120,7 +120,7 @@ test("a successful offer escrows the offered goods immediately", () => {
   );
 });
 
-test("escrow blocks double-spending the same goods across two offers", () => {
+test("escrow blocks double spending the same goods across two offers", () => {
   // This is the reason posting escrows up front rather than at accept
   // time. Without it a captain could post all 8 Hemp twice and have both
   // offers accepted.
@@ -134,7 +134,7 @@ test("escrow blocks double-spending the same goods across two offers", () => {
   assertEqual(
     postBarterOffer(g, "Hemp", 8, "Tea", 1, logs),
     false,
-    "a second offer for the same already-escrowed stock must be rejected",
+    "a second offer for the same already escrowed stock must be rejected",
   );
   assertEqual(g.inventory.Hemp, 0, "only the first offer's stock is escrowed");
 });
@@ -230,16 +230,16 @@ test("the poster receives the requested item, having already paid at post time",
   assertEqual(
     g.inventory.Hemp,
     4,
-    "settling must not refund the already-escrowed offer as well",
+    "settling must not refund the already escrowed offer as well",
   );
 });
 
 suite("a completed trade conserves goods across both captains");
 
-// The invariant a per-side test cannot catch: run both halves of one real
+// The invariant a per side test cannot catch: run both halves of one real
 // trade and check the totals before and after. Alice offers 4 Hemp for 2
 // Silk; Bob accepts.
-test("no goods are created or destroyed by a full two-sided trade", () => {
+test("no goods are created or destroyed by a full two sided trade", () => {
   const alice = captain();
   const bob = captain();
   const logs: string[] = [];

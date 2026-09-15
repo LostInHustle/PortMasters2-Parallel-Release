@@ -91,7 +91,7 @@ function freshState(
   return createInitialGameState(0, 1, 0, difficulty);
 }
 
-// ---------- Difficulty selectors ----------
+// ========== Difficulty selectors ==========
 suite("difficulty selectors");
 
 test("normalizeDifficulty falls back to fair_winds on garbage input", () => {
@@ -233,7 +233,7 @@ test("mandateIndexFor matches each tier's schedule exactly", () => {
   assertEqual(mandateIndexFor("monsoon", 16), 2, "monsoon round 16 -> large");
 });
 
-// ---------- Content pools ----------
+// ========== Content pools ==========
 suite("content pools");
 
 test("unlockedResources: fair_winds only ever sees the founding trio", () => {
@@ -368,7 +368,7 @@ test("isCharterGood: tier1/tier2 goods are charter goods, founding trade is not"
   }
 });
 
-// ---------- Price / VAT / transport math ----------
+// ========== Price / VAT / transport math ==========
 suite("price and tax math");
 
 test("calcTransportCost: base formula, ship level discount, floor at 5 (no modules)", () => {
@@ -378,7 +378,7 @@ test("calcTransportCost: base formula, ship level discount, floor at 5 (no modul
   assertEqual(
     calcTransportCost(s, 5),
     5,
-    "5 items, ship level 3: max(5, 10-15)=5",
+    "5 items, ship level 3: max(5, 10 minus 15) = 5",
   );
 });
 
@@ -436,9 +436,9 @@ test("explainTransportCost mirrors calcTransportCost's final cost across module 
 
 test("calcVAT: no VAT when the margin is zero or negative", () => {
   const s = freshState();
-  // Sachet: materials Silk×1 (avg 8) + Tea×2 (avg 12) = 32, worker wage 20 -> break-even at 52
-  assertEqual(calcVAT(s, "Sachet", 52), 0, "exactly break-even");
-  assertEqual(calcVAT(s, "Sachet", 40), 0, "below break-even");
+  // Sachet: materials Silk×1 (avg 8) + Tea×2 (avg 12) = 32, worker wage 20 -> break even at 52
+  assertEqual(calcVAT(s, "Sachet", 52), 0, "exactly break even");
+  assertEqual(calcVAT(s, "Sachet", 40), 0, "below break even");
 });
 
 test("calcVAT: 5% of the margin above material + wage cost, floored", () => {
@@ -553,7 +553,7 @@ test("brokersFavorCommission: zero reward has zero commission; net payout is bou
     const net = reward - brokersFavorCommission(reward);
     assert(
       net >= prevNet,
-      `net payout should be non-decreasing in reward (reward=${reward})`,
+      `net payout should be never decreasing in reward (reward=${reward})`,
     );
     prevNet = net;
   }
@@ -629,7 +629,7 @@ test("merchantRatingForScore picks the highest threshold the score clears", () =
   );
 });
 
-// ---------- Legacy / Renown ----------
+// ========== Legacy / Renown ==========
 suite("legacy and renown");
 
 test("xpRequiredForLevel follows the documented triangular curve", () => {
@@ -655,7 +655,7 @@ test("renownStartingGoldBonus: +3/level above 1, capped at 60", () => {
   assertEqual(renownStartingGoldBonus(50), 60, "level 50: still capped");
 });
 
-test("parseStatsByDifficulty / recordVoyageInStats round-trip and degrade gracefully", () => {
+test("parseStatsByDifficulty / recordVoyageInStats round trip and degrade gracefully", () => {
   assertEqual(
     Object.keys(parseStatsByDifficulty(null)).length,
     0,
@@ -687,8 +687,8 @@ test("parseStatsByDifficulty / recordVoyageInStats round-trip and degrade gracef
   assertEqual(stats.monsoon.bestScore, 400, "best score still tracks the max");
 });
 
-// ---------- Merits ----------
-suite("difficulty-scoped merits");
+// ========== Merits ==========
+suite("difficulty scoped merits");
 
 test("open_water_captain requires open_waters and no bankruptcy", () => {
   const base = {
@@ -767,11 +767,11 @@ test("storm_sovereign requires a monsoon crown; eye_of_the_storm requires monsoo
       crowned: true,
       reputation: 200,
     }).includes("eye_of_the_storm"),
-    "eye_of_the_storm is monsoon-only",
+    "eye_of_the_storm is monsoon only",
   );
 });
 
-// ---------- Sanity on the config table itself ----------
+// ========== Sanity on the config table itself ==========
 suite("difficulty config integrity");
 
 test("every difficulty's mandate schedule only references valid MANDATE_TEMPLATES indices", () => {
@@ -796,20 +796,20 @@ test("every difficulty's tierUnlock rounds fall within its own voyage length", (
   }
 });
 
-// ---------- Harbor systems (Manifests 01-03) ----------
-// Pure-function coverage for the three room-wide harbor systems merged via
-// PR #12: The Harbor Pulse (price nudge), Word on the Docks (first-to-3
-// race), and Tidewatch Alerts (combined-reputation surge). Each system's
+// ========== Harbor systems (Manifests 01 to 03) ==========
+// Pure function coverage for the three room wide harbor systems merged via
+// PR #12: The Harbor Pulse (price nudge), Word on the Docks (the race to
+// three orders), and Tidewatch Alerts (combined reputation surge). Each system's
 // authoritative "who won" or "did the room cross the line" arbitration
-// lives server-side in src/server/realtime.ts (roomPulseTallies,
+// lives server side in src/server/realtime.ts (roomPulseTallies,
 // roomDocksWinners, roomSurges), which needs a live socket connection to
-// exercise and is out of scope for this framework-free script; what's
+// exercise and is out of scope for this framework free script; what's
 // tested here is every piece of it that's a pure function reachable
 // without one: the pricing formula itself (computeHarborPulse, hoisted out
 // of realtime.ts into src/lib/game/harborPulse.ts for exactly this reason,
 // the same move pools.ts made for difficulty.ts) and every exported engine
 // function these systems added or touched.
-suite("harbor systems (Manifests 01-03)");
+suite("harbor systems (Manifests 01 to 03)");
 
 function orderCard(
   overrides: Partial<OrderCard> & { resources: OrderCard["resources"] },
@@ -824,7 +824,7 @@ function orderCard(
   };
 }
 
-// ----- The Harbor Pulse: computeHarborPulse -----
+// ========== The Harbor Pulse: computeHarborPulse ==========
 
 test("computeHarborPulse: no tally (round 1, or nobody reported) is neutral", () => {
   assertEqual(
@@ -853,10 +853,10 @@ test("computeHarborPulse: an item the room leaned into gets a positive nudge, cl
   assertClose(pulse.Hemp, PULSE_CAP, 1e-9, "clamped to +PULSE_CAP");
 });
 
-test("computeHarborPulse: a reported-but-untouched item still gets a negative nudge, clamped to -PULSE_CAP", () => {
+test("computeHarborPulse: a reported but untouched item still gets a negative nudge, clamped to -PULSE_CAP", () => {
   // Silk/Tea split the room's buying and Hemp gets none of it: share = 0,
   // unclamped nudge = (0 - 1/3) * 0.6 = -0.2, past the cap on the low side.
-  // (Filtering a genuinely zero-quantity entry out of the tally entirely is
+  // (Filtering a genuinely zero quantity entry out of the tally entirely is
   // addPulseReport's job, not this pure function's, see the next test.)
   const pulse = computeHarborPulse({ Hemp: 0, Silk: 50, Tea: 50 });
   assertClose(pulse.Hemp, -PULSE_CAP, 1e-9, "clamped to -PULSE_CAP");
@@ -867,8 +867,8 @@ test("computeHarborPulse: an underrepresented but present item still clamps at -
   assertClose(pulse.Hemp, -PULSE_CAP, 1e-9, "clamped to -PULSE_CAP");
 });
 
-test("computeHarborPulse: a total of zero (all reported quantities non-positive) is neutral", () => {
-  // addPulseReport already filters non-positive quantities before they ever
+test("computeHarborPulse: a total of zero (all reported quantities zero or negative) is neutral", () => {
+  // addPulseReport already filters zero or negative quantities before they ever
   // reach this function, but the pure function is defensive on its own
   // terms too: this pins that defensiveness down independently of the
   // caller that currently guarantees it.
@@ -876,9 +876,9 @@ test("computeHarborPulse: a total of zero (all reported quantities non-positive)
   assertEqual(Object.keys(pulse).length, 0, "zero total -> {}");
 });
 
-// ----- The Harbor Pulse: tallyPurchasesByResource -----
+// ========== The Harbor Pulse: tallyPurchasesByResource ==========
 
-test("tallyPurchasesByResource: sums only purchased, non-product resource cards", () => {
+test("tallyPurchasesByResource: sums only purchased, raw resource cards", () => {
   const s = freshState();
   s.resourceCards = [
     {
@@ -895,7 +895,7 @@ test("tallyPurchasesByResource: sums only purchased, non-product resource cards"
       totalCost: 8,
       isProductCard: false,
     },
-    // Purchased but a finished-good card: the pulse is about raw goods, so
+    // Purchased but a finished good card: the pulse is about raw goods, so
     // this must never contribute, even though it's in purchasedCards below.
     {
       id: 2,
@@ -965,7 +965,7 @@ test("tallyPurchasesByResource: nothing purchased yields an empty tally", () => 
   );
 });
 
-// ----- The Harbor Pulse: applyHarborPulse -----
+// ========== The Harbor Pulse: applyHarborPulse ==========
 
 test("applyHarborPulse replaces state.harborPulse wholesale, not a merge", () => {
   const s = freshState();
@@ -975,7 +975,7 @@ test("applyHarborPulse replaces state.harborPulse wholesale, not a merge", () =>
   assertEqual(s.harborPulse.Silk, undefined, "prior round's pulse is gone");
 });
 
-// ----- Tidewatch Alerts: applyTidewatchSurge -----
+// ========== Tidewatch Alerts: applyTidewatchSurge ==========
 
 test("applyTidewatchSurge: flips the flag once and logs exactly once", () => {
   const s = freshState();
@@ -996,7 +996,7 @@ test("applyTidewatchSurge: idempotent once already flipped, never a repeat annou
   assertEqual(s.tidewatchSurge, true, "flag stays true");
 });
 
-// ----- Word on the Docks: claimWordOnTheDocksReward -----
+// ========== Word on the Docks: claimWordOnTheDocksReward ==========
 
 test("claimWordOnTheDocksReward: pays the reward exactly once per call and logs it", () => {
   const s = freshState();
@@ -1008,7 +1008,7 @@ test("claimWordOnTheDocksReward: pays the reward exactly once per call and logs 
   assert(logs[0].includes("Word on the Docks"), "log names the system");
 });
 
-// ----- Word on the Docks: completeOrder's one-shot claim signal -----
+// ========== Word on the Docks: completeOrder's one shot claim signal ==========
 
 test("completeOrder: _pendingDocksClaim is unset before the threshold, set exactly at it", () => {
   const s = freshState();
@@ -1033,7 +1033,7 @@ test("completeOrder: _pendingDocksClaim is unset before the threshold, set exact
   );
 });
 
-test("completeOrder: never re-fires _pendingDocksClaim past the threshold", () => {
+test("completeOrder: never sets _pendingDocksClaim a second time past the threshold", () => {
   const s = freshState();
   s.inventory.Hemp = 100;
   s.customerCards = Array.from(
@@ -1054,12 +1054,12 @@ test("completeOrder: never re-fires _pendingDocksClaim past the threshold", () =
   assertEqual(
     s._pendingDocksClaim,
     undefined,
-    "the === guard is one-shot: a 4th completed order never re-sets the claim",
+    "the === guard is one shot: a 4th completed order never resets the claim",
   );
 });
 
-// ----- Constant sanity: guards silent balance drift -----
-// These numbers are load-bearing in guideText()/tipsText() copy and in the
+// ========== Constant sanity: guards silent balance drift ==========
+// These numbers are load bearing in guideText()/tipsText() copy and in the
 // server's arbitration logic; a change here should be a deliberate design
 // decision, not a typo that silently desyncs the rules text from the code.
 
@@ -1069,7 +1069,7 @@ test("harbor system constants match the documented design", () => {
   assertEqual(TIDEWATCH_SURGE_THRESHOLD, 500, "combined Reputation past 500");
 });
 
-// ---------- Bequest Routing (Manifest 07) ----------
+// ========== Bequest Routing (Manifest 07) ==========
 suite("Bequest Routing");
 
 function stateWithLoanGiven(): GameState {
@@ -1086,7 +1086,7 @@ function stateWithLoanGiven(): GameState {
   return s;
 }
 
-test("receiveRepayment credits Gold and removes the closed loan (the ordinary, non-redirected path)", () => {
+test("receiveRepayment credits Gold and removes the closed loan (the ordinary, unredirected path)", () => {
   const s = stateWithLoanGiven();
   const before = s.money;
   const logs: string[] = [];
@@ -1129,7 +1129,7 @@ test("clearRedirectedLoan only removes the matching debt, leaving any other outs
   assertEqual(s.loansGiven[0].id, "debt2", "debt2 is still tracked");
 });
 
-// ---------- [MANIFEST 13] Ledger Integrity Pass ----------
+// ========== [MANIFEST 13] Ledger Integrity Pass ==========
 // The guard only ever flags, never rejects, so the property that actually
 // matters is that ordinary play can never trip it. These pin both ends: a
 // real voyage's numbers stay plausible, and a forged one does not.

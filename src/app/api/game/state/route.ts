@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { getCurrentUser } from "@/lib/api-auth";
+import { getCurrentUser } from "@/lib/apiAuth";
 import {
   checkSave,
   describeFindings,
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   // changed it), the same reason renownLevel is refreshed on load.
   // A brand new captain (no save yet) should also drop into the voyage at
   // wherever the room currently is, not back at round 1. The room's
-  // checkpoint is what the synchronized ready-check (src/server/realtime.ts)
+  // checkpoint is what the synchronized ready check (src/server/realtime.ts)
   // keeps everyone else lined up against.
   const room = await db.room.findUnique({
     where: { id: roomId },

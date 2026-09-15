@@ -7,12 +7,8 @@
 // works. Still requires being signed in, just not shared membership.
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getCurrentUser } from "@/lib/api-auth";
-import {
-  DEFAULT_LEGACY_SUMMARY,
-  parseStatsByDifficulty,
-  type CaptainLegacySummary,
-} from "@/lib/game/legacy";
+import { getCurrentUser } from "@/lib/apiAuth";
+import { legacySummaryFromRow } from "@/lib/game/legacy";
 
 export async function GET(
   _req: NextRequest,
@@ -35,17 +31,11 @@ export async function GET(
     where: { userId },
     select: { meritId: true },
   });
-  const summary: CaptainLegacySummary = legacy
-    ? {
-        renownLevel: legacy.renownLevel,
-        renownXP: legacy.renownXP,
-        voyagesCompleted: legacy.voyagesCompleted,
-        seaMasterCrowns: legacy.seaMasterCrowns,
-        bestScore: legacy.bestScore,
-        meritIds: merits.map((m) => m.meritId),
-        statsByDifficulty: parseStatsByDifficulty(legacy.statsByDifficulty),
-      }
-    : DEFAULT_LEGACY_SUMMARY;
 
-  return NextResponse.json({ legacy: summary });
+  return NextResponse.json({
+    legacy: legacySummaryFromRow(
+      legacy,
+      merits.map((m) => m.meritId),
+    ),
+  });
 }

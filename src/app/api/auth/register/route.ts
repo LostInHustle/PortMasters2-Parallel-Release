@@ -3,7 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { hashPassword, createSession, sessionCookieMaxAge } from "@/lib/auth";
-import { sessionCookie, publicUser, hueFromString } from "@/lib/api-auth";
+import { authUser, sessionCookie } from "@/lib/apiAuth";
+import { hueFromString } from "@/lib/publicUser";
 
 const Schema = z.object({
   username: z
@@ -53,9 +54,7 @@ export async function POST(req: NextRequest) {
   });
 
   const { token, expiresAt } = await createSession(user.id);
-  // Also handed back in the body (not just the httpOnly cookie) so the browser can
-  // present it to a realtime service hosted on a different domain than this API.
-  const res = NextResponse.json({ user: publicUser(user), expiresAt, token });
+  const res = NextResponse.json({ user: authUser(user), expiresAt });
   res.headers.set("Set-Cookie", sessionCookie(token, sessionCookieMaxAge));
   return res;
 }

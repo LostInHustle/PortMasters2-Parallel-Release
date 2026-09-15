@@ -70,7 +70,7 @@ export const COLORS: Record<string, string> = {
 // every common form of color vision deficiency. Selecting it changes
 // nothing about game rules, balance, or what any other captain sees, only
 // how one captain's own client renders a color already being shown to
-// them anyway; see useColorPreference in src/lib/use-color-preference.ts
+// them anyway; see useColorPreference in src/lib/useColorPreference.ts
 // for where a player turns it on.
 export const COLORS_COLORBLIND_SAFE: Record<string, string> = {
   Gold: "#E8A33D",
@@ -607,8 +607,8 @@ export const MODULES: Module[] = [
 
 // How a single voyage's final Reputation reads on the Endgame screen (see
 // merchantRatingForScore in engine.ts). Ordered highest threshold first so
-// the lookup is a plain first-match scan; the last entry's minScore of 0
-// is the catch-all floor. The top entry also doubles as the threshold for
+// the lookup is a plain first match scan; the last entry's minScore of 0
+// is the catch all floor. The top entry also doubles as the threshold for
 // the "king_of_silk_road" merit in src/lib/game/merits.ts, so retuning it
 // here moves both places at once instead of drifting apart.
 export type MerchantRating = { minScore: number; icon: string; label: string };
@@ -620,7 +620,7 @@ export const MERCHANT_RATINGS: MerchantRating[] = [
   { minScore: 0, icon: "🌊", label: "Novice Merchant" },
 ];
 
-// Broker's Favor: a Renown-gated, once-per-voyage skill a captain invokes in
+// Broker's Favor: a Renown gated, once per voyage skill a captain invokes in
 // Phase 2 to summon one extra guaranteed trade order for a chosen quantity of
 // a good they are already holding, so a hold full of otherwise unsellable
 // stock still has a buyer. Unlocks at Renown Level 5 (the Trade Officer
@@ -673,7 +673,7 @@ export const CONVOY_VENTURE_FAILURE_REFUND_RATE = 0.5;
 // [MANIFEST 04 fix] No single captain may ever fund more than this share of
 // a venture's own target, on their own. Without this, a captain could post
 // a venture and instantly fill it entirely with their own Gold, alone,
-// which is worse than the original repeat-fill exploit: it still prints a
+// which is worse than the original repeat fill exploit: it still prints a
 // bounded amount of free Gold, and it burns the whole room's one shared
 // chance for the voyage in the process, locking every other captain out
 // for personal gain instead of the room's. Capping each contributor's own
@@ -681,7 +681,7 @@ export const CONVOY_VENTURE_FAILURE_REFUND_RATE = 0.5;
 // genuinely take part before a venture can ever fill.
 export const CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE = 0.5;
 
-// [MANIFEST 05: Backing] A third captain can co-sign part of an existing
+// [MANIFEST 05: Backing] A third captain can cosign part of an existing
 // loan between two others, pledging their own Gold as a safety net for the
 // lender. The pledge is escrowed immediately, the same moment every other
 // commitment in this game is (a barter offer, an aid loan, a Convoy
@@ -695,7 +695,7 @@ export const CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE = 0.5;
 export const BACKING_REPUTATION_PER_GOLD = AID_REPUTATION_PER_GOLD / 2;
 
 // =====================================================================
-// Player-facing copy. The wording is preserved from the original game; the
+// Player facing copy. The wording is preserved from the original game; the
 // numbers are not baked in any more, because they now depend on the room's
 // difficulty tier (see ./difficulty). Every figure a captain could act on
 // (voyage length, raid odds, escort fee, mandate rounds) is derived from the
@@ -781,7 +781,7 @@ ${mandates.length ? `<p style="font-size:13px;margin-top:10px">📜 On voyage${m
     },
     {
       title: "⚠️ The artisan trap",
-      content: `<p>Artisans turn raw materials into high-value finished goods and collect wages at each Phase 3. That part is simple. What catches most new players is this:</p>
+      content: `<p>Artisans turn raw materials into high value finished goods and collect wages at each Phase 3. That part is simple. What catches most new players is this:</p>
 <div style="background:#C62828;color:#fff;border-radius:6px;padding:12px;margin:12px 0;text-align:center;font-size:14px;font-weight:bold;line-height:1.7">
   Assign a task this voyage.<br>The goods are ready next voyage, not this one.
 </div>
@@ -811,7 +811,7 @@ ${cfg.brokerCorruption ? `<p>In these waters a broker can be corrupt. The rumor 
     <span style="font-size:12px;color:#444">8 to 20 Gold per person per voyage</span>
   </div>
 </div>
-<p style="font-size:13px;color:#333">The <strong>Round-End Obligations</strong> panel in the sidebar shows exactly what is owed. Check it before spending anything.</p>
+<p style="font-size:13px;color:#333">The <strong>Round End Obligations</strong> panel in the sidebar shows exactly what is owed. Check it before spending anything.</p>
 <p style="font-size:13px;color:#333">Coming up short isn't the end on its own. Right there on the settlement screen, you can ask another captain in the harbor for a loan, and they can send it to you on the spot if they've got the Gold to spare. Just repay it before the voyage's last round ends, or it comes out of your funds automatically and goes straight to them.</p>`,
     },
     {
@@ -845,9 +845,9 @@ ${cfg.summary}
 Travel ${cfg.rounds} voyages, accumulate wealth and reputation!
 
 📦 Goods System:
-Raw Materials: Hemp(3-6💰), Silk(6-10💰), Tea(10-14💰)
-Finished Goods: Linen Clothes(30-42💰), Cotton Clothes(50-65💰),
-Brocade(70-90💰), Sachet(95-120💰)
+Raw Materials: Hemp (3 to 6💰), Silk (6 to 10💰), Tea (10 to 14💰)
+Finished Goods: Linen Clothes (30 to 42💰), Cotton Clothes (50 to 65💰),
+Brocade (70 to 90💰), Sachet (95 to 120💰)
 
 👥 Worker System:
 • Weaver (8 Gold/Round): Makes Linen or Cotton Clothes

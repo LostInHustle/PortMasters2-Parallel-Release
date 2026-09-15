@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { QuantityInput } from "@/components/ui/quantity-input";
+import { QuantityInput } from "@/components/ui/quantityInput";
 import {
   BROKERS_FAVOR_UNLOCK_LEVEL,
   PRODUCTS,
@@ -20,7 +20,7 @@ import {
 } from "@/lib/game/engine";
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
-import { itemColorResolver } from "@/lib/use-color-preference";
+import { itemColorResolver } from "@/lib/useColorPreference";
 import { Coins } from "lucide-react";
 import type { PublicUser } from "@/lib/api";
 import { Term } from "../../Term";

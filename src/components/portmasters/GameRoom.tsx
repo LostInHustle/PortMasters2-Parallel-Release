@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
+import type { Socket } from "socket.io-client";
 import {
   api,
   type ChatMessage,
@@ -11,43 +12,42 @@ import {
 import type { VoyageCompleteEvent } from "@/lib/realtime";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import {
+  APP_NAME,
   BROKERS_FAVOR_UNLOCK_LEVEL,
+  guideText,
+  tipsText,
   WORD_ON_THE_DOCKS_THRESHOLD,
 } from "@/lib/game/constants";
 import { meritById } from "@/lib/game/merits";
-import { useRealtime } from "@/lib/use-realtime";
-import { useGameSession } from "@/lib/use-game-session";
-import { usePhaseSync } from "@/lib/use-phase-sync";
-import {
-  usePlayerDetail,
-  type PlayerDetailData,
-} from "@/lib/use-player-detail";
-import { useBarter, type BarterOffer } from "@/lib/use-barter";
+import { useRealtime } from "@/lib/useRealtime";
+import { useGameSession } from "@/lib/useGameSession";
+import { usePhaseSync } from "@/lib/usePhaseSync";
+import { usePlayerDetail, type PlayerDetailData } from "@/lib/usePlayerDetail";
+import { useBarter, type BarterOffer } from "@/lib/useBarter";
 import {
   useAid,
   type GrantedLoan,
   type RepaidLoan,
   type RedirectedLoanClosed,
-} from "@/lib/use-aid";
+} from "@/lib/useAid";
 import {
   useBacking,
   type BackingCovered,
   type BackingResolved,
   type OutstandingLoan,
-} from "@/lib/use-backing";
+} from "@/lib/useBacking";
 import {
   useConvoy,
   type VentureOutcome,
   type VentureSettlement,
-} from "@/lib/use-convoy";
-import { useNotificationCenter } from "@/lib/use-notifications";
+} from "@/lib/useConvoy";
+import { useNotificationCenter } from "@/lib/useNotifications";
 import { PlayerDetailModal } from "./game/GameModals";
 import { GameStatusPanel } from "./game/GameStatusPanel";
 import { GamePhasePanel } from "./game/GamePhasePanel";
 import { GameControlPanel } from "./game/GameControlPanel";
 import {
-  GuideModal,
-  TipsModal,
+  TextModal,
   RumorBoardModal,
   TutorialModal,
   RestartConfirmModal,
@@ -60,12 +60,14 @@ import { Avatar, MeritIcon, OnlineDot, Pill } from "./shared";
 import { NotificationCenter } from "./NotificationCenter";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea } from "@/components/ui/scrollArea";
 import { toast } from "sonner";
 import {
   Anchor,
+  BookOpen,
   DoorOpen,
   Copy,
+  Lightbulb,
   Users,
   MessageCircle,
   Ship,
@@ -74,7 +76,7 @@ import {
   Palette,
 } from "lucide-react";
 import { cn, normalizeRoomName } from "@/lib/utils";
-import { useColorPreference } from "@/lib/use-color-preference";
+import { useColorPreference } from "@/lib/useColorPreference";
 import {
   acceptBarterOffer,
   applyTidewatchSurge,
@@ -104,24 +106,13 @@ export function GameRoom({
   onLeave,
 }: {
   me: PublicUser;
-  room:
-    | RoomDetail
-    | (PublicUser & {
-        id: string;
-        code: string;
-        name: string;
-        isPublic: boolean;
-        host: PublicUser;
-        memberCount: number;
-        members: Array<PublicUser & { joinedAt: string }>;
-      });
+  room: RoomDetail;
   onLeave: () => void;
 }) {
   const { socket, connected, authed, onlineUsers } = useRealtime(me);
   const { state, act, ctx, flush, startingGoldBonus } = useGameSession(
     room.id,
     socket,
-    true,
     me.id,
   );
   const phaseSync = usePhaseSync(
@@ -197,7 +188,7 @@ export function GameRoom({
     [act],
   );
   // I'm the lender, being repaid: either a captain paying me back early,
-  // or a forced settlement at the end of Round 8 (see the
+  // or a forced settlement at the end of the final round (see the
   // _pendingDebtSettlements effect below), identical from this side.
   const onAidRepaid = useCallback(
     (loan: RepaidLoan) => {
@@ -230,7 +221,7 @@ export function GameRoom({
 
   // [MANIFEST 05: Backing] The server just accepted my own pledge to back
   // someone else's loan (see backing:offer in src/server/realtime.ts);
-  // escrow it immediately, same as any other cross-player commitment.
+  // escrow it immediately, same as any other cross player commitment.
   const onBackingAccepted = useCallback(
     (loan: OutstandingLoan) => {
       if (loan.backedAmount)
@@ -326,14 +317,14 @@ export function GameRoom({
     onVentureSettled,
   );
 
-  // Joins this room's Socket.IO channel, re-run every time `authed` goes
+  // Joins this room's Socket.IO channel, rerun every time `authed` goes
   // back to true, not just on mount. The socket is a singleton (see
-  // use-realtime.ts) that survives across reconnects, but the server
+  // useRealtime.ts) that survives across reconnects, but the server
   // gives every reconnect a brand new connection with no room recorded
-  // against it. Without re-joining here, a captain whose connection so
-  // much as blips keeps looking connected, but every room-scoped event
+  // against it. Without rejoining here, a captain whose connection so
+  // much as blips keeps looking connected, but every room scoped event
   // they send afterward (ready votes, status, barter, aid) is silently
-  // dropped server-side: the room ends up with everyone "ready" and no
+  // dropped server side: the room ends up with everyone "ready" and no
   // way to actually advance, with no error to explain why. authed (from
   // useRealtime) flips false then back to true on every reconnect, which
   // is exactly the signal this needs, rather than the raw socket
@@ -346,7 +337,7 @@ export function GameRoom({
   // Fires once, the moment every captain still seated in the room has
   // reached either the endgame screen or bankruptcy (see
   // maybeConcludeVoyage in src/server/realtime.ts): who was crowned Sea
-  // Master, and everyone's final standing. Re-fetches my own Captain's
+  // Master, and everyone's final standing. Refetches my own Captain's
   // Legacy right after, since that's the one place its Renown XP,
   // level, and Sea Master crown count actually change. Cleared on
   // "room:restarted" so a fresh voyage's Endgame screen doesn't show the
@@ -400,7 +391,7 @@ export function GameRoom({
   // mutation, with no way to call socket.emit itself, so it leaves the
   // settlements it made on this transient field for this effect to relay
   // and clear, the same way _draftChoices/_newModule signal the React
-  // layer for other once-per-round actions.
+  // layer for other once per round actions.
   useEffect(() => {
     const pending = state.game._pendingDebtSettlements;
     if (!pending || pending.length === 0) return;
@@ -414,7 +405,7 @@ export function GameRoom({
   // instant this captain's own running total crosses the threshold; only
   // the server actually knows whether anyone else in the room got there
   // first, so this just reports the claim and clears the flag, the same
-  // relay-then-clear shape as _pendingDebtSettlements above.
+  // relay then clear shape as _pendingDebtSettlements above.
   useEffect(() => {
     if (!state.game._pendingDocksClaim || !socket) return;
     socket.emit("docks:claim", { roomId: room.id });
@@ -427,7 +418,7 @@ export function GameRoom({
   // Docks race. Only the winner's own client actually credits the Gold
   // (claimWordOnTheDocksReward), since Gold is this captain's own local
   // truth; everyone else in the room just hears about it, the same split
-  // every other cross-player event in this file already follows.
+  // every other cross player event in this file already follows.
   useEffect(() => {
     if (!socket) return;
     const onDocksWon = (data: {
@@ -458,7 +449,7 @@ export function GameRoom({
   // combined Reputation cleared the threshold (see the game:status handler
   // in src/server/realtime.ts). Unlike Word on the Docks there is no winner
   // here, every captain in the room applies the same flip and sees the same
-  // toast; the room:system chat message is the room-wide announcement,
+  // toast; the room:system chat message is the room wide announcement,
   // this toast is just each captain's own client noticing the same thing.
   useEffect(() => {
     if (!socket) return;
@@ -521,7 +512,7 @@ export function GameRoom({
   const [roomMessages, setRoomMessages] = useState<ChatMessage[]>([]);
   const [members, setMembers] = useState<
     Array<PublicUser & { joinedAt?: string }>
-  >(room.members ?? []);
+  >(room.members);
 
   // The host can change (the original one left before the voyage even
   // started, say), so this is kept live from the room:members broadcast
@@ -529,7 +520,7 @@ export function GameRoom({
   // The member list is also kept live here so the DM candidate list and
   // player detail modal always see the current roster, not just the
   // snapshot that arrived via REST on mount.
-  const [hostId, setHostId] = useState<string>((room as any).host?.id ?? me.id);
+  const [hostId, setHostId] = useState<string>(room.host.id);
   // [MANIFEST 14: Harbor Watch] Rides the same room:members broadcast
   // hostId already reads live from; whether I'm muted only ever matters to
   // my own client, which is why this derives amIMuted below rather than
@@ -582,7 +573,7 @@ export function GameRoom({
     };
   }, [room.id]);
 
-  // Pop up a 15-second notification for every action's worth of new ledger
+  // Pop up a fifteen second notification for every action's worth of new ledger
   // entries, grouped together. A single action like ending a round can
   // write out half a dozen lines at once, and that should read as one
   // event, not a flood of separate popups. It mirrors into the ledger
@@ -593,7 +584,7 @@ export function GameRoom({
   // Driven by state.newLines (the lines the reducer's own APPLY case just
   // added) rather than diffing state.logs.length against a remembered
   // count. The length diff used to be how this worked, and it quietly broke
-  // for good the moment a voyage's ledger reached its 500-entry cap: once
+  // for good the moment a voyage's ledger reached its cap of 500 entries: once
   // logs.length pins at 500, trimming one entry off the front for every one
   // pushed onto the back, the length never grows again, so every action
   // from then on read as "nothing new" and stopped popping a toast at all
@@ -611,7 +602,7 @@ export function GameRoom({
     });
   }, [state.newLines, state.loaded, notifications.push]);
 
-  // Every room/DM message pops up as its own 15-second notification too,
+  // Every room/DM message pops up as its own fifteen second notification too,
   // regardless of which chat tab is currently open, so it's never missed.
   // Clicking it jumps straight to the conversation it came from.
   useEffect(() => {
@@ -645,7 +636,7 @@ export function GameRoom({
     };
   }, [socket, room.id, me.id, notifications.push]);
 
-  // First-time tutorial hint.
+  // First time tutorial hint.
   //
   // This flag was read but never written anywhere in the app, so the guard was
   // always false and the guide reopened every time the room returned to phase
@@ -1071,15 +1062,23 @@ export function GameRoom({
         </div>
       </main>
 
-      <GuideModal
+      <TextModal
         open={guideOpen}
         onOpenChange={setGuideOpen}
-        difficulty={state.game.difficulty}
+        title="Navigation Guide"
+        description={`${APP_NAME} rules and shortcuts`}
+        icon={<BookOpen className="h-5 w-5 text-teal-600 dark:text-teal-400" />}
+        text={guideText(state.game.difficulty)}
       />
-      <TipsModal
+      <TextModal
         open={tipsOpen}
         onOpenChange={setTipsOpen}
-        difficulty={state.game.difficulty}
+        title="Trade Strategy Advice"
+        description="Bankruptcy avoidance strategies"
+        icon={
+          <Lightbulb className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+        }
+        text={tipsText(state.game.difficulty)}
       />
       <RumorBoardModal
         open={rumorOpen}
@@ -1156,7 +1155,7 @@ function DmTab({
   onPick,
   onClear,
 }: {
-  socket: any;
+  socket: Socket | null;
   me: PublicUser;
   target: PublicUser | null;
   history: ChatMessage[];

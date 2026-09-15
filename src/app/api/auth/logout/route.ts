@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 import { SESSION_COOKIE_NAME } from "@/lib/auth";
-import { clearSessionCookie, getCurrentUser } from "@/lib/api-auth";
+import { clearSessionCookie, getCurrentUser } from "@/lib/apiAuth";
 import { leaveRoomForUser, roomIdsForUser } from "@/lib/rooms";
 
 export async function POST() {
@@ -16,8 +16,7 @@ export async function POST() {
   // they were the only one left in never gets cleaned up.
   const user = await getCurrentUser();
   if (user) {
-    const roomIds = await roomIdsForUser(user.id);
-    for (const roomId of roomIds) {
+    for (const roomId of await roomIdsForUser(user.id)) {
       await leaveRoomForUser(user.id, roomId);
     }
   }

@@ -1,10 +1,10 @@
 // =====================================================================
 // Effect audit: every Boon and every Ship Module, every distinct modifier
 // each one carries, verified against the live BOONS/MODULES data (not a
-// hand-copied assumption of what they do) and driven through the real
+// hand copied assumption of what they do) and driven through the real
 // engine functions that are supposed to react to them.
 //
-// Chance-based effects (Salvage Crane, Tax Evasion's audit, the corrupt
+// Chance based effects (Salvage Crane, Tax Evasion's audit, the corrupt
 // broker) are pinned down with withFixedRandom rather than run N times and
 // eyeballed statistically: stubbing Math.random to a known value either
 // side of the threshold proves the branch fires exactly where the code
@@ -97,15 +97,15 @@ function order(
   };
 }
 
-// Mirrors completeOrder's real sequencing for a single-item product order:
+// Mirrors completeOrder's real sequencing for a single item product order:
 // VAT is computed and subtracted from the ORIGINAL reward first, and only
 // then do the percentage reward bonuses (silk_monopoly, charter_order_bonus,
 // bureau_token, exotic_order_bonus) stack on what's left, never the other
 // way around. `boosts` are applied in the order completeOrder would apply
 // them. Transport is a separate deduction from state.money, not part of
 // `reward`, so it comes off the total independently at the end. Built on
-// the already-audited calcVAT/calcTransportCost rather than re-deriving
-// their formulas, so this only exercises completeOrder's own composition.
+// the already audited calcVAT/calcTransportCost rather than working their
+// formulas out again, so this only exercises completeOrder's own composition.
 function expectedProductOrderDelta(
   state: GameState,
   product: string,
@@ -290,7 +290,7 @@ test("tax_evasion: income tax & VAT halved, 15% audit chance costs 20 Gold on or
   s.shipLevel = 1;
   equipModule(s, mod("tax_evasion"), null, []);
   assertEqual(calcIncomeTax(s, 100), 5, "income tax halved: floor(10*0.5)=5");
-  // Sachet break-even is 52 (see unit.game.ts); 152 -> taxable 100 -> vat 5 -> halved 2
+  // Sachet break even is 52 (see unit.game.ts); 152 -> taxable 100 -> vat 5 -> halved 2
   assertEqual(calcVAT(s, "Sachet", 152), 2, "VAT halved: floor(5*0.5)=2");
 
   const s2 = freshState();
@@ -340,7 +340,7 @@ test("silk_monopoly: Silk freight waived, Silk product orders pay +20%", () => {
   equipModule(s, mod("silk_monopoly"), null, []);
   assertEqual(calcTransportCost(s, 10, true), 0, "silk freight waived");
   s.inventory["Brocade"] = 5;
-  // A reward large enough that the per-unit VAT doesn't floor to 0, so this
+  // A reward large enough that the per unit VAT doesn't floor to 0, so this
   // actually exercises "VAT first, then the +20% on what's left" rather than
   // passing by coincidence on a margin too thin to tell the two orders apart.
   s.customerCards = [
@@ -454,7 +454,7 @@ test("farsight: reveals one Broker's rumor for free at the start of Phase 1", ()
   );
 });
 
-test("kiln_and_forge_guild: charter-good orders pay +15%", () => {
+test("kiln_and_forge_guild: charter good orders pay +15%", () => {
   const s = freshState("open_waters", 4);
   applyBoon(s, boon("kiln_and_forge_guild"), []);
   s.inventory["Bronze Mirror"] = 5;
@@ -493,7 +493,7 @@ test("frontier_tariff_relief: VAT on finished goods is halved", () => {
   );
 });
 
-test("bureau_token: charter-good orders pay +10%", () => {
+test("bureau_token: charter good orders pay +10%", () => {
   const s = freshState("open_waters", 4);
   s.shipLevel = 1;
   equipModule(s, mod("bureau_token"), null, []);
@@ -703,11 +703,11 @@ test("fleet_of_treasures: Foreign Balm / Pearl String freight is 3 Gold cheaper 
 });
 
 // =====================================================================
-// Cross-check: every Boon and Module in the game data actually got audited
+// Cross check: every Boon and Module in the game data actually got audited
 // above. If a new one is added without a matching test, this fails loudly
-// instead of silently under-covering the content.
+// instead of silently under covering the content.
 // =====================================================================
-suite("coverage cross-check");
+suite("coverage cross check");
 
 test("every BOONS id has exactly one dedicated audit test above", () => {
   const auditedIds = [

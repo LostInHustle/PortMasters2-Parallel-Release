@@ -1,8 +1,8 @@
 // =====================================================================
-// PortMasters 2 Parallel Release: Daily Check-In
-// A position-based weekly reward cycle tied to a captain's account, not
+// PortMasters 2 Parallel Release: Daily Check In
+// A position based weekly reward cycle tied to a captain's account, not
 // any single room. Pure functions only (no React, no Prisma), so both the
-// client (the lobby widget) and the server (the /api/check-in route) can
+// client (the lobby widget) and the server (the /api/checkin route) can
 // share the exact same day math and reward table.
 //
 // The cycle deliberately is NOT a streak. Progress advances by exactly one
@@ -15,15 +15,15 @@
 
 // Reward for each day of the cycle, in Renown XP. Index 0 is Day 1. These
 // feed the same Renown ladder a voyage's Reputation does (see
-// src/lib/game/legacy.ts), so a week of check-ins is a few early levels and
+// src/lib/game/legacy.ts), so a week of check ins is a few early levels and
 // a rounding error near the top of the curve.
-export const CHECK_IN_XP_REWARDS = [20, 30, 40, 50, 60, 80, 150] as const;
-export const CHECK_IN_CYCLE_LENGTH = CHECK_IN_XP_REWARDS.length; // 7
+const CHECK_IN_XP_REWARDS = [20, 30, 40, 50, 60, 80, 150] as const;
+const CHECK_IN_CYCLE_LENGTH = CHECK_IN_XP_REWARDS.length; // 7
 
-// Renown XP granted for a given 1-based day of the cycle. Days outside
+// Renown XP granted for a given day of the cycle, counted from 1. Days outside
 // 1..7 clamp into range rather than returning undefined, so a corrupt or
-// out-of-range stored count can never hand out an undefined reward.
-export function checkInRewardForDay(day: number): number {
+// out of range stored count can never hand out an undefined reward.
+function checkInRewardForDay(day: number): number {
   const idx = Math.min(CHECK_IN_CYCLE_LENGTH, Math.max(1, Math.floor(day))) - 1;
   return CHECK_IN_XP_REWARDS[idx];
 }
@@ -36,7 +36,7 @@ export function utcDayKey(date: Date = new Date()): string {
   return date.toISOString().slice(0, 10);
 }
 
-// The persisted half of a captain's check-in: how many days of the current
+// The persisted half of a captain's check in: how many days of the current
 // cycle they have already claimed (0..6, wrapping to 0 the instant Day 7 is
 // claimed) and the UTC date key of their most recent claim. Mirrors the two
 // columns added to the CaptainLegacy table.
@@ -48,20 +48,20 @@ export type CheckInState = {
 // Everything the lobby widget needs to render the seven tiles and the claim
 // button, derived from the persisted state plus today's date.
 export type CheckInStatus = {
-  // 1-based day the captain is currently on: the tile to highlight and the
-  // reward the next claim will grant.
+  // The day the captain is currently on, counted from 1: the tile to
+  // highlight and the reward the next claim will grant.
   currentDay: number;
   // How many tiles at the start of the cycle are already claimed (0..6).
   claimedThisCycle: number;
   // False once today's claim is spent, until the UTC date rolls over.
   canClaimToday: boolean;
-  // The full reward table, so the widget never hard-codes the values.
+  // The full reward table, so the widget never hardcodes the values.
   rewards: number[];
   lastCheckInDate: string | null;
 };
 
 // A defensive read of the stored count: anything out of the 0..6 range
-// (missing column, hand-edited row, a future cycle-length change) folds
+// (missing column, hand edited row, a future cycle length change) folds
 // back into a valid cycle position instead of throwing off every tile.
 function normalizeCount(count: number): number {
   if (!Number.isFinite(count)) return 0;
@@ -87,7 +87,7 @@ export function checkInStatus(
 
 // The result of a successful claim: the day that was claimed (1..7), the XP
 // it granted, and the state to persist. Returns null when the claim is a
-// no-op because today's date was already claimed, so the caller can report
+// does nothing because today's date was already claimed, so the caller can report
 // "already claimed" without a second guard of its own.
 export type CheckInResult = { day: number; xp: number; next: CheckInState };
 

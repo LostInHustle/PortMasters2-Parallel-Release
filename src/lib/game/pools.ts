@@ -110,7 +110,7 @@ export function unlockedResourceDraw(
 }
 
 // Whether a good arrived with a charter rather than being part of the founding
-// trade. Used by the charter-scoped boon and module effects, which pay out on
+// trade. Used by the charter scoped boon and module effects, which pay out on
 // the new lane's goods only.
 export function isCharterGood(item: string): boolean {
   return (
