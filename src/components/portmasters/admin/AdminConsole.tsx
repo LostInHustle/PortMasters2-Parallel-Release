@@ -1,22 +1,32 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Anchor,
   ArrowLeft,
+  Ban,
   Loader2,
   LogOut,
   RefreshCw,
   ScrollText,
   Search,
   ShieldCheck,
+  Trash2,
+  Undo2,
   Users,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api, type SelfUser } from "@/lib/api";
 import type { AdminPlayer, ModerationLogEntry } from "@/lib/admin/actions";
-import { isStaff, type Role } from "@/lib/admin/rules";
+import {
+  bulkEligibility,
+  canModerate,
+  isStaff,
+  type BulkAction,
+  type Role,
+} from "@/lib/admin/rules";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -24,6 +34,7 @@ import { Avatar, Pill } from "../shared";
 import { PlayerRow } from "./PlayerRow";
 import { ModerationLog } from "./ModerationLog";
 import { PlayerActionDialog, type PendingAction } from "./PlayerActionDialog";
+import { BulkActionDialog } from "./BulkActionDialog";
 
 const PAGE_SIZE = 25;
 const SEARCH_DEBOUNCE_MS = 250;
@@ -59,6 +70,14 @@ export function AdminConsole({
   const [loadingLog, setLoadingLog] = useState(true);
   const [pending, setPending] = useState<PendingAction | null>(null);
 
+  // The selection is kept as a map of id to the captain as last seen, so it
+  // survives a page change or a search and the bulk dialog can still name
+  // everyone in it.
+  const [selected, setSelected] = useState<Map<string, AdminPlayer>>(
+    () => new Map(),
+  );
+  const [bulk, setBulk] = useState<BulkAction | null>(null);
+
   // A 403 from any console route means this account's authority changed
   // while the console was open; ask the server rather than guessing from
   // the message.
@@ -77,6 +96,14 @@ export function AdminConsole({
       const res = await api.admin.players(search, page);
       setPlayers(res.players);
       setTotal(res.total);
+      // Anyone still selected is refreshed to what the server just said,
+      // and anyone gone (deleted) drops out of the selection.
+      setSelected((prev) => {
+        if (prev.size === 0) return prev;
+        const next = new Map(prev);
+        for (const p of res.players) if (next.has(p.id)) next.set(p.id, p);
+        return next;
+      });
     } catch (err) {
       toast.error("Could not load the roster", {
         description: err instanceof Error ? err.message : undefined,
@@ -123,6 +150,47 @@ export function AdminConsole({
     void loadPlayers();
     void loadLog();
   }, [loadPlayers, loadLog]);
+
+  const toggle = useCallback(
+    (id: string) => {
+      setSelected((prev) => {
+        const next = new Map(prev);
+        if (next.has(id)) next.delete(id);
+        else {
+          const p = players.find((x) => x.id === id);
+          if (p) next.set(id, p);
+        }
+        return next;
+      });
+    },
+    [players],
+  );
+
+  const actor = useMemo(() => ({ id: me.id, role: me.role }), [me.id, me.role]);
+  const selectableOnPage = useMemo(
+    () =>
+      players.filter(
+        (p) => canModerate(actor, "ban", { id: p.id, role: p.role }).ok,
+      ),
+    [players, actor],
+  );
+  const allOnPageSelected =
+    selectableOnPage.length > 0 &&
+    selectableOnPage.every((p) => selected.has(p.id));
+
+  function toggleAllOnPage() {
+    setSelected((prev) => {
+      const next = new Map(prev);
+      if (allOnPageSelected)
+        for (const p of selectableOnPage) next.delete(p.id);
+      else for (const p of selectableOnPage) next.set(p.id, p);
+      return next;
+    });
+  }
+
+  const selection = useMemo(() => [...selected.values()], [selected]);
+  const reach = (action: BulkAction) =>
+    bulkEligibility(actor, action, selection).eligible.length;
 
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -187,8 +255,8 @@ export function AdminConsole({
                     ? "One registered account."
                     : `${total} registered accounts.`}{" "}
                   {me.role === "admin"
-                    ? "You can ban, appoint moderators, and delete accounts."
-                    : "You can ban and unban captains. The admin handles roles and deletions."}
+                    ? "You can ban, appoint moderators, and delete accounts, one at a time or as a selection."
+                    : "You can ban and unban captains, one at a time or as a selection. The admin handles roles and deletions."}
                 </p>
               </div>
               <Button
@@ -205,7 +273,7 @@ export function AdminConsole({
               </Button>
             </div>
 
-            <div className="relative mb-4">
+            <div className="relative mb-3">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 value={query}
@@ -213,6 +281,72 @@ export function AdminConsole({
                 placeholder="Search by captain name or display name"
                 className="h-10 pl-9"
               />
+            </div>
+
+            <div className="flex items-center justify-between gap-3 mb-3 min-h-9">
+              <label
+                className={cn(
+                  "flex items-center gap-2 text-xs text-muted-foreground select-none",
+                  selectableOnPage.length
+                    ? "cursor-pointer"
+                    : "opacity-40 cursor-not-allowed",
+                )}
+              >
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-teal-600"
+                  checked={allOnPageSelected}
+                  disabled={selectableOnPage.length === 0}
+                  onChange={toggleAllOnPage}
+                  aria-label="Select every captain on this page"
+                />
+                {allOnPageSelected
+                  ? "Clear this page"
+                  : "Select everyone on this page"}
+              </label>
+              {selection.length > 0 && (
+                <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                  <Pill tone="sea">{selection.length} selected</Pill>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="rounded-lg text-rose-600 dark:text-rose-300 border-rose-500/30 hover:bg-rose-500/10"
+                    disabled={reach("ban") === 0}
+                    onClick={() => setBulk("ban")}
+                  >
+                    <Ban className="h-3.5 w-3.5" /> Ban
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="rounded-lg"
+                    disabled={reach("unban") === 0}
+                    onClick={() => setBulk("unban")}
+                  >
+                    <Undo2 className="h-3.5 w-3.5" /> Lift bans
+                  </Button>
+                  {me.role === "admin" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="rounded-lg text-rose-600 dark:text-rose-300 border-rose-500/30 hover:bg-rose-500/10"
+                      disabled={reach("delete") === 0}
+                      onClick={() => setBulk("delete")}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> Delete
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="rounded-lg"
+                    onClick={() => setSelected(new Map())}
+                    title="Clear the selection"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -233,6 +367,8 @@ export function AdminConsole({
                     key={p.id}
                     me={me}
                     player={p}
+                    selected={selected.has(p.id)}
+                    onToggle={toggle}
                     onAction={setPending}
                   />
                 ))
@@ -274,7 +410,12 @@ export function AdminConsole({
               </h3>
               <Pill tone="amber">{entries.length}</Pill>
             </div>
-            <ModerationLog entries={entries} loading={loadingLog} />
+            <ModerationLog
+              entries={entries}
+              loading={loadingLog}
+              canClear={me.role === "admin"}
+              onCleared={loadLog}
+            />
           </aside>
         </div>
 
@@ -291,6 +432,22 @@ export function AdminConsole({
           onClose={() => setPending(null)}
           onDone={() => {
             setPending(null);
+            refresh();
+          }}
+          onForbidden={recheckRole}
+        />
+      )}
+
+      {bulk && (
+        <BulkActionDialog
+          key={bulk}
+          me={me}
+          action={bulk}
+          players={selection}
+          onClose={() => setBulk(null)}
+          onDone={() => {
+            setBulk(null);
+            setSelected(new Map());
             refresh();
           }}
           onForbidden={recheckRole}

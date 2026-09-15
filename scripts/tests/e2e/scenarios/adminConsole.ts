@@ -23,7 +23,16 @@ type Roster = {
   total: number;
 };
 type Log = {
-  entries: { action: string; actorName: string; targetName: string }[];
+  entries: {
+    action: string;
+    actorName: string;
+    targetName: string;
+    reason: string | null;
+  }[];
+};
+type Outcome = {
+  done: { id: string }[];
+  skipped: { id: string; displayName: string | null; reason: string }[];
 };
 
 export async function run(baseUrl: string): Promise<void> {
@@ -201,6 +210,145 @@ export async function run(baseUrl: string): Promise<void> {
         (e) => e.action === "ban" && e.actorName === mod.user!.displayName,
       ),
       "the log names the moderator who banned",
+    );
+  });
+
+  // Three fresh captains for the selection tests below.
+  const crew = [
+    new TestClient(baseUrl),
+    new TestClient(baseUrl),
+    new TestClient(baseUrl),
+  ];
+  const crewNames = crew.map((_, i) => uniqueUsername(`crew${i}`));
+  for (let i = 0; i < crew.length; i++) {
+    await crew[i].register(crewNames[i], "testpass123", `Crew ${i}`);
+  }
+  const crewIds = crew.map((c) => c.user!.id);
+
+  await test("a moderator can ban a selection with one reason, and the reply names who was skipped and why", async () => {
+    assertEqual(
+      await statusOf(
+        mod.post("/api/admin/players/bulk", {
+          action: "ban",
+          ids: [crewIds[0], crewIds[1]],
+        }),
+      ),
+      400,
+      "a batch of bans still needs a reason",
+    );
+    // The admin is in the selection on purpose: the batch must reach the
+    // two captains it can and report the one it cannot, not fail outright.
+    const outcome = await mod.post<Outcome>("/api/admin/players/bulk", {
+      action: "ban",
+      ids: [crewIds[0], crewIds[1], admin.user!.id],
+      reason: "Testing the batch path",
+    });
+    assertEqual(outcome.done.length, 2, "two captains banned");
+    assertEqual(outcome.skipped.length, 1, "one skipped");
+    assertEqual(
+      outcome.skipped[0].id,
+      admin.user!.id,
+      "the admin was the one skipped",
+    );
+    assert(
+      /admin/i.test(outcome.skipped[0].reason),
+      "with the matrix's reason",
+    );
+    assertEqual(
+      (await crew[0].me()).user,
+      null,
+      "the first banned session is gone",
+    );
+    assertEqual(
+      (await crew[1].me()).user,
+      null,
+      "the second banned session is gone",
+    );
+    assertEqual(
+      (await admin.me()).user?.role,
+      "admin",
+      "the admin is untouched",
+    );
+  });
+
+  await test("lifting bans as a batch skips anyone not actually banned", async () => {
+    const outcome = await mod.post<Outcome>("/api/admin/players/bulk", {
+      action: "unban",
+      ids: crewIds,
+    });
+    assertEqual(outcome.done.length, 2, "the two bans were lifted");
+    assertEqual(
+      outcome.skipped.length,
+      1,
+      "the never banned captain was skipped",
+    );
+    assertEqual(outcome.skipped[0].id, crewIds[2], "and it was the right one");
+    await crew[0].login(crewNames[0], "testpass123");
+    assertEqual(
+      (await crew[0].me()).user?.username,
+      crewNames[0],
+      "signed in again",
+    );
+  });
+
+  await test("deleting a selection is the admin's alone", async () => {
+    assertEqual(
+      await statusOf(
+        mod.post("/api/admin/players/bulk", { action: "delete", ids: crewIds }),
+      ),
+      403,
+      "a moderator cannot delete a selection",
+    );
+    const outcome = await admin.post<Outcome>("/api/admin/players/bulk", {
+      action: "delete",
+      ids: [crewIds[0], crewIds[1], "no-such-captain"],
+    });
+    assertEqual(outcome.done.length, 2, "two accounts deleted");
+    assertEqual(
+      outcome.skipped.length,
+      1,
+      "an unknown id is reported, not fatal",
+    );
+    assertEqual(
+      outcome.skipped[0].displayName,
+      null,
+      "an unknown id has no name to report",
+    );
+    assertEqual(
+      await statusOf(crew[0].login(crewNames[0], "testpass123")),
+      401,
+      "the deleted account is gone",
+    );
+    assertEqual(
+      (await crew[2].me()).user?.username,
+      crewNames[2],
+      "the third captain is untouched",
+    );
+  });
+
+  await test("only the admin can clear the log, and the clear leaves its own entry behind", async () => {
+    assertEqual(
+      await statusOf(mod.delete("/api/admin/log")),
+      403,
+      "a moderator cannot clear the log",
+    );
+    const before = (await admin.get<Log>("/api/admin/log")).entries.length;
+    assert(before > 5, "the log had a history to clear");
+    const { removed } = await admin.delete<{ removed: number }>(
+      "/api/admin/log",
+    );
+    assertEqual(removed, before, "every entry was removed");
+    const after = (await admin.get<Log>("/api/admin/log")).entries;
+    assertEqual(after.length, 1, "exactly one entry remains");
+    assertEqual(after[0].action, "clear_log", "and it is the clear itself");
+    assertEqual(
+      after[0].actorName,
+      admin.user!.displayName,
+      "naming who cleared it",
+    );
+    assert(
+      !!after[0].reason && after[0].reason.includes(String(before)),
+      "and how many entries went",
     );
   });
 

@@ -5,6 +5,7 @@ import type { SelfUser } from "@/lib/api";
 import type { AdminPlayer } from "@/lib/admin/actions";
 import { canModerate, type ModerationAction } from "@/lib/admin/rules";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Avatar, OnlineDot, Pill } from "../shared";
 import type { PendingAction } from "./PlayerActionDialog";
 
@@ -18,14 +19,20 @@ function joinedOn(iso: string): string {
 
 // One captain on the roster with exactly the actions this viewer may take
 // on them. The buttons are filtered through the same canModerate the
-// server enforces, so nothing shows up that would only fail on click.
+// server enforces, so nothing shows up that would only fail on click. The
+// checkbox follows the same rule: a captain nothing here can touch (you,
+// the admin, a fellow moderator) has nothing to be selected for.
 export function PlayerRow({
   me,
   player,
+  selected,
+  onToggle,
   onAction,
 }: {
   me: SelfUser;
   player: AdminPlayer;
+  selected: boolean;
+  onToggle: (id: string) => void;
   onAction: (action: PendingAction) => void;
 }) {
   const allowed = (action: ModerationAction) =>
@@ -34,9 +41,35 @@ export function PlayerRow({
       role: player.role,
     }).ok;
   const isMe = player.id === me.id;
+  const selectable = allowed("ban");
 
   return (
-    <div className="pm-glass rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center gap-3">
+    <div
+      className={cn(
+        "pm-glass rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center gap-3",
+        selected && "ring-2 ring-teal-500/40",
+      )}
+    >
+      <label
+        className={cn(
+          "flex items-center shrink-0",
+          selectable ? "cursor-pointer" : "opacity-30 cursor-not-allowed",
+        )}
+        title={
+          selectable
+            ? "Select this captain"
+            : "Nothing here can act on this account"
+        }
+      >
+        <input
+          type="checkbox"
+          className="h-4 w-4 accent-teal-600 cursor-pointer disabled:cursor-not-allowed"
+          checked={selected}
+          disabled={!selectable}
+          onChange={() => onToggle(player.id)}
+          aria-label={`Select ${player.displayName}`}
+        />
+      </label>
       <div className="relative shrink-0">
         <Avatar hue={player.avatarHue} name={player.displayName} size={40} />
         <OnlineDot

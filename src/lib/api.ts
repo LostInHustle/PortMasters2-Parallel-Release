@@ -5,8 +5,12 @@ import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import type { CheckInStatus } from "@/lib/game/checkin";
 import type { Difficulty } from "@/lib/game/difficulty";
 import type { PublicUser } from "@/lib/publicUser";
-import type { AdminPlayer, ModerationLogEntry } from "@/lib/admin/actions";
-import type { Role } from "@/lib/admin/rules";
+import type {
+  AdminPlayer,
+  BulkOutcome,
+  ModerationLogEntry,
+} from "@/lib/admin/actions";
+import type { BulkAction, Role } from "@/lib/admin/rules";
 
 export type { PublicUser } from "@/lib/publicUser";
 
@@ -167,6 +171,10 @@ export const api = {
       post<{ ok: true }>(`/api/admin/players/${id}/role`, { role }),
     remove: (id: string) =>
       jfetch<{ ok: true }>(`/api/admin/players/${id}`, { method: "DELETE" }),
+    bulk: (action: BulkAction, ids: string[], reason?: string) =>
+      post<BulkOutcome>("/api/admin/players/bulk", { action, ids, reason }),
     log: () => jfetch<{ entries: ModerationLogEntry[] }>("/api/admin/log"),
+    clearLog: () =>
+      jfetch<{ removed: number }>("/api/admin/log", { method: "DELETE" }),
   },
 };

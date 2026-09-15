@@ -32,8 +32,9 @@ export type ModerationAction =
   "ban" | "unban" | "delete" | "promote" | "demote";
 
 // Everything the log can record. The console only ever issues the five
-// actions above; "claim" is written by the seat handover itself.
-export type LoggedAction = ModerationAction | "claim";
+// actions above; "claim" is written by the seat claim itself, and
+// "clear_log" is the one entry a log clear leaves behind.
+export type LoggedAction = ModerationAction | "claim" | "clear_log";
 
 export type ModerationSubject = { id: string; role: Role };
 
@@ -76,6 +77,46 @@ export function canModerate(
     return { ok: false, reason: "That captain is not a moderator." };
   }
   return { ok: true };
+}
+
+// ---------- Acting on several captains at once ----------
+// The bulk bar in the console and the bulk route on the server both need
+// the same answer: of these selected captains, which ones can this action
+// actually apply to, and why not the rest. Beyond the permission matrix
+// this also reads the ban state, since banning someone already banned or
+// lifting a ban that is not there is not an action, just noise in the log.
+export type BulkAction = "ban" | "unban" | "delete";
+
+// At most this many targets per request. Big enough for any real sweep,
+// small enough that one request cannot tie the server up for long.
+export const BULK_LIMIT = 100;
+
+export type BulkTarget = ModerationSubject & { bannedAt: string | null };
+
+export type BulkEligibility<T extends BulkTarget> = {
+  eligible: T[];
+  skipped: { target: T; reason: string }[];
+};
+
+export function bulkEligibility<T extends BulkTarget>(
+  actor: ModerationSubject,
+  action: BulkAction,
+  targets: T[],
+): BulkEligibility<T> {
+  const out: BulkEligibility<T> = { eligible: [], skipped: [] };
+  for (const target of targets) {
+    const verdict = canModerate(actor, action, target);
+    if (!verdict.ok) {
+      out.skipped.push({ target, reason: verdict.reason });
+    } else if (action === "ban" && target.bannedAt) {
+      out.skipped.push({ target, reason: "Already banned." });
+    } else if (action === "unban" && !target.bannedAt) {
+      out.skipped.push({ target, reason: "Not banned." });
+    } else {
+      out.eligible.push(target);
+    }
+  }
+  return out;
 }
 
 // Reasons are shown to the banned captain at sign in and kept in the log,

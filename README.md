@@ -107,7 +107,9 @@ A ban is immediate and complete. The reason is required and the banned captain s
 
 Deleting an account is the one thing here that cannot be undone. The account leaves every room first, the same way a voluntary departure does, so a harbor they were hosting is handed to the next captain rather than cascading away with them, and only then is the row removed along with their sessions, saved voyages, chat, Renown and merits.
 
-Nobody can act on their own account, moderators cannot touch each other or the admin, and every action is written to a log that outlives the accounts it mentions, with the actor's name, the target's name, and the reason. The rules themselves are one pure function, `canModerate` in [src/lib/admin/rules.ts](src/lib/admin/rules.ts), tested in `npm run test:admin`; the console only ever shows a button the server would also allow.
+Every row you are allowed to act on has a checkbox, so a sweep is one selection and one confirmation: ban them all with a single reason, lift their bans, or (admin only) delete them together. The batch is never all or nothing. Each captain in it is judged on their own, the dialog shows beforehand exactly who will be reached and who will be skipped and why (already banned, not banned, a fellow moderator, yourself), and the server answers with the same report after the fact. A batch tops out at 100 captains.
+
+Nobody can act on their own account, moderators cannot touch each other or the admin, and every action is written to a log that outlives the accounts it mentions, with the actor's name, the target's name, and the reason. The admin can clear that log, and the clear writes one last entry recording who did it and how many entries went, so the log can never be wiped without trace. The rules themselves are one pure function, `canModerate` in [src/lib/admin/rules.ts](src/lib/admin/rules.ts), with `bulkEligibility` beside it for selections, both tested in `npm run test:admin`; the console only ever shows a button the server would also allow.
 
 If the server has no `ADMIN_KEY`, the office is closed: the claim page says so, and every console route answers 503 or 403. Once the seat is taken, an ordinary player visiting `/admin` sees a closed door instead of the key form. Nothing else about the game changes.
 
@@ -205,7 +207,7 @@ That runs all twelve suites in sequence. Each also runs on its own, as `npm run 
 | `test:harbor`      | Harbor Pulse, Word on the Docks, Tidewatch Alerts                                                                    |
 | `test:convoy`      | Convoy venture math and its exploit guards                                                                           |
 | `test:backing`     | Backing resolution, escrow and payout                                                                                |
-| `test:admin`       | The moderation permission matrix, ban reasons and the admin key throttle                                             |
+| `test:admin`       | The moderation permission matrix, selection eligibility, ban reasons and the admin key throttle                      |
 
 They are plain `tsx` scripts sharing a small harness, with no test runner, no database and no live server. Everything they touch is pure logic that imports neither Prisma nor React, which is exactly why the Gold math for convoy and backing was pulled out of the socket closures in `src/server/realtime.ts` and into their own modules: a regression there now shows up in a fast deterministic test instead of only in a live room.
 

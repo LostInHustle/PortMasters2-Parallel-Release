@@ -10,6 +10,7 @@
 import { suite, test, assert, assertEqual, summary } from "./harness";
 import {
   BAN_REASON_MAX_LENGTH,
+  bulkEligibility,
   canModerate,
   isStaff,
   KeyAttemptThrottle,
@@ -124,6 +125,65 @@ test("every refusal carries a reason a person can read", () => {
   for (const verdict of refused) {
     assert(!verdict.ok && verdict.reason.length > 10, "reason present");
   }
+});
+
+suite("acting on a selection");
+
+const BANNED_AT = "2026-09-01T00:00:00.000Z";
+const crew = [
+  { id: "p1", role: "player" as Role, bannedAt: null },
+  { id: "p2", role: "player" as Role, bannedAt: BANNED_AT },
+  { id: "modA", role: "moderator" as Role, bannedAt: null },
+  { id: "admin", role: "admin" as Role, bannedAt: null },
+];
+
+test("a ban reaches the players who are not banned yet and names why the rest are skipped", () => {
+  const { eligible, skipped } = bulkEligibility(admin, "ban", crew);
+  assertEqual(
+    eligible.map((t) => t.id).join(","),
+    "p1,modA",
+    "the admin can ban a player and a moderator",
+  );
+  const reasons = Object.fromEntries(
+    skipped.map((s) => [s.target.id, s.reason]),
+  );
+  assertEqual(reasons.p2, "Already banned.", "an existing ban is skipped");
+  assert(!!reasons.admin, "the admin themselves is skipped with a reason");
+});
+
+test("lifting bans reaches only the banned, and a moderator's reach stops at other staff", () => {
+  const { eligible, skipped } = bulkEligibility(modA, "unban", crew);
+  assertEqual(
+    eligible.map((t) => t.id).join(","),
+    "p2",
+    "only the banned player",
+  );
+  const reasons = Object.fromEntries(
+    skipped.map((s) => [s.target.id, s.reason]),
+  );
+  assertEqual(reasons.p1, "Not banned.", "nothing to lift");
+  assert(!!reasons.modA, "a moderator cannot act on themselves");
+  assert(!!reasons.admin, "a moderator cannot act on the admin");
+});
+
+test("a moderator's delete reaches nobody, and the admin's reaches everyone but themselves", () => {
+  assertEqual(
+    bulkEligibility(modA, "delete", crew).eligible.length,
+    0,
+    "deletion is admin only",
+  );
+  assertEqual(
+    bulkEligibility(admin, "delete", crew)
+      .eligible.map((t) => t.id)
+      .join(","),
+    "p1,p2,modA",
+    "banned or not, everyone but the admin can be deleted",
+  );
+});
+
+test("an empty selection is simply empty", () => {
+  const { eligible, skipped } = bulkEligibility(admin, "ban", []);
+  assertEqual(eligible.length + skipped.length, 0, "nothing in, nothing out");
 });
 
 suite("ban reasons");
