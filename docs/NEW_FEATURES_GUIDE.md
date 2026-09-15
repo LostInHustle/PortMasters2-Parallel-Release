@@ -261,12 +261,12 @@ Only the host sees this control. On the Harbor Roster, hover the row of any capt
 
 You will need at least two captains, one of whom is the host, and it helps to have a third to confirm what an uninvolved captain sees.
 
-1. As the host, hover a non-host captain's row on the Harbor Roster and click the speaker icon to mute them.
+1. As the host, hover a other captain captain's row on the Harbor Roster and click the speaker icon to mute them.
 2. Confirm every captain in the room, not just the host, sees the "muted" tag appear on that captain's roster row.
 3. On the muted captain's own screen, confirm their room chat input is replaced with the explanatory note, and confirm they cannot send a room chat message.
 4. Confirm the muted captain can still send and receive direct messages normally, and confirm they can still read the room chat that others post, they simply cannot post to it themselves.
 5. As the host, click the speaker icon again to unmute them. Confirm their message box returns to normal immediately, and confirm the "muted" tag disappears from their roster row for everyone.
-6. To confirm this is host only, try to find a mute control on a non-host captain's own view of the roster. There should not be one, on any row, including their own.
+6. To confirm this is host only, try to find a mute control on a other captain captain's own view of the roster. There should not be one, on any row, including their own.
 7. To confirm a mute does not survive a restart, mute a captain, then have the host restart the voyage. Confirm the newly started voyage shows nobody as muted.
 
 ---
@@ -308,7 +308,7 @@ A single captain can fully confirm this alone; no second player is required.
 
 The Harbor Roster already shows every captain's live round, phase, Gold, and Reputation at a glance, but on a phone or a narrow browser window it sits at the very bottom of the page, behind the phase panel you are actively playing in, so seeing it means scrolling past everything else first. Fleet Ticker adds a second, much smaller summary of the exact same information, a slim strip pinned directly under the room's header, visible on every screen size without scrolling past anything.
 
-This is not a replacement for the Harbor Roster, which still has the fuller per-captain detail, the mute control, and the click through to each captain's full detail popup. It exists specifically to close the gap the roster's own scrolling position leaves open on a small screen.
+This is not a replacement for the Harbor Roster, which still has the fuller detail on each captain, the mute control, and the click through to each captain's full detail popup. It exists specifically to close the gap the roster's own scrolling position leaves open on a small screen.
 
 ### Where to find it and how to use it
 

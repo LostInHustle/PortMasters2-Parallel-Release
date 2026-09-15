@@ -1,21 +1,21 @@
 // =====================================================================
-// Unit tests for the reducer in src/lib/use-game-session.ts. It's a pure
+// Unit tests for the reducer in src/lib/useGameSession.ts. It's a pure
 // function with no React dependency, exported specifically so it can be
 // tested directly here rather than only through a browser (see
-// scripts/tests/e2e/scenarios/notification-cap.ts for the end-to-end
+// scripts/tests/e2e/scenarios/notificationCap.ts for the end to end
 // version, which proves the toast itself still fires; this file proves
 // the reducer's own contract fast, without a server or a browser).
 // Run with: npx tsx scripts/tests/unit.session.ts
 // =====================================================================
 import { suite, test, assert, assertEqual, summary } from "./harness";
-import { reducer, type SessionState } from "../../src/lib/use-game-session";
+import { reducer, type SessionState } from "../../src/lib/useGameSession";
 import { createInitialGameState } from "../../src/lib/game/types";
 
 // assertEqual compares with !==, which for two array literals is always
 // "not equal" regardless of contents (different references). newLines is
 // exactly the kind of ordered sequence assertArrayEqual (which sorts
 // before comparing) shouldn't be trusted for either, so this is a plain
-// order-sensitive equality check instead.
+// order sensitive equality check instead.
 function assertLinesEqual(actual: string[], expected: string[], msg: string) {
   assert(
     JSON.stringify(actual) === JSON.stringify(expected),
@@ -43,8 +43,8 @@ test("INIT loads the given game and logs, and starts newLines empty", () => {
     game: g,
     logs: ["a prior voyage's history", "line two"],
   });
-  assertEqual(s.game, g, "INIT should install the given game as-is");
-  assertEqual(s.logs.length, 2, "INIT should install the given logs as-is");
+  assertEqual(s.game, g, "INIT should install the given game as is");
+  assertEqual(s.logs.length, 2, "INIT should install the given logs as is");
   assertEqual(
     s.newLines.length,
     0,
@@ -88,7 +88,7 @@ test("APPLY captures exactly the lines the action added, not the whole log", () 
   assertLinesEqual(
     s1.newLines,
     ["brand new entry"],
-    "newLines should hold exactly the one line this action added, not the pre-existing history",
+    "newLines should hold exactly the one line this action added, not the existing history",
   );
 });
 
@@ -141,7 +141,7 @@ test("APPLY trims the ledger to 500 entries, but newLines still reports the true
     "setup: ledger should start at exactly the cap",
   );
 
-  // One more action, pushing the ledger to 501 lines pre-trim.
+  // One more action, pushing the ledger to 501 lines pre trim.
   s = reducer(s, {
     type: "APPLY",
     fn: (_g, logs) => logs.push("the 501st line"),
@@ -153,7 +153,7 @@ test("APPLY trims the ledger to 500 entries, but newLines still reports the true
     "the ledger itself should stay pinned at the 500-entry cap",
   );
   // This is the assertion that would have failed before the fix: a
-  // length-diff approach sees state.logs.length go 500 -> 500 (no change)
+  // length difference approach sees state.logs.length go 500 -> 500 (no change)
   // and concludes nothing happened. newLines sidesteps length entirely.
   assertLinesEqual(
     s.newLines,
@@ -181,11 +181,11 @@ test("APPLY continues reporting fresh newLines correctly for many consecutive ac
   for (let i = 0; i < 20; i++) {
     s = reducer(s, {
       type: "APPLY",
-      fn: (_g, logs) => logs.push(`post-cap line ${i}`),
+      fn: (_g, logs) => logs.push(`post cap line ${i}`),
     });
     assertLinesEqual(
       s.newLines,
-      [`post-cap line ${i}`],
+      [`post cap line ${i}`],
       `iteration ${i}: newLines should report that iteration's line even though the ledger length never changes once saturated`,
     );
     assertEqual(

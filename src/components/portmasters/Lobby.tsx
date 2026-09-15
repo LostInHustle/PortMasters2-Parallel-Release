@@ -1,14 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   api,
   type ChatMessage,
   type PublicUser,
   type RoomSummary,
+  type SelfUser,
 } from "@/lib/api";
-import { useRealtime } from "@/lib/use-realtime";
+import { isStaff } from "@/lib/admin/rules";
+import { useRealtime } from "@/lib/useRealtime";
 import {
   DIFFICULTIES,
   DIFFICULTY_ORDER,
@@ -22,7 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea } from "@/components/ui/scrollArea";
 import {
   Dialog,
   DialogContent,
@@ -43,6 +46,7 @@ import {
   MessageCircle,
   RefreshCw,
   Gift,
+  ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn, normalizeRoomName } from "@/lib/utils";
@@ -59,7 +63,7 @@ export function Lobby({
   onEnterRoom,
   onLogout,
 }: {
-  me: PublicUser;
+  me: SelfUser;
   onEnterRoom: (room: RoomSummary) => void;
   onLogout: () => void;
 }) {
@@ -104,7 +108,7 @@ export function Lobby({
     // Kicked off on a timer rather than called straight from the effect body,
     // so the first refresh's setLoadingRooms(true) isn't a synchronous setState
     // inside an effect (react-hooks/set-state-in-effect). Nothing changes
-    // visually: loadingRooms already starts true, so that first set was a no-op
+    // visually: loadingRooms already starts true, so that first set changed nothing
     // anyway, and the interval's later calls were never inside an effect body.
     const kickoff = setTimeout(refreshRooms, 0);
     const t = setInterval(refreshRooms, 8000);
@@ -134,7 +138,7 @@ export function Lobby({
     };
   }, []);
 
-  // Claim today's Daily Check-In. The server is the source of truth for the
+  // Claim today's Daily Check In. The server is the source of truth for the
   // day math and the guard against a second claim, so we just render whatever
   // state it returns, claimed or not, and surface the reward as a toast.
   const claimCheckIn = useCallback(async () => {
@@ -146,7 +150,7 @@ export function Lobby({
       if (res.claimed) {
         toast.success(`Day ${res.day} claimed: +${res.xpGained} Renown XP`, {
           description: res.leveledUp
-            ? "Renown level up! A bigger start-of-voyage Gold bonus awaits."
+            ? "Renown level up! A bigger Gold bonus awaits at the start of your next voyage."
             : "Fair winds. Come back tomorrow for the next reward.",
         });
       } else {
@@ -155,7 +159,7 @@ export function Lobby({
         });
       }
     } catch {
-      toast.error("Check-in failed", {
+      toast.error("Check in failed", {
         description: "Could not reach the harbour master. Try again.",
       });
     } finally {
@@ -261,7 +265,7 @@ export function Lobby({
     }
   }
 
-  // Re-fetch DM history when switching targets (initial seed for ChatPanel).
+  // Refetch DM history when switching targets (initial seed for ChatPanel).
   useEffect(() => {
     if (!dmTarget) return;
     let alive = true;
@@ -317,11 +321,11 @@ export function Lobby({
             <button
               onClick={() => setCheckInOpen(true)}
               className="pm-pressable relative"
-              title="Daily Check-In"
+              title="Daily Check In"
             >
               <Pill tone="amber">
                 <Gift className="h-3 w-3" />{" "}
-                <span className="hidden sm:inline">Check-In</span>
+                <span className="hidden sm:inline">Check In</span>
               </Pill>
               {checkIn.canClaimToday && (
                 <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-background" />
@@ -336,6 +340,18 @@ export function Lobby({
                 {renownProgress(legacy.renownXP).level}
               </Pill>
             </button>
+            {isStaff(me.role) && (
+              <Link
+                href="/admin"
+                className="pm-pressable"
+                title="Harbor Office"
+              >
+                <Pill tone="rose">
+                  <ShieldCheck className="h-3 w-3" />{" "}
+                  <span className="hidden sm:inline">Harbor Office</span>
+                </Pill>
+              </Link>
+            )}
             <div className="flex items-center gap-2 pl-2 border-l border-black/5 dark:border-white/10">
               <Avatar hue={me.avatarHue} name={me.displayName} size={32} ring />
               <div className="hidden sm:block leading-tight">
@@ -750,11 +766,11 @@ export function Lobby({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Gift className="h-5 w-5 text-violet-500" />
-              Daily Check-In
+              Daily Check In
             </DialogTitle>
             <DialogDescription>
-              Claim a Renown reward each day. The 7-day cycle picks up where you
-              left off, even after a missed day, and restarts once Day 7 is
+              Claim a Renown reward each day. The seven day cycle picks up where
+              you left off, even after a missed day, and restarts once Day 7 is
               claimed.
             </DialogDescription>
           </DialogHeader>

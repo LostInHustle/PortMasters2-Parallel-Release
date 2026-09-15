@@ -12,18 +12,25 @@
 //   Live game status broadcast (round, phase, gold, reputation)
 //   Starting the voyage: host only, and only once the harbor has two
 //   captains in it (see "room:start" below)
-//   Phase/round ready-checks after that, so a room advances together
+//   Phase/round ready checks after that, so a room advances together
 //   instead of each captain racing ahead on their own clock
-//   Relaying on-demand player detail requests (cargo, workers, logs) so
+//   Relaying on demand player detail requests (cargo, workers, logs) so
 //   the roster can show a quick summary without broadcasting it constantly
 //   Room chat (persisted) and one to one direct messages (persisted)
-//   The Bartering phase's open-offer board: the one place this file is
+//   The Bartering phase's open offer board: the one place this file is
 //   briefly authoritative over real state instead of just a vote/relay
 // =====================================================================
 import type { Server as HttpServer } from "http";
-import { Server } from "socket.io";
-import { db, PUBLIC_USER_SELECT } from "../lib/db";
+import { Server, type Socket } from "socket.io";
+import { db } from "../lib/db";
+import { getUserFromToken, SESSION_COOKIE_NAME } from "../lib/auth";
+import {
+  PUBLIC_USER_SELECT,
+  publicUser,
+  type PublicUser,
+} from "../lib/publicUser";
 import { leaveRoomForUser, roomMemberIds } from "../lib/rooms";
+import { registerRealtimeModeration } from "../lib/admin/bridge";
 import {
   levelForRenownXP,
   parseStatsByDifficulty,
@@ -62,13 +69,6 @@ import { computeBackingResolution } from "../lib/game/backing";
 import { computeHarborPulse } from "../lib/game/harborPulse";
 
 // ---------- Types ----------
-type PublicUser = {
-  id: string;
-  username: string;
-  displayName: string;
-  avatarHue: number;
-};
-
 type SocketState = {
   userId: string;
   user: PublicUser;
@@ -78,11 +78,10 @@ type SocketState = {
 
 // One captain's last reported status, as cached per room and rebroadcast on
 // the "game:status" channel. Mirrors GameStatusUpdate in src/lib/realtime.ts
-// rather than importing it, for the same reason `publicUser` is duplicated
-// below: that module is a client entry point that pulls in socket.io-client,
-// which has no business inside this Node server. Spelled out here instead of
-// left as `any`, so the several readers that reach for `.phase` or
-// `.reputation` are checked rather than trusted.
+// rather than importing it: that module is a client entry point that pulls
+// in socket.io-client, which has no business inside this Node server.
+// Spelled out here instead of left as `any`, so the several readers that
+// reach for `.phase` or `.reputation` are checked rather than trusted.
 type CaptainStatus = {
   roomId: string;
   user: PublicUser;
@@ -102,24 +101,10 @@ export function attachRealtime(httpServer: HttpServer): Server {
     pingInterval: 25000,
   });
 
-  // ---------- In-memory presence ----------
+  // ---------- In memory presence ----------
   const sockets = new Map<string, SocketState>(); // socketId -> state
   // userId -> Set<socketId>  (a user may have multiple tabs)
   const userSockets = new Map<string, Set<string>>();
-
-  function publicUser(u: {
-    id: string;
-    username: string;
-    displayName: string;
-    avatarHue: number;
-  }): PublicUser {
-    return {
-      id: u.id,
-      username: u.username,
-      displayName: u.displayName,
-      avatarHue: u.avatarHue,
-    };
-  }
 
   function onlineUsers(): Array<PublicUser & { roomId: string | null }> {
     const seen = new Map<string, PublicUser & { roomId: string | null }>();
@@ -136,7 +121,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
 
   // One row per *user*, never per socket. A captain can hold several
   // sockets at once, legitimately (two browser tabs) or transiently (a
-  // reconnect's brand-new socket while the dropped one is still inside
+  // reconnect's brand new socket while the dropped one is still inside
   // pingTimeout and so still sitting in `sockets` with its roomId set).
   // The roster has to collapse all of them down to a single seat. This
   // mirrors how onlineUsers() already dedupes presence by userId; without
@@ -146,11 +131,11 @@ export function attachRealtime(httpServer: HttpServer): Server {
   // the "duplicate me with different statuses" symptom.
   function roomMembers(roomId: string) {
     const byUser = new Map<string, PublicUser & { socketId: string }>();
-    // Reverse-iterate so the newest socket (inserted last) wins the dedup.
+    // Iterate in reverse so the newest socket (inserted last) wins the dedup.
     // When a hosting edge proxy recycles an idle WebSocket, the stale one
     // hangs around in `sockets` until pingTimeout fires, if it wins the
     // dedup, every other captain sees a frozen status for that user.  By
-    // walking newest-first, the freshly-reconnected (or even just more
+    // walking newest first, the freshly reconnected (or even just more
     // recently active) socket always claims the roster slot.
     for (const [sid, s] of Array.from(sockets.entries()).reverse()) {
       if (s.roomId === roomId && !byUser.has(s.userId)) {
@@ -164,13 +149,13 @@ export function attachRealtime(httpServer: HttpServer): Server {
   // one left before anyone else did) sees the Start Game control without
   // needing to refresh. Read fresh from the database every time rather
   // than cached, since host changes are rare and this only fires on
-  // join/leave/disconnect, never on the hot game-action path.
+  // join/leave/disconnect, never on the hot game action path.
   //
   // [MANIFEST 14: Harbor Watch] mutedUserIds rides along on the same
   // broadcast every client already listens to for the roster itself, so
   // muting someone needs no separate client subscription: the roster (and
   // the muted captain's own client) simply see the flag the next time
-  // membership is re-emitted, which mute/unmute below always triggers.
+  // membership is emitted again, which mute/unmute below always triggers.
   async function emitRoomMembers(roomId: string) {
     const members = roomMembers(roomId).map(({ socketId: _sid, ...u }) => u);
     const room = await db.room.findUnique({
@@ -187,12 +172,12 @@ export function attachRealtime(httpServer: HttpServer): Server {
 
   // [MANIFEST 14: Harbor Watch] Who the host has muted from room chat this
   // voyage, in memory only, the same reasoning startingRooms/restartingRooms
-  // above use: no horizontal scaling, so a plain in-process Set is all the
-  // durability a per-voyage flag needs. Cleared on room:restart and on room
-  // deletion, alongside every other per-voyage structure this file keeps.
+  // above use: no horizontal scaling, so a plain in process Set is all the
+  // durability a per voyage flag needs. Cleared on room:restart and on room
+  // deletion, alongside every other per voyage structure this file keeps.
   const roomMutedUsers = new Map<string, Set<string>>();
 
-  // Last-known game status per (room, user) so late joiners can hydrate the
+  // Last known game status per (room, user) so late joiners can hydrate the
   // roster immediately instead of seeing "loading…" until the next broadcast.
   const roomStatuses = new Map<string, Map<string, CaptainStatus>>();
 
@@ -227,13 +212,13 @@ export function attachRealtime(httpServer: HttpServer): Server {
   // sockets left at all.  A socket disconnect (or a transport blip that
   // looks like one to the server) shouldn't erase the one piece of data the
   // roster uses to show live gold/reputation/phase, not while another tab
-  // or a just-reconnected socket is still around to keep it current.
+  // or a just reconnected socket is still around to keep it current.
   function forgetStatusIfLastSocket(roomId: string, userId: string) {
     const set = userSockets.get(userId);
     if (!set || set.size === 0) forgetStatus(roomId, userId);
   }
 
-  // ---------- Abandoned-room cleanup ----------
+  // ---------- Abandoned room cleanup ----------
   // A player who closes their tab (crash, lost connection, refresh) never
   // sends an explicit "leave", so without this their seat would stay
   // occupied forever and the room would never empty out. Closing the tab
@@ -278,7 +263,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
       if (!result) return;
       if (result.roomDeleted) {
         // The room was deleted because this was its last member.  Tear
-        // down every in-memory structure for it so a future room (with a
+        // down every in memory structure for it so a future room (with a
         // different id) doesn't inherit stale checkpoint / status /
         // barter / aid data from a room that no longer exists.
         roomCheckpoints.delete(roomId);
@@ -309,7 +294,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
     departureTimers.set(key, t);
   }
 
-  // ---------- Phase/round ready-check ----------
+  // ---------- Phase/round ready check ----------
   // The room's shared checkpoint: the round + phase every captain is
   // expected to be at. Phase is kept as a string here purely for
   // comparison. This file never runs game rules, it only counts who has
@@ -327,8 +312,8 @@ export function attachRealtime(httpServer: HttpServer): Server {
   const roomCheckpoints = new Map<string, Checkpoint>();
 
   // Guards "room:start" against firing twice for the same room if the
-  // host double-clicks or has two tabs open. There's no horizontal
-  // scaling here (one process, see docs/deployment.md), so this in-memory
+  // host double clicks or has two tabs open. There's no horizontal
+  // scaling here (one process, see docs/deployment.md), so this in memory
   // set is all the locking a single "is this room already starting?"
   // check needs.
   const startingRooms = new Set<string>();
@@ -337,7 +322,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
   const restartingRooms = new Set<string>();
 
   // Order of the phases that make up one synchronized lap of a round. Only
-  // these eight are gated; sub-states like module drafting/swapping, and
+  // these eight are gated; substates like module drafting/swapping, and
   // terminal ones like bankruptcy/endgame, are personal and never become a
   // room checkpoint.
   const CHECKPOINT_PHASE_ORDER = [
@@ -668,8 +653,8 @@ export function attachRealtime(httpServer: HttpServer): Server {
         (prior?.voyagesCompleted ?? 0) + (forged ? 0 : 1);
       // Resets on any bankruptcy rather than only incrementing on a clean
       // finish, so a single defaulted voyage costs the whole streak, the
-      // same "start over" feel as the streak-shaped systems this project
-      // already has (a missed pirate roll undoing an escort-free run). A
+      // same "start over" feel as the streak shaped systems this project
+      // already has (a missed pirate roll undoing an escort free run). A
       // forged finish neither extends the streak nor breaks it, since
       // breaking it would be a punishment beyond simply not counting.
       const newConsecutiveSolventVoyages = forged
@@ -677,7 +662,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         : bankrupt
           ? 0
           : (prior?.consecutiveSolventVoyages ?? 0) + 1;
-      // The per tier breakdown behind the all-tier totals above, so a crown or
+      // The per tier breakdown behind the all tier totals above, so a crown or
       // a high score can be attributed to the waters it was earned on (see
       // statsByDifficulty in prisma/schema.prisma).
       const priorStats = parseStatsByDifficulty(prior?.statsByDifficulty);
@@ -746,7 +731,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
       // One upsert per merit rather than a single createMany: SQLite's
       // Prisma client (unlike Postgres/MySQL) doesn't support
       // skipDuplicates, and there are never more than a handful of merits
-      // to grant in one voyage, so the per-row round trip costs nothing
+      // to grant in one voyage, so the per row round trip costs nothing
       // worth avoiding in exchange for a write that can't ever throw on
       // the @@unique constraint racing with itself.
       for (const meritId of newMerits) {
@@ -797,7 +782,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
   }
 
   // ---------- Bartering ----------
-  // The one piece of real cross-player state this file owns. Everything
+  // The one piece of real cross player state this file owns. Everything
   // else here is either a vote count or a relay; an open barter offer is
   // an actual object two different captains' inventories need to agree
   // happened, so unlike the rest of this file, this server is briefly
@@ -806,8 +791,8 @@ export function attachRealtime(httpServer: HttpServer): Server {
   // against each captain's own local state on their own client (see
   // src/lib/game/engine.ts), this just makes sure only one captain can
   // ever claim a given offer. Ephemeral by design, same as the checkpoint
-  // and status maps above: a server restart loses in-flight offers, which
-  // is exactly as durable as the ready-vote state already is.
+  // and status maps above: a server restart loses in flight offers, which
+  // is exactly as durable as the ready vote state already is.
   // targetUserId/targetName are optional: unset for an ordinary open offer,
   // anyone in the room can see and accept it. Set for a direct offer to one
   // specific captain, a safeguard against exactly the failure mode an open
@@ -846,7 +831,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
     );
   }
 
-  // Personalized per connected socket, unlike every other room-wide
+  // Personalized per connected socket, unlike every other room wide
   // broadcast in this file: a direct offer means two different captains in
   // the same room can legitimately see two different boards. Iterates the
   // presence map already kept for onlineUsers()/roomMembers() rather than
@@ -887,7 +872,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
   // A captain short on Gold for this round's wages or maintenance can ask
   // the rest of the harbor for a loan before being forced into a bankrupt
   // payment. Structurally the same problem as a barter offer (real
-  // cross-player state two clients need to agree happened), so this is
+  // cross player state two clients need to agree happened), so this is
   // deliberately built the same way: this server only keeps one captain
   // from claiming the same request twice, it never sees anyone's actual
   // Gold total. Whether the helper can really afford to lend is decided
@@ -961,7 +946,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
     redirectToUserId?: string;
     redirectToName?: string;
   };
-  // The in-process copy stays the read path, so every handler below reads a
+  // The in process copy stays the read path, so every handler below reads a
   // loan synchronously exactly as it always did. What changed is that the
   // Map is no longer the only copy: every mutation is written through to the
   // Loan table, and the Map is rebuilt from that table when the process
@@ -969,7 +954,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
   //
   // Why a cache and not a straight database read: this file is a single
   // process with no horizontal scaling, the same assumption every other
-  // per-room structure here already makes, so the Map cannot go stale
+  // per room structure here already makes, so the Map cannot go stale
   // against another writer. Reading through it keeps the socket handlers
   // synchronous, which matters because a loan is read in the middle of
   // settlement paths that already have their own ordering to get right.
@@ -1198,7 +1183,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
   // toward or away from whatever the room actually did, instead of every
   // captain's price roll staying completely blind to the rest of the harbor.
   // Keyed by room, then by round, since a report can arrive for the round
-  // that's just ending while a slower captain is still mid-report for the
+  // that's just ending while a slower captain is still mid report for the
   // one before it. Reports for a round are only ever read once, the moment
   // the room advances into the next round's Phase 1 (see maybeAdvance
   // below), and are never written to the database: losing this on a server
@@ -1231,7 +1216,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
   // ---------- Word on the Docks ----------
   // [MANIFEST 02] A spontaneous, room wide race layered alongside the
   // scheduled Imperial Mandates (see difficulty.ts), which stay untouched.
-  // Whoever's own client is first to report crossing the completed-orders
+  // Whoever's own client is first to report crossing the completed orders
   // threshold wins; this server's only job is deciding who was first, the
   // same "first report wins" arbitration the barter board already uses for
   // who gets to accept a given offer. One winner per room per voyage, so
@@ -1246,8 +1231,8 @@ export function attachRealtime(httpServer: HttpServer): Server {
   // above) and, once the room's combined total clears
   // TIDEWATCH_SURGE_THRESHOLD, flips a one direction, one time flag for the
   // room. roomSurges tracks which rooms have already triggered this voyage,
-  // so a status report arriving after the flip is a harmless no-op, not a
-  // repeat trigger.
+  // so a status report arriving after the flip does nothing rather than
+  // triggering it again.
   const roomSurges = new Set<string>();
 
   function combinedReputation(roomId: string): number {
@@ -1409,46 +1394,36 @@ export function attachRealtime(httpServer: HttpServer): Server {
     if (anyResolved) await broadcastVentures(roomId, voyageEpoch);
   }
 
-  // ---------- Helpers ----------
-  async function validateToken(token: string): Promise<PublicUser | null> {
-    const session = await db.session.findUnique({
-      where: { token },
-      include: { user: true },
-    });
-    if (!session) return null;
-    if (session.expiresAt.getTime() < Date.now()) {
-      await db.session.delete({ where: { id: session.id } }).catch(() => {});
-      return null;
-    }
-    return publicUser(session.user);
-  }
-
-  // Parse the pm_session cookie from a raw cookie header.
+  // ---------- Authentication ----------
+  // The session cookie rides on the WebSocket handshake like on any other
+  // same origin request, so this reads it off the raw Cookie header and
+  // validates it through the very same getUserFromToken the API routes
+  // use. One door, one lock: an expired or banned session fails here for
+  // exactly the reasons it fails there.
   function readSessionCookie(cookieHeader: string | undefined): string | null {
     if (!cookieHeader) return null;
     for (const part of cookieHeader.split(";")) {
       const [k, ...rest] = part.trim().split("=");
-      if (k === "pm_session") return decodeURIComponent(rest.join("="));
+      if (k === SESSION_COOKIE_NAME) return decodeURIComponent(rest.join("="));
     }
     return null;
   }
 
-  // Authenticate a socket from its handshake cookie (auto) or an explicit token.
-  async function authenticate(socket: any, explicitToken?: string) {
-    const token =
-      explicitToken ?? readSessionCookie(socket.handshake?.headers?.cookie);
+  async function authenticate(socket: Socket): Promise<PublicUser | null> {
+    const token = readSessionCookie(socket.handshake?.headers?.cookie);
     if (!token) {
       socket.emit("auth:fail", { error: "Missing session" });
       return null;
     }
-    const user = await validateToken(token);
-    if (!user) {
+    const row = await getUserFromToken(token);
+    if (!row) {
       socket.emit("auth:fail", { error: "Invalid or expired session" });
       return null;
     }
+    const user = publicUser(row);
     const state = sockets.get(socket.id);
     if (!state) return null;
-    // If re-authenticating a different user, clean up old presence first.
+    // If this socket is switching to a different user, clean up the old presence first.
     if (state.authed && state.userId && state.userId !== user.id) {
       const oldSet = userSockets.get(state.userId);
       if (oldSet) {
@@ -1485,11 +1460,14 @@ export function attachRealtime(httpServer: HttpServer): Server {
       authed: false,
     });
 
-    // Auto-authenticate from the handshake cookie (sent with credentials).
+    // Every new connection is authenticated from its handshake cookie
+    // straight away. The explicit "auth" event exists for a client that
+    // mounts onto an already open socket and needs a fresh auth:ok to know
+    // where it stands (see useRealtime in src/lib/useRealtime.ts).
     authenticate(socket);
 
-    socket.on("auth", async (payload: { token?: string } | undefined) => {
-      await authenticate(socket, payload?.token);
+    socket.on("auth", async () => {
+      await authenticate(socket);
     });
 
     const requireAuth = (): SocketState | null => {
@@ -1523,11 +1501,11 @@ export function attachRealtime(httpServer: HttpServer): Server {
       if (s.roomId) {
         const previousRoomId = s.roomId;
         socket.leave(`room:${previousRoomId}`);
-        // Clear this socket's room BEFORE re-emitting the old room's roster.
+        // Clear this socket's room BEFORE sending the old room its roster again.
         // roomMembers() builds that roster from live sockets whose own
         // s.roomId still points at the room, so emitting while this socket
         // still claimed the old room left the departing captain listed on
-        // everyone else's roster, and nothing re-emitted afterwards to
+        // everyone else's roster, and nothing sent it again afterwards to
         // correct it. Only this socket is cleared: another tab of the same
         // captain genuinely still sitting in the old room keeps its own
         // s.roomId and so correctly stays on the roster, the same reasoning
@@ -1561,13 +1539,13 @@ export function attachRealtime(httpServer: HttpServer): Server {
         });
       }
       emitRoomMembers(roomId);
-      // Hydrate the joiner with everyone's last-known game status, the
+      // Hydrate the joiner with everyone's last known game status, the
       // room's current synchronized checkpoint + who's already readied
       // up, and the live Bartering/aid boards. This is also what makes
       // room:join safe (and necessary) to call again on every reconnect,
       // not just the first time: a socket that drops and reconnects gets
-      // a brand new id and starts with no room at all server-side, so
-      // without re-joining, every subsequent room-scoped event from that
+      // a brand new id and starts with no room at all server side, so
+      // without rejoining, every subsequent room scoped event from that
       // captain (ready votes, status, barter, aid) would silently fail
       // the `roomId !== s.roomId` checks those handlers rely on, with no
       // error and no way to recover short of a full page reload.
@@ -1610,7 +1588,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
       if (!roomId) return;
       socket.leave(`room:${roomId}`);
       // Cleared before emitRoomMembers below, for the same reason room:join
-      // clears it before re-emitting the room it is leaving.
+      // clears it before sending the room it is leaving a fresh roster.
       if (s.roomId === roomId) s.roomId = null;
       forgetStatus(roomId, s.userId);
       removeUserBarterOffers(roomId, s.userId);
@@ -1678,8 +1656,8 @@ export function attachRealtime(httpServer: HttpServer): Server {
         // right after this one's Reputation is folded into the room's
         // remembered totals above, so the sum is always current. Fires at
         // most once per room per voyage; roomSurges is what makes every
-        // later report, from anyone, a harmless no-op instead of a repeat
-        // trigger.
+        // later report, from anyone, do nothing instead of triggering it
+        // again.
         if (
           !roomSurges.has(roomId) &&
           combinedReputation(roomId) >= TIDEWATCH_SURGE_THRESHOLD
@@ -1700,17 +1678,17 @@ export function attachRealtime(httpServer: HttpServer): Server {
         // the rest of the room from advancing.
         //
         // Gated on the room's own "started" column, read fresh rather than
-        // off any in-memory copy, because a stale report can otherwise
+        // off any in memory copy, because a stale report can otherwise
         // resurrect a checkpoint a host just reset. A captain's client keeps
         // a status broadcast in flight on a 120ms debounce and an 8s
-        // heartbeat (see use-game-session.ts); if either is already on the
+        // heartbeat (see useGameSession.ts); if either is already on the
         // wire the instant a host hits "Restart Voyage", it lands at the
         // server moments after "started" flips back to false and, without
         // this check, immediately advances the checkpoint right back to
         // whatever phase that stale report claims, persisting "started:
-        // false, currentPhase: <mid-game>" forever. The very next captain to
+        // false, currentPhase: <mid game>" forever. The very next captain to
         // join that room then gets snapped straight into that orphaned phase
-        // with a blank, never-initialized game state (see snapToCheckpoint
+        // with a blank, never initialized game state (see snapToCheckpoint
         // in engine.ts), instead of the fresh lobby it should be.
         const room = await db.room.findUnique({
           where: { id: roomId },
@@ -1780,8 +1758,8 @@ export function attachRealtime(httpServer: HttpServer): Server {
         const roomId = payload?.roomId ?? s.roomId;
         if (!roomId || roomId !== s.roomId) return;
         const cp = await getCheckpoint(roomId);
-        // Phase 0 is the pre-game lobby. It only ever moves forward through
-        // the host's "room:start" (see below), never through a per-player
+        // Phase 0 is the pre game lobby. It only ever moves forward through
+        // the host's "room:start" (see below), never through a per player
         // ready vote, so a solitary host (or whoever happens to be the only
         // one connected at that instant) can't accidentally start the
         // voyage alone.
@@ -1794,8 +1772,8 @@ export function attachRealtime(httpServer: HttpServer): Server {
           // silently dropping the vote (which leaves them stuck at
           // "Waiting…" forever on a tunnelled connection where the
           // earlier phase:advance was eaten by a proxy), send them the
-          // authoritative ready state right now so their self-healing /
-          // desync-catch-up in usePhaseSync can get them back in sync.
+          // authoritative ready state right now so their self healing
+          // desync catch up in usePhaseSync can get them back in sync.
           io.to(socket.id).emit(
             "phase:ready_update",
             await readyStatePayload(roomId, cp),
@@ -1820,7 +1798,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
 
     // [MANIFEST 01: The Harbor Pulse] Fired once per captain per round, the
     // moment their own client is about to leave Phase 1 for good (see
-    // use-phase-sync.ts), carrying what they personally bought. Purely
+    // usePhaseSync.ts), carrying what they personally bought. Purely
     // additive and read only once, by maybeAdvance above when the next
     // round's Phase 1 begins, so there is nothing here for a late or
     // duplicate report to corrupt: the worst a stale or repeated report can
@@ -1847,7 +1825,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
     // completeOrder in engine.ts). First claim in for a room wins; every
     // later claim, including one from the same captain if this ever fired
     // twice, is silently ignored, the same "first report wins, everything
-    // else is a no-op" shape maybeAdvance already uses for the ready check.
+    // else does nothing" shape maybeAdvance already uses for the ready check.
     socket.on("docks:claim", (payload: { roomId?: string }) => {
       const s = requireAuth();
       if (!s) return;
@@ -2001,7 +1979,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
 
     // A contribution is escrowed on the contributor's own client the moment
     // this server confirms it (see venture:contributed below), the same
-    // escrow-on-post timing barter offers already use. If this contribution
+    // escrow on post timing barter offers already use. If this contribution
     // would overshoot the target, only the portion still needed is ever
     // accepted; venture:contributed tells the contributor exactly how much
     // actually landed, so their own client never deducts more than that.
@@ -2042,7 +2020,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         // [MANIFEST 04 fix] Defense in depth: destroyOtherOpenVentures
         // already cleans up every other open venture the instant one fills,
         // but this closes the narrow window where a contribution to a
-        // second venture could theoretically be mid-flight at that exact
+        // second venture could theoretically be mid flight at that exact
         // moment, by refusing it outright rather than letting it briefly
         // fill a venture that's about to be destroyed anyway.
         if (await hasRoomClaimedVenture(roomId, venture.voyageEpoch)) {
@@ -2251,7 +2229,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
     // First accept to reach the server wins: the offer is deleted from the
     // room's list immediately (this handler runs to completion before the
     // next one does, so there's no real concurrency to race), so a second,
-    // near-simultaneous accept for the same offer simply finds it already
+    // near simultaneous accept for the same offer simply finds it already
     // gone.
     socket.on(
       "barter:accept",
@@ -2356,9 +2334,9 @@ export function attachRealtime(httpServer: HttpServer): Server {
     });
 
     // First help to reach the server wins: the request is removed from
-    // the room's list immediately, so a second, near-simultaneous offer
+    // the room's list immediately, so a second, near simultaneous offer
     // to fund the same request simply finds it already gone, the same
-    // race-safety as barter:accept above.
+    // race safety as barter:accept above.
     socket.on(
       "aid:help",
       (payload: { roomId?: string; requestId?: string }) => {
@@ -2421,7 +2399,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
     );
 
     // A direct relay between two known captains settling one specific
-    // loan, the same shape as a direct message: no room-wide state to
+    // loan, the same shape as a direct message: no room wide state to
     // keep here, just forward to every socket the lender currently has
     // open so their own client can credit itself. Covers both a
     // voluntary repayment and the forced one at Round 8's end (see
@@ -2445,7 +2423,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         // reached the forced settlement holding no Gold at all. It still has
         // to be processed, because this event is what closes the debt and
         // resolves any Backing pledge on it, not merely what credits the
-        // lender. Only a negative or non-integer amount is nonsense.
+        // lender. Only a negative or fractional amount is nonsense.
         //
         // lenderId is checked for presence and then deliberately ignored.
         // Clients have always sent it and the wire contract keeps it, but
@@ -2576,11 +2554,11 @@ export function attachRealtime(httpServer: HttpServer): Server {
       socket.emit("loans:update", { roomId, loans: loanList(roomId) });
     });
 
-    // A third captain co-signs part of an existing loan between two
+    // A third captain cosigns part of an existing loan between two
     // others. One backer per loan, capped at whatever the loan still owes,
     // and never the lender or borrower themselves, who each already have
     // their own stake in it. First to reach the server wins the slot, the
-    // same race-safety as barter:accept and aid:help above.
+    // same race safety as barter:accept and aid:help above.
     socket.on(
       "backing:offer",
       (payload: { roomId?: string; debtId?: string; amount?: number }) => {
@@ -2637,7 +2615,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
       },
     );
 
-    // ---------- On-demand player detail (cargo, workers, logs) ----------
+    // ---------- On demand player detail (cargo, workers, logs) ----------
     // Kept out of the constant game:status heartbeat on purpose. Most of
     // the room never needs this, only whoever just opened that one
     // captain's detail popup, so it's a direct request/response relay
@@ -2784,7 +2762,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
     // own host check above: read the room fresh rather than trust anything
     // the client claims, reject with room:error if the caller isn't
     // actually the host, and only touch chat, never gold, cargo, ship, or
-    // progress. emitRoomMembers re-broadcasts the roster (with the new
+    // progress. emitRoomMembers rebroadcasts the roster (with the new
     // mutedUserIds) so every client, including the muted captain's own,
     // picks up the change immediately.
     socket.on(
@@ -2839,12 +2817,6 @@ export function attachRealtime(httpServer: HttpServer): Server {
       },
     );
 
-    socket.on("presence:request", () => {
-      const s = requireAuth();
-      if (!s) return;
-      socket.emit("presence:update", { users: onlineUsers() });
-    });
-
     // A fresh snapshot of the room's checkpoint + ready state, independent
     // of "room:join". This lets a component mount its own listener first
     // and then ask, instead of racing the join reply broadcast elsewhere.
@@ -2858,12 +2830,12 @@ export function attachRealtime(httpServer: HttpServer): Server {
     });
 
     // ---------- Starting the voyage ----------
-    // The one transition that isn't a per-player ready vote: only the
+    // The one transition that isn't a per player ready vote: only the
     // host can fire it, and only once the harbor has at least two
     // captains in it. Everyone else is told to go via "room:started"
     // rather than the generic "phase:advance" used by the other six
     // transitions, since nobody but the host called anything to trigger
-    // this. There's no per-client "pending action" to resume, every
+    // this. There's no per client "pending action" to resume, every
     // client just runs the same startBoonDrafting() unconditionally.
     socket.on("room:start", async (payload: { roomId?: string }) => {
       const s = requireAuth();
@@ -2919,7 +2891,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
     });
 
     // ---------- Restarting the voyage ----------
-    // Host-only, same as starting it. Unlike "room:start" this is allowed
+    // Host only, same as starting it. Unlike "room:start" this is allowed
     // whether the room has set sail or not, since a harbor that never left
     // port still benefits from a clean slate. The part that actually fixes
     // the bug this exists for: flipping "started" back to false is what
@@ -2932,9 +2904,9 @@ export function attachRealtime(httpServer: HttpServer): Server {
     // host's, and tells every connected client to reset its own local copy
     // too. Each captain runs the same deterministic engine off the room's
     // seed, so a restart that only reset the caller (the old behavior,
-    // calling restartGame() locally with no server round-trip at all) just
+    // calling restartGame() locally with no server round trip at all) just
     // desynced that one captain from everyone else's round/phase with no
-    // way back, since phase 0 never participates in the ready-check vote.
+    // way back, since phase 0 never participates in the ready check vote.
     socket.on("room:restart", async (payload: { roomId?: string }) => {
       const s = requireAuth();
       if (!s) return;
@@ -2964,9 +2936,9 @@ export function attachRealtime(httpServer: HttpServer): Server {
         // under it has to be force resolved right now or never.
         await resolveExpiredVentures(roomId, room.voyageEpoch, 0, true);
 
-        // Bumping voyageEpoch is what makes a restart a brand-new voyage:
+        // Bumping voyageEpoch is what makes a restart a brand new voyage:
         // every captain folds it into their deterministic seed (see
-        // src/lib/use-game-session.ts and the engine's seed strings), so the
+        // src/lib/useGameSession.ts and the engine's seed strings), so the
         // whole harbor rerolls fresh market, orders, and Broker intel.
         const restarted = await db.room.update({
           where: { id: roomId },
@@ -2998,13 +2970,13 @@ export function attachRealtime(httpServer: HttpServer): Server {
         roomDocksWinners.delete(roomId);
         // A brand new voyage starts with nobody's Reputation counted yet, so
         // the room can earn its own Tidewatch surge all over again rather
-        // than inheriting the last voyage's already-tripped flag.
+        // than inheriting the last voyage's already tripped flag.
         roomSurges.delete(roomId);
         // A restarted room can sail, and conclude, all over again.
         concludedRooms.delete(roomId);
         // [MANIFEST 14: Harbor Watch] A mute lasts only "for the remainder
         // of the voyage", so a fresh one clears the slate the same way
-        // every other per-voyage structure above does.
+        // every other per voyage structure above does.
         if (roomMutedUsers.delete(roomId)) emitRoomMembers(roomId);
 
         io.to(`room:${roomId}`).emit("room:restarted", {
@@ -3030,7 +3002,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         }
         if (s.roomId) {
           // Don't erase the live status cache unless every socket the user
-          // owns is gone; a parallel tab or a freshly-reconnected socket
+          // owns is gone; a parallel tab or a freshly reconnected socket
           // that hasn't emitted game:status yet otherwise leaves a
           // "loading…" gap on every other captain's roster.
           forgetStatusIfLastSocket(s.roomId, s.userId);
@@ -3053,28 +3025,85 @@ export function attachRealtime(httpServer: HttpServer): Server {
     });
   });
 
-  // ---------- Boot-time membership reconciliation ----------
+  // ---------- Moderation ----------
+  // The one thing the admin console needs from this file: a way to reach a
+  // captain who is connected right now. The database side of a ban or a
+  // deletion is already done by the time this runs (sessions revoked,
+  // seats given up, see src/lib/admin/actions.ts), so this only has to
+  // deal with what lives in memory: their sockets, their cached status,
+  // any offer or request they left on a board, and the rooms that need
+  // telling. Each socket is told why before it is dropped, so the
+  // captain's own screen can explain itself instead of just going dark.
+  function ejectUser(userId: string, notice: string) {
+    const rooms = new Set<string>();
+    for (const sid of Array.from(userSockets.get(userId) ?? [])) {
+      const s = sockets.get(sid);
+      const live = io.sockets.sockets.get(sid);
+      if (s?.roomId) {
+        rooms.add(s.roomId);
+        live?.leave(`room:${s.roomId}`);
+        // Cleared before the disconnect below fires its handler, so that
+        // handler treats this as a captain with no seat: no "gone ashore"
+        // line, no grace timer for a seat that no longer exists.
+        s.roomId = null;
+      }
+      live?.emit("auth:revoked", { reason: notice });
+      live?.disconnect(true);
+    }
+    // A pending grace timer belongs to a seat that was just given up.
+    const suffix = `:${userId}`;
+    for (const key of Array.from(departureTimers.keys())) {
+      if (!key.endsWith(suffix)) continue;
+      const roomId = key.slice(0, -suffix.length);
+      rooms.add(roomId);
+      cancelDeparture(roomId, userId);
+    }
+    for (const roomId of rooms) {
+      forgetStatus(roomId, userId);
+      removeUserBarterOffers(roomId, userId);
+      removeUserAidRequest(roomId, userId);
+      io.to(`room:${roomId}`).emit("room:system", { roomId, content: notice });
+      emitRoomMembers(roomId);
+      // They may have been the last captain still out at sea while everyone
+      // else waited at the endgame screen, or the one vote the room was
+      // waiting on. Both checks read membership fresh, which no longer
+      // includes them.
+      void getCheckpoint(roomId).then(async (cp) => {
+        await broadcastReadyState(roomId, cp);
+        await maybeAdvance(roomId, cp);
+        await maybeConcludeVoyage(roomId);
+      });
+    }
+    broadcastPresence();
+  }
+
+  registerRealtimeModeration({
+    ejectUser,
+    onlineUserIds: () => Array.from(userSockets.keys()),
+  });
+
+  // ---------- Boot time membership reconciliation ----------
   // Every map above (sockets, userSockets, departureTimers, roomCheckpoints,
   // roomStatuses) starts this function call empty on every process boot,
   // but Room/RoomMember in the database persist across it. Without this, a
   // captain who was seated in a room the moment the process went down (a
-  // dev hot-reload, a Railway redeploy, a crash) keeps that seat forever:
+  // dev hot reload, a Railway redeploy, a crash) keeps that seat forever:
   // there is no live socket left to ever fire the "disconnect" event that
   // would normally arm their departure grace timer, so activeRosterSet()
-  // (what the ready-check protocol waits on) requires a ready signal from
+  // (what the ready check protocol waits on) requires a ready signal from
   // them that can now never arrive, and the whole room is stuck on
   // whatever checkpoint it was at, permanently, for everyone left in it.
-  // It also never empties out and self-deletes, which is the main reason
+  // It also never empties out and deletes itself, which is the main reason
   // disposable rooms from past sessions pile up indefinitely.
   //
   // The fix mirrors the disconnect grace period below exactly: arm the
   // same departure timer for every current member of every room as soon
   // as the process comes up, instead of only when a live socket reports
   // going away. A captain whose browser tab is still genuinely open
-  // reconnects within a couple of seconds (the client re-auths and
-  // re-emits "room:join" automatically, see the `authed` effect in
+  // reconnects within a couple of seconds (the client authenticates again and
+  // emits "room:join" again automatically, see the `authed` effect in
   // GameRoom.tsx), which cancels this the same way an ordinary
-  // reconnect-after-a-blip already does. Anyone who doesn't reconnect
+  // reconnect after a blip already does. Anyone who doesn't reconnect
   // within the window is exactly as gone as a normal disconnect would
   // make them, and is reaped the same way.
   async function reconcileMembershipAfterBoot() {

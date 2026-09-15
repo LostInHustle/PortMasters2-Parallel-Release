@@ -1,14 +1,14 @@
 // =====================================================================
 // Unit tests for the defensive "repair whatever a save actually holds"
 // functions in src/lib/game/types.ts (normalizeInventory,
-// normalizeWorkerRoster), and for restartGame's Object.assign-based reset
+// normalizeWorkerRoster), and for restartGame's Object.assign based reset
 // in engine.ts. None of these had any coverage before: every existing
 // suite either builds a GameState fresh in memory or drives one through a
-// full voyage, never round-trips a save through the same repair path a
-// real page load (src/lib/use-game-session.ts) or a real restart takes.
+// full voyage, never round trips a save through the same repair path a
+// real page load (src/lib/useGameSession.ts) or a real restart takes.
 // That's exactly the kind of path where a subtle gap silently corrupts a
 // captain's save rather than crashing loudly, the same failure shape as
-// the notification-toast bug this whole scenario suite exists because of.
+// the notification toast bug this whole scenario suite exists because of.
 // Run with: npx tsx scripts/tests/unit.persistence.ts
 // =====================================================================
 import { suite, test, assert, assertEqual, summary } from "./harness";
@@ -30,15 +30,15 @@ test("null/undefined input produces a zeroed entry for every catalogued item", (
   }
 });
 
-test("a JSON-poisoned NaN (stored as null) heals back to 0 instead of staying broken", () => {
+test("a JSON poisoned NaN (stored as null) heals back to 0 instead of staying broken", () => {
   // JSON.stringify(NaN) -> "null", so a save damaged before validation
   // existed reads back exactly like this on the next load.
   const out = normalizeInventory({ Hemp: null, Silk: 12 });
-  assertEqual(out.Hemp, 0, "a null (ex-NaN) figure should heal to 0");
+  assertEqual(out.Hemp, 0, "a null (formerly NaN) figure should heal to 0");
   assertEqual(out.Silk, 12, "an untouched valid figure should pass through");
 });
 
-test("a non-numeric value for a known item is coerced to 0, not carried through", () => {
+test("a value that is not a number for a known item is coerced to 0, not carried through", () => {
   const out = normalizeInventory({ Hemp: "eight" as unknown as number });
   assertEqual(out.Hemp, 0, "a string where a number belongs should heal to 0");
 });
@@ -56,7 +56,7 @@ test("an unrecognized key with an invalid value is dropped, not defaulted to 0 a
   const out = normalizeInventory({ "Some Garbage Key": "not a number" });
   assert(
     !("Some Garbage Key" in out),
-    "a non-numeric unknown key should not manufacture a new inventory line",
+    "an unknown key that is not a number should not manufacture a new inventory line",
   );
 });
 
@@ -82,7 +82,7 @@ test("null/undefined input with no legacy produces an empty array for every work
 
 test("a partially populated save keeps its real workers and defaults the rest empty", () => {
   const roster = normalizeWorkerRoster({ weaver: [IDLE, IDLE] });
-  assertEqual(roster.weaver.length, 2, "weaver roster should be read as-is");
+  assertEqual(roster.weaver.length, 2, "weaver roster should be read as is");
   assertEqual(
     roster.master.length,
     0,
@@ -95,7 +95,7 @@ test("a partially populated save keeps its real workers and defaults the rest em
   );
 });
 
-test("a pre-charter save (weavers/masterWeavers/sachetMakers, no roster) migrates via the legacy fallback", () => {
+test("a pre charter save (weavers/masterWeavers/sachetMakers, no roster) migrates via the legacy fallback", () => {
   const roster = normalizeWorkerRoster(
     { weaver: "not-an-array" }, // predates the roster key entirely, in spirit
     { weavers: [IDLE], masterWeavers: [IDLE, IDLE], sachetMakers: [] },
@@ -121,7 +121,7 @@ test("a save already on the new schema is never overwritten by legacy fields, ev
   assertEqual(
     roster.weaver.length,
     1,
-    "the new-schema roster field should always win over a legacy fallback when both exist",
+    "the new schema roster field should always win over a legacy fallback when both exist",
   );
 });
 
@@ -130,28 +130,28 @@ test("garbage in place of an array falls back to empty rather than crashing down
   assertEqual(
     roster.weaver.length,
     0,
-    "non-array weaver data should heal to an empty array",
+    "weaver data that is not an array should heal to an empty array",
   );
   assertEqual(
     roster.master.length,
     0,
-    "non-array master data should heal to an empty array",
+    "master data that is not an array should heal to an empty array",
   );
 });
 
 suite("restartGame :: transient signal fields must not survive a restart");
 
 // These four fields (_draftChoices, _newModule, _pendingDebtSettlements,
-// _pendingDocksClaim) are optional and meant to be short-lived signals to
+// _pendingDocksClaim) are optional and meant to be short lived signals to
 // the React layer. restartGame resets a voyage via
 // Object.assign(state, fresh), which only overwrites keys `fresh` itself
 // has. Before createInitialGameState explicitly listed these four as
 // `undefined`, they were simply absent from `fresh`, so Object.assign
 // left a stale value from the abandoned voyage in place untouched.
 // _draftChoices is the one with a real, easily reached, visible
-// consequence: startModuleDrafting treats a non-undefined _draftChoices
+// consequence: startModuleDrafting treats a defined _draftChoices
 // as "already rolled for this round" and skips rolling a fresh pool, so a
-// captain who restarts while mid module-draft would have seen the
+// captain who restarts while mid module draft would have seen the
 // PREVIOUS voyage's module pool (wrong tier's modules included) on their
 // very first draft of the new one.
 
@@ -206,7 +206,7 @@ test("_pendingDebtSettlements from an abandoned voyage does not leak into the re
   assertEqual(
     s._pendingDebtSettlements,
     undefined,
-    "restartGame must clear _pendingDebtSettlements, or the new voyage could relay a stale forced-repayment notice",
+    "restartGame must clear _pendingDebtSettlements, or the new voyage could relay a stale forced repayment notice",
   );
 });
 

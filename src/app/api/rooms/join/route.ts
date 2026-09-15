@@ -1,10 +1,11 @@
-// POST /api/rooms/join: join a room by its 6 character code
+// POST /api/rooms/join: join a room by its six character code
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { db, PUBLIC_USER_SELECT } from "@/lib/db";
-import { getCurrentUser, publicUser } from "@/lib/api-auth";
+import { db } from "@/lib/db";
+import { getCurrentUser } from "@/lib/apiAuth";
+import { joinRoom, ROOM_CODE_LENGTH, ROOM_SUMMARY_INCLUDE } from "@/lib/rooms";
 
-const Schema = z.object({ code: z.string().length(6) });
+const Schema = z.object({ code: z.string().length(ROOM_CODE_LENGTH) });
 
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
@@ -20,20 +21,14 @@ export async function POST(req: NextRequest) {
   const parsed = Schema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "A 6-character room code is required" },
+      { error: `A ${ROOM_CODE_LENGTH} character room code is required` },
       { status: 400 },
     );
   }
-  const code = parsed.data.code.toUpperCase();
 
   const room = await db.room.findUnique({
-    where: { code },
-    include: {
-      members: true,
-      host: {
-        select: PUBLIC_USER_SELECT,
-      },
-    },
+    where: { code: parsed.data.code.toUpperCase() },
+    include: ROOM_SUMMARY_INCLUDE,
   });
   if (!room)
     return NextResponse.json(
@@ -41,47 +36,8 @@ export async function POST(req: NextRequest) {
       { status: 404 },
     );
 
-  const alreadyMember = room.members.some((m) => m.userId === user.id);
-  if (!alreadyMember && room.started) {
-    return NextResponse.json(
-      {
-        error:
-          "This voyage has already set sail. Ask the host to open a new room.",
-      },
-      { status: 403 },
-    );
-  }
-
-  await db.roomMember.upsert({
-    where: { userId_roomId: { userId: user.id, roomId: room.id } },
-    create: { userId: user.id, roomId: room.id },
-    update: {},
-  });
-
-  const members = await db.roomMember.findMany({
-    where: { roomId: room.id },
-    include: {
-      user: {
-        select: PUBLIC_USER_SELECT,
-      },
-    },
-  });
-
-  return NextResponse.json({
-    room: {
-      id: room.id,
-      code: room.code,
-      name: room.name,
-      isPublic: room.isPublic,
-      createdAt: room.createdAt,
-      started: room.started,
-      difficulty: room.difficulty,
-      host: publicUser(room.host),
-      memberCount: members.length,
-      members: members.map((m) => ({
-        ...publicUser(m.user),
-        joinedAt: m.joinedAt,
-      })),
-    },
-  });
+  const joined = await joinRoom(user.id, room);
+  if (!joined.ok)
+    return NextResponse.json({ error: joined.error }, { status: 403 });
+  return NextResponse.json({ room: joined.room });
 }

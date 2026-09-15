@@ -14,7 +14,7 @@
 // venture in this room's voyage has ever reached "filled". Everything here
 // is a plain function of its arguments: parse a stored JSON blob, total a
 // contribution map, decide how much of a contribution a venture can
-// actually use, decide a settlement's payout rate and per-contributor
+// actually use, decide a settlement's payout rate and per contributor
 // amounts, and decide the valid deadline window for a fresh post.
 // =====================================================================
 import {
@@ -32,7 +32,7 @@ export type VentureSettlement = {
 };
 
 // Deliberately defensive: this parses a JSON column written by this same
-// server, but a malformed or hand-edited row should degrade to "nobody
+// server, but a malformed or hand edited row should degrade to "nobody
 // contributed" rather than throw inside a socket handler every other
 // captain in the room is waiting on.
 export function parseVentureContributions(raw: string): VentureContributions {
@@ -76,7 +76,7 @@ export function ventureTotal(contributions: VentureContributions): number {
 // post a venture and fill the entire target alone in one contribution,
 // which both prints free Gold and burns the room's one shared chance for
 // personal gain instead of the room's; requiring real headroom to remain
-// for someone else is what actually forces genuine multi-captain
+// for someone else is what actually forces genuine multi captain
 // participation before a venture can ever fill. Rounded up (not down) so
 // two contributors splitting an odd targetGold in half still have exactly
 // enough combined room to reach it; rounding down would occasionally leave

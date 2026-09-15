@@ -36,6 +36,24 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  // "player", "moderator" or "admin" (see src/lib/admin/rules.ts). There is
+  // only ever one admin: the account that most recently presented the
+  // ADMIN_KEY from the server environment at POST /api/admin/claim, which
+  // demotes whoever held the seat before. Moderators are appointed by the
+  // admin from the console and can ban and unban players; only the admin
+  // can delete an account or change anyone's role. A plain string rather
+  // than an enum because SQLite has no enum type and the set is checked in
+  // code anyway.
+  role String @default("player")
+
+  // Set while the account is banned, cleared on unban. A banned captain
+  // cannot sign in, every existing session is revoked the moment the ban
+  // lands, and the realtime layer drops their sockets (see ejectUser in
+  // src/server/realtime.ts). The reason is shown to them at sign in so a
+  // ban never reads as a mysterious login failure.
+  bannedAt  DateTime?
+  banReason String?
+
   sessions     Session[]
   memberships  RoomMember[]
   ownedRooms   Room[]         @relation("RoomHost")
@@ -69,7 +87,7 @@ model Room {
   // The room's shared checkpoint: the round and phase every captain is
   // synchronized to. currentPhase stores the Phase union (see
   // src/lib/game/types.ts) as a string, e.g. "0", "5", "worker_mgmt".
-  // Advanced by the ready-check protocol in src/server/realtime.ts once
+  // Advanced by the ready check protocol in src/server/realtime.ts once
   // every current room member (minus anyone bankrupt or at the endgame
   // screen) has signaled ready, so it survives a server restart instead
   // of living only in memory.
@@ -79,9 +97,9 @@ model Room {
   // Bumped by one every time the host restarts the voyage (see the
   // "room:restart" handler in src/server/realtime.ts). Folded into each
   // captain's deterministic seed (roomId + userId + voyageEpoch, see
-  // src/lib/use-game-session.ts) so a restart overwrites the room with a
-  // brand-new voyage (fresh market, orders, and Broker intel for everyone),
-  // while a mid-voyage reload still reproduces the current one.
+  // src/lib/useGameSession.ts) so a restart overwrites the room with a
+  // brand new voyage (fresh market, orders, and Broker intel for everyone),
+  // while a mid voyage reload still reproduces the current one.
   voyageEpoch Int @default(0)
 
   // Flips to true the moment the host starts the voyage (see the
@@ -96,7 +114,7 @@ model Room {
   // src/lib/game/difficulty.ts). One tier for the whole room: every captain
   // folds it into their own game state so they all resolve the same voyage
   // length, market breadth, and raid odds. Defaults to the entry tier so every
-  // pre-existing room keeps the current single mode with no change.
+  // existing room keeps the current single mode with no change.
   difficulty String @default("fair_winds")
 
   host           User            @relation("RoomHost", fields: [hostId], references: [id], onDelete: Cascade)
@@ -126,7 +144,7 @@ model GameState {
   id        String   @id @default(cuid())
   userId    String
   roomId    String
-  data      String // JSON blob of the full per-player game state
+  data      String // JSON blob of the full per player game state
   updatedAt DateTime @updatedAt
 
   // [MANIFEST 13: Ledger Integrity Pass] Which band the worst finding on any
@@ -159,8 +177,8 @@ model GameState {
 // one player within one room); this table is deliberately the one
 // exception, keyed only on userId. The voyage conclusion check in
 // src/server/realtime.ts is where Renown, crowns, and
-// consecutiveSolventVoyages get written; Daily Check-In's two columns
-// are written from POST /api/check-in instead (see src/lib/game/checkin.ts).
+// consecutiveSolventVoyages get written; Daily Check In's two columns
+// are written from POST /api/checkin instead (see src/lib/game/checkin.ts).
 // See src/lib/game/legacy.ts for the level curve, titles, and the
 // starting Gold bonus this unlocks.
 model CaptainLegacy {
@@ -181,18 +199,18 @@ model CaptainLegacy {
 
   // Sea Master crowns and best score broken down by difficulty tier, as a JSON
   // map of { [difficulty]: { crowns, bestScore } } (see src/lib/game/legacy.ts).
-  // The seaMasterCrowns and bestScore columns above stay as the all-tier
-  // totals; this only adds the per-tier split, so a Monsoon crown can be shown
+  // The seaMasterCrowns and bestScore columns above stay as the all tier
+  // totals; this only adds the per tier split, so a Monsoon crown can be shown
   // as the rarer thing it is and a future leaderboard can be segmented by tier.
   // A JSON column rather than fixed columns per tier keeps it open ended: a
   // fourth tier would need no migration.
   statsByDifficulty String @default("{}")
 
-  // Daily Check-In (see src/lib/game/checkin.ts). checkInCount is how many
+  // Daily Check In (see src/lib/game/checkin.ts). checkInCount is how many
   // days of the current 7-day cycle have been claimed (0..6, wrapping to 0
   // the moment Day 7 is claimed); lastCheckInDate is the "YYYY-MM-DD" UTC
   // key of the most recent claim, which enforces one claim per day. Kept on
-  // this account-level table since check-in, like Renown, spans every room.
+  // this account level table since check in, like Renown, spans every room.
   checkInCount    Int     @default(0)
   lastCheckInDate String?
 
@@ -264,6 +282,24 @@ model ConvoyVenture {
   @@index([roomId, voyageEpoch])
 }
 
+// One row per moderation action ever taken from the admin console: who did
+// what to whom, and why. Names are copied in alongside the ids rather than
+// joined, and neither id is a foreign key on purpose: the log has to outlive
+// the accounts it describes, and "deleted the account" is exactly the entry
+// a cascade would erase. Append only; nothing ever updates or removes a row.
+model ModerationLog {
+  id         String   @id @default(cuid())
+  actorId    String
+  actorName  String
+  action     String
+  targetId   String
+  targetName String
+  reason     String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 model Message {
   id          String   @id @default(cuid())
   roomId      String?
@@ -283,8 +319,8 @@ model Message {
 // [MANIFEST 05/07] An aid loan still outstanding, with whatever Backing
 // pledge and Bequest Routing redirect has been attached to it.
 //
-// This lived in a plain in-process Map until now, the same shape every other
-// per-voyage structure in src/server/realtime.ts uses. That was fine for a
+// This lived in a plain in process Map until now, the same shape every other
+// per voyage structure in src/server/realtime.ts uses. That was fine for a
 // mute list or a price tally, which cost nothing to lose. A loan is not that:
 // a backer's pledge leaves their purse the instant it is accepted, so a
 // restart in the middle of a voyage destroyed Gold a captain had genuinely

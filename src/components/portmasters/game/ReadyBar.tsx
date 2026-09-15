@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReadyState } from "@/lib/use-phase-sync";
+import type { ReadyState } from "@/lib/usePhaseSync";
 import type { PublicUser } from "@/lib/api";
 import { Avatar } from "../shared";
 import { cn } from "@/lib/utils";

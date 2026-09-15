@@ -6,10 +6,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { getCurrentUser } from "@/lib/api-auth";
+import { getCurrentUser } from "@/lib/apiAuth";
 import {
-  DEFAULT_LEGACY_SUMMARY,
-  parseStatsByDifficulty,
+  legacySummaryFromRow,
   type CaptainLegacySummary,
 } from "@/lib/game/legacy";
 
@@ -49,18 +48,10 @@ export async function POST(req: NextRequest) {
 
   const legacies: Record<string, CaptainLegacySummary> = {};
   for (const id of ids) {
-    const row = byUserId.get(id);
-    legacies[id] = row
-      ? {
-          renownLevel: row.renownLevel,
-          renownXP: row.renownXP,
-          voyagesCompleted: row.voyagesCompleted,
-          seaMasterCrowns: row.seaMasterCrowns,
-          bestScore: row.bestScore,
-          meritIds: meritsByUserId.get(id) ?? [],
-          statsByDifficulty: parseStatsByDifficulty(row.statsByDifficulty),
-        }
-      : DEFAULT_LEGACY_SUMMARY;
+    legacies[id] = legacySummaryFromRow(
+      byUserId.get(id),
+      meritsByUserId.get(id) ?? [],
+    );
   }
 
   return NextResponse.json({ legacies });

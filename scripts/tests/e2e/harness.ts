@@ -1,16 +1,16 @@
 // =====================================================================
-// A small async-aware sibling to ../harness.ts, for the E2E scenario
-// suite specifically. The original harness's test() is fire-and-forget
+// A small async aware sibling to ../harness.ts, for the E2E scenario
+// suite specifically. The original harness's test() is fire and forget
 // synchronous (`fn: () => void`, never awaited by its callers), and every
 // existing suite relies on that to run instantly and report a truthful
 // summary the moment the script finishes. E2E scenarios need to `await
 // page.click(...)` inside a test body, and making the shared test()
 // async without every caller awaiting it would let summary() run before
-// any results land (await, even on a non-Promise, always yields at least
+// any results land (await, even on a plain value, always yields at least
 // one microtask). Rather than risk that regression across six passing
 // suites, this is its own module: same shape, `test()` awaited by design.
 // The pure assertion helpers have no state to duplicate, so they're
-// re-exported straight from the original.
+// reexported straight from the original.
 // =====================================================================
 export { assert, assertEqual, assertClose, assertArrayEqual } from "../harness";
 

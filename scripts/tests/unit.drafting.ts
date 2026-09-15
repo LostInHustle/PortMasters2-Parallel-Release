@@ -5,9 +5,9 @@
 //
 // effects.audit.ts already proves what each individual boon and module
 // DOES once equipped. What had no coverage at all is the drafting
-// machinery around that: the once-per-round swap limits, the Gold cost on
+// machinery around that: the once per round swap limits, the Gold cost on
 // the boon side versus the free reroll on the module side, and the two
-// branch module-select flow (install straight into a free slot, versus
+// branch module select flow (install straight into a free slot, versus
 // routing through module_swap when every slot is full).
 //
 // The pool bookkeeping in that second flow is the subtle part and is
@@ -55,7 +55,7 @@ test("a swap costs 10 Gold and hands back a fresh set of choices", () => {
   swapBoonChoices(g, logs);
   assertEqual(g.money, before - 10, "a boon swap should cost 10 Gold");
   assert(g.boonChoices.length > 0, "a fresh set of boons should be dealt");
-  assert(g.boonSwapUsed, "the once-per-round flag should be set");
+  assert(g.boonSwapUsed, "the once per round flag should be set");
 });
 
 test("only one swap per round, and the second attempt costs nothing", () => {
@@ -80,7 +80,7 @@ test("a captain who cannot afford the fee keeps their Gold and their choices", (
 
   swapBoonChoices(g, logs);
   assertEqual(g.money, 9, "an unaffordable swap must not charge");
-  assert(!g.boonSwapUsed, "and must not burn the once-per-round swap");
+  assert(!g.boonSwapUsed, "and must not burn the once per round swap");
   assertEqual(
     g.boonChoices.map((b) => b.id).join(","),
     choicesBefore,
@@ -112,7 +112,7 @@ test("rerolling the module pool is free, unlike the boon swap", () => {
 
   swapModuleChoices(g, logs);
   assertEqual(g.money, before, "a module reroll must not cost Gold");
-  assert(g.moduleSwapUsed, "the once-per-round flag should be set");
+  assert(g.moduleSwapUsed, "the once per round flag should be set");
   assert(
     (g._draftChoices?.length ?? 0) > 0,
     "a fresh pool should have been rolled",
@@ -220,7 +220,7 @@ test("picking with every slot full defers to the swap screen", () => {
   assertEqual(
     g.phase,
     "module_swap",
-    "a full ship should route to the slot-choosing screen",
+    "a full ship should route to the slot choosing screen",
   );
   assertEqual(
     g._newModule?.id,
@@ -306,7 +306,7 @@ test("swapping out a module reverses the penalty it was carrying", () => {
   );
 });
 
-test("finalising with no pending pick is a no-op", () => {
+test("finalising with no pending pick changes nothing", () => {
   const g = createInitialGameState();
   const logs: string[] = [];
   g.shipLevel = 1;

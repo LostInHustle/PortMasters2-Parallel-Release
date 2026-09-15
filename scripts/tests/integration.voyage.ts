@@ -1,6 +1,6 @@
 // =====================================================================
-// Integration test: drives a full voyage end-to-end through the real
-// phase-transition functions (startBoonDrafting -> selectBoon ->
+// Integration test: drives a full voyage end to end through the real
+// phase transition functions (startBoonDrafting -> selectBoon ->
 // startPhase1 -> ... -> endRound -> ...) on each of the three difficulty
 // tiers, the way a live room actually calls them. Unlike unit.game.ts and
 // effects.audit.ts, which each test one function in isolation, this
@@ -90,17 +90,17 @@ type VoyageReport = {
 // empirically (scripts/tests/.scratch during development, not part of the
 // suite) that tip is actually a trap for a *solo* simulated captain: a raid
 // while poor drops money to exactly 0, and payMaintenance treats exactly-0
-// as instant, unrecoverable bankruptcy with no partial-payment branch. A real
+// as instant, unrecoverable bankruptcy with no partial payment branch. A real
 // player in that spot asks another captain in the room for a loan on the
 // settlement screen (see receiveLoan/grantLoan in engine.ts); a lone bot has
 // no one to borrow from, so the tutorial's advice only holds with peers
-// present. That's a property of single-captain simulation, not a balance bug,
-// so the per-tier suites below treat bankruptcy as an honestly-reported
+// present. That's a property of single captain simulation, not a balance bug,
+// so the per tier suites below treat bankruptcy as an honestly reported
 // outcome to verify, not a failure to avoid.
 //
 // "safe" always hires an escort instead, measured far more reliable for a
 // captain with no one to borrow from, and keeps a 50 Gold buffer above
-// Phase 3's cost while stocking both raw and finished-good purchase cards
+// Phase 3's cost while stocking both raw and finished good purchase cards
 // (half of every trade board demands a finished product; a captain who only
 // ever holds raw goods can only ever fill the other half). It exists to show
 // Fair Winds is reliably, not just theoretically, winnable without leaning on
@@ -136,13 +136,13 @@ function playRound(
 
   // 50 Gold above whatever Phase 3 (maintenance + wages) will cost this
   // round, not just 50 Gold above zero, tuned empirically to leave enough
-  // headroom that a single income-less round doesn't immediately starve the
+  // headroom that a single incomeless round doesn't immediately starve the
   // next one (see the strategy note above).
   const RESERVE =
     strategy === "safe" ? state.fixedCost + state.maintenancePenalty + 50 : 30;
   for (const card of state.resourceCards) {
-    // The "safe" captain stocks finished-good purchase cards too (buy-to-
-    // resell, no artisan needed), not just raw materials: roughly half of
+    // The "safe" captain stocks finished good purchase cards too (bought
+    // to resell, no artisan needed), not just raw materials: roughly half of
     // every trade board demands a finished product, and a captain who only
     // ever holds raw goods can only ever fill the other half. Skipping
     // product cards left this strategy earning zero trade income on any
@@ -224,7 +224,7 @@ function runVoyage(
     reachedEndgame: false,
   };
   startBoonDrafting(state, []);
-  const maxIterations = roundsFor(difficulty) + 2; // safety cap; a well-behaved voyage never needs it
+  const maxIterations = roundsFor(difficulty) + 2; // safety cap; a well behaved voyage never needs it
   for (let i = 0; i < maxIterations; i++) {
     const outcome = playRound(state, report, strategy);
     if (outcome === "bankrupt") {
@@ -327,7 +327,7 @@ const fairWindsReport = runFullVoyageSuite("fair_winds");
 const openWatersReport = runFullVoyageSuite("open_waters");
 const monsoonReport = runFullVoyageSuite("monsoon");
 
-// Fair Winds-specific: this tier is calibrated to be byte-for-byte the game
+// Fair Winds specific: this tier is calibrated to be byte for byte the game
 // as it played before difficulty existed, so a captain who actually follows
 // the game's own tutorial advice (see the "safe" strategy above) should
 // reliably complete it, and it should never touch tier1/tier2 content at all.
@@ -358,7 +358,7 @@ test("a captain who always escorts and keeps a healthy reserve survives Fair Win
   const survivalRate = (trials - bankruptcies) / trials;
   assert(
     survivalRate >= 0.85,
-    `only ${trials - bankruptcies}/${trials} (${Math.round(survivalRate * 100)}%) safe-strategy voyages survived Fair Winds`,
+    `only ${trials - bankruptcies}/${trials} (${Math.round(survivalRate * 100)}%) safe strategy voyages survived Fair Winds`,
   );
 });
 
@@ -472,7 +472,7 @@ test("a corrupt leak raises this round's raid chance by exactly brokerCorruption
   );
 });
 
-// A captain joining mid-voyage (snapToCheckpoint) should land on a fully
+// A captain joining mid voyage (snapToCheckpoint) should land on a fully
 // formed phase with the room's actual difficulty content, not round 1's.
 suite("late joiner (snapToCheckpoint)");
 
@@ -481,7 +481,7 @@ test("snapping to round 9 of an open_waters voyage yields tier2 content, not tie
   const logs: string[] = [];
   snapToCheckpoint(s, ctx, 9, "1", logs);
   assertEqual(s.currentRound, 9, "lands on the requested round");
-  assertEqual(s.phase, 1, "lands mid-Phase 1, not back at the welcome screen");
+  assertEqual(s.phase, 1, "lands mid Phase 1, not back at the welcome screen");
   const resourceTypesOnBoard = new Set(
     s.resourceCards.flatMap((c) => c.resources.map((r) => r.type)),
   );
@@ -500,7 +500,7 @@ test("snapping to round 9 of an open_waters voyage yields tier2 content, not tie
 });
 
 // Restart must fully reset state (money, inventory, workers, round) while
-// re-applying whatever difficulty the room currently has, since a restart
+// reapplying whatever difficulty the room currently has, since a restart
 // is also how a host can change tiers between voyages.
 suite("restart preserves the chosen difficulty");
 

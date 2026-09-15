@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { QuantityInput } from "@/components/ui/quantity-input";
+import { QuantityInput } from "@/components/ui/quantityInput";
 import { WORKER_TYPES } from "@/lib/game/constants";
 import {
   difficultyConfig,

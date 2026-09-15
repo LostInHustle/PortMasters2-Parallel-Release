@@ -1,6 +1,6 @@
 // =====================================================================
 // PortMasters 2 Parallel Release: terminology glossary
-// Short, plain-language descriptions for anything a new captain might
+// Short, plain language descriptions for anything a new captain might
 // hover over and wonder about. Pulled in by the <Term> component
 // (src/components/portmasters/Term.tsx) wherever that term is used as a
 // label across the status panel, the phase screens, and the player
@@ -11,7 +11,7 @@ import { BOONS, MODULES } from "./constants";
 export const GLOSSARY: Record<string, string> = {
   // Raw materials
   Hemp: "A cheap raw material, bought at port. Weavers turn it into Linen Clothes, or combine it with Silk for Cotton Clothes.",
-  Silk: "A pricier raw material. Goes into Cotton Clothes, Brocade, and Sachets. Most of the high-value recipes need it.",
+  Silk: "A pricier raw material. Goes into Cotton Clothes, Brocade, and Sachets. Most of the high value recipes need it.",
   Tea: "A raw material used only in Sachets, alongside Silk.",
 
   // Finished goods
@@ -20,7 +20,7 @@ export const GLOSSARY: Record<string, string> = {
   "Cotton Clothes":
     "A Weaver's product: 2 Hemp + 1 Silk in. Worth more than Linen Clothes, costs more to make.",
   Brocade:
-    "A Master Weaver's product: 3 Silk in. One of the two highest-value finished goods.",
+    "A Master Weaver's product: 3 Silk in. One of the two highest value finished goods.",
   Sachet:
     "A Sachet Maker's product: 1 Silk + 2 Tea in. The most valuable finished good, and the only one that needs Tea.",
 
@@ -36,18 +36,18 @@ export const GLOSSARY: Record<string, string> = {
   Reputation:
     "Your score for the voyage, roughly your accumulated trading profit. Highest reputation after round 8 wins.",
   Gold: "Your spendable funds. Hit zero with bills still due and the voyage ends in bankruptcy.",
-  VAT: "A 5% tax on the profit margin of finished-good sales (selling price minus material cost minus wage). Raw material sales aren't taxed this way.",
+  VAT: "A 5% tax on the profit margin of finished good sales (selling price minus material cost minus wage). Raw material sales aren't taxed this way.",
   "Income Tax":
     "A 10% tax on your net profit for the round, charged at Phase 3 settlement after everything else is paid.",
   Freight:
     "The shipping fee for completing a trade order, based on how many items you're moving. Reduced by your ship level and certain boons or modules.",
   Maintenance:
-    "A fixed per-round upkeep fee for your ship, due at Phase 3 regardless of how the round went.",
+    "A fixed per round upkeep fee for your ship, due at Phase 3 regardless of how the round went.",
   "Ship Level":
     "Raises your module slots and gives a flat discount on freight costs. Upgraded from the Shipyard in Phase 4.",
   Wages:
     "What your hired artisans cost per round, paid at Phase 3 whether they produced anything or not.",
-  Boon: "A one-round bonus you draft at the start of each voyage. It's picked personally, so your three choices differ from everyone else's.",
+  Boon: "A one round bonus you draft at the start of each voyage. It's picked personally, so your three choices differ from everyone else's.",
   Module:
     "A permanent ship upgrade, drafted from the Shipyard once you have a free slot. Stays equipped until you swap it out.",
   Barter:

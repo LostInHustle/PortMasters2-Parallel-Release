@@ -17,7 +17,7 @@ import {
 import type { GameContext, GameState, Worker } from "@/lib/game/types";
 import type { PublicUser } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { itemColorResolver } from "@/lib/use-color-preference";
+import { itemColorResolver } from "@/lib/useColorPreference";
 import { Term } from "../../Term";
 import { ItemIcon } from "../../shared";
 import { ReadyFooter, type PhaseSync } from "./PhaseShared";
@@ -286,7 +286,7 @@ export function WorkerMgmt({
             </div>
           ))}
         </div>
-        {/* Each hire button wears its own craft's hue. The old three-colour
+        {/* Each hire button wears its own craft's hue. The old three colour
             cycle put the same saturated green on the first, fourth and
             seventh artisan, so a row of seven read as one repeating stripe
             and the colour told you nothing about which artisan you were

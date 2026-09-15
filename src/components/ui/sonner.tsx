@@ -10,7 +10,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
-      // Wider and taller than sonner's 356px default so a game-log line or
+      // Wider and taller than sonner's 356px default so a game log line or
       // a chat preview is actually readable at a glance instead of getting
       // clipped down to a sliver of text.
       style={

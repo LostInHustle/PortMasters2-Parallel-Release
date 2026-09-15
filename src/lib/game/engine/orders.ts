@@ -10,10 +10,10 @@
 // bonus is applied to what remains, freight is charged before the Salvage
 // Crane can refund it, and the Broker's commission is taken last of all.
 // A past bug came from reordering exactly this sequence and paying every
-// crane refund out twice, which is why the cost-ledger true-up in the
+// crane refund out twice, which is why the cost ledger true up in the
 // middle carries the comment it does. Splitting it into tidy helpers
 // would make that ordering implicit rather than obvious, so it stays as
-// one readable top-to-bottom settlement.
+// one readable top to bottom settlement.
 //
 // The order generators come from ./market: Phase 1 and Phase 2 draw from
 // the same seeded deck, so there is exactly one implementation of them.
@@ -78,7 +78,7 @@ export function completeOrder(
     logs.push(`🧾 Product Sales VAT: ${totalVat} Gold`);
   }
   // Fleet of Treasures discount applied before money moves, so the captain
-  // is never charged the pre-discount freight.
+  // is never charged the pre discount freight.
   if (
     hasModule(state, "fleet_of_treasures") &&
     ["Foreign Balm", "Pearl String"].some((g) =>
@@ -100,7 +100,7 @@ export function completeOrder(
     reward = Math.floor(reward * 1.2);
     logs.push("👘 Silk Monopoly: +20% Reward!");
   }
-  // Charter-lane payouts: the Kiln and Forge Guild boon and the Maritime
+  // Charter lane payouts: the Kiln and Forge Guild boon and the Maritime
   // Bureau Token both reward trading the goods a charter opened, so they only
   // look at orders that actually involve them (see isCharterGood).
   const hasCharterGood = order.resources.some((r) => isCharterGood(r.type));
@@ -186,13 +186,13 @@ export function claimWordOnTheDocksReward(state: GameState, logs: string[]) {
   );
 }
 
-// Broker's Favor: the Renown-gated, once-per-voyage skill (see the flag on
+// Broker's Favor: the Renown gated, once per voyage skill (see the flag on
 // GameState and BROKERS_FAVOR_UNLOCK_LEVEL). Appends one extra standard trade
 // order for a chosen quantity of a good this captain is currently holding,
 // so a hold full of otherwise unsellable stock still has a guaranteed buyer.
 // Like the paid Broker's Whisper guarantee in startPhase2, it draws with
 // this captain's own Math.random and only appends to their own
-// customerCards, so it can never shift the shared, room-wide market anyone
+// customerCards, so it can never shift the shared, room wide market anyone
 // else sees. Quantity is capped at the captain's own hold rather than the
 // usual 1-3/2-5 order range, since brokersFavorCommission (see
 // completeOrder) is what keeps an oversized ask from paying out too much,

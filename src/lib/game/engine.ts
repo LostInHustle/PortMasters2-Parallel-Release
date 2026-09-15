@@ -1,7 +1,7 @@
 // =====================================================================
 // PortMasters 2 Parallel Release: Lords of the Silk Road game engine
 //
-// Ported faithfully from the original single-player build. All wording,
+// Ported faithfully from the original single player build. All wording,
 // log messages, balance, and phase flow are preserved verbatim.
 //
 // [ONLINE EXTENSION] The one behavioural addition is a seedable PRNG
@@ -9,14 +9,14 @@
 // orders, and the Broker's intel pool are generated deterministically from
 // (roomId + userId + voyageEpoch + round), so each captain has their own
 // market, orders, and intel: reproducible on reload, different from every
-// other captain, and rerolled into a brand-new voyage whenever the host
+// other captain, and rerolled into a brand new voyage whenever the host
 // restarts (which bumps voyageEpoch, see prisma/schema.prisma and
-// src/lib/use-game-session.ts). Each captain's gold, reputation, inventory,
-// workers, and personal luck (Salvage Crane refunds, Tax-Evasion audits,
+// src/lib/useGameSession.ts). Each captain's gold, reputation, inventory,
+// workers, and personal luck (Salvage Crane refunds, Tax Evasion audits,
 // boon offerings) are their own too.
 //
 // One new gameplay skill, Broker's Favor, is layered on top of the faithful
-// port: a Renown-gated, once-per-voyage guaranteed buyer (see
+// port: a Renown gated, once per voyage guaranteed buyer (see
 // callBrokersFavor). It draws with a captain's own live randomness, so it
 // stays personal and never perturbs their seeded market.
 //

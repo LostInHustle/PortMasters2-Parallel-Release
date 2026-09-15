@@ -8,13 +8,7 @@
 import type { GameState } from "../../../src/lib/game/types";
 import type { Difficulty } from "../../../src/lib/game/difficulty";
 import { SESSION_COOKIE_NAME } from "../../../src/lib/auth";
-
-export type PublicUser = {
-  id: string;
-  username: string;
-  displayName: string;
-  avatarHue: number;
-};
+import type { PublicUser } from "../../../src/lib/publicUser";
 
 export type RoomSummary = {
   id: string;
@@ -125,11 +119,47 @@ export class TestClient {
   ): Promise<{ state: string | null; checkpoint: unknown }> {
     return this.request(`/api/game/state?roomId=${roomId}`);
   }
+
+  me(): Promise<{ user: (PublicUser & { role: string }) | null }> {
+    return this.request("/api/auth/me");
+  }
+
+  // Plain verbs for routes that have no dedicated helper above (the admin
+  // console scenario drives a dozen of them). Errors surface the same way
+  // as everywhere else in this client: a thrown Error carrying the status
+  // and the server's message, which is exactly what those scenarios assert
+  // on.
+  get<T>(path: string): Promise<T> {
+    return this.request(path);
+  }
+
+  post<T>(path: string, body?: unknown): Promise<T> {
+    return this.request(path, {
+      method: "POST",
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  }
+
+  delete<T>(path: string): Promise<T> {
+    return this.request(path, { method: "DELETE" });
+  }
+}
+
+// Whether a request rejected with a given HTTP status, for asserting that a
+// door is closed rather than that it opened.
+export async function statusOf(promise: Promise<unknown>): Promise<number> {
+  try {
+    await promise;
+    return 200;
+  } catch (err) {
+    const m = /-> (\d{3}):/.exec((err as Error).message);
+    return m ? Number(m[1]) : 0;
+  }
 }
 
 // A username unique enough that two scenarios (or two runs) never collide,
 // without needing a counter threaded through every caller. Usernames are
-// capped at 20 chars server-side (see the register route's Zod schema),
+// capped at 20 chars server side (see the register route's Zod schema),
 // so the prefix is trimmed rather than the uniqueness suffix.
 export function uniqueUsername(prefix: string): string {
   const suffix =

@@ -4,13 +4,15 @@
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import type { CheckInStatus } from "@/lib/game/checkin";
 import type { Difficulty } from "@/lib/game/difficulty";
+import type { PublicUser } from "@/lib/publicUser";
+import type { AdminPlayer, ModerationLogEntry } from "@/lib/admin/actions";
+import type { Role } from "@/lib/admin/rules";
 
-export type PublicUser = {
-  id: string;
-  username: string;
-  displayName: string;
-  avatarHue: number;
-};
+export type { PublicUser } from "@/lib/publicUser";
+
+// The signed in captain's own record: what other captains see, plus the
+// role only they and the admin console are ever told about.
+export type SelfUser = PublicUser & { role: Role };
 
 export type RoomSummary = {
   id: string;
@@ -57,31 +59,24 @@ async function jfetch<T>(url: string, init?: RequestInit): Promise<T> {
   return data as T;
 }
 
+function post<T>(url: string, body?: unknown): Promise<T> {
+  return jfetch<T>(url, {
+    method: "POST",
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
 export const api = {
   // Auth
-  me: () =>
-    jfetch<{ user: PublicUser | null; token: string | null }>("/api/auth/me"),
+  me: () => jfetch<{ user: SelfUser | null }>("/api/auth/me"),
   register: (body: {
     username: string;
     password: string;
     displayName?: string;
-  }) =>
-    jfetch<{ user: PublicUser; expiresAt: string; token: string }>(
-      "/api/auth/register",
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-      },
-    ),
+  }) => post<{ user: SelfUser; expiresAt: string }>("/api/auth/register", body),
   login: (body: { username: string; password: string }) =>
-    jfetch<{ user: PublicUser; expiresAt: string; token: string }>(
-      "/api/auth/login",
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-      },
-    ),
-  logout: () => jfetch<{ ok: true }>("/api/auth/logout", { method: "POST" }),
+    post<{ user: SelfUser; expiresAt: string }>("/api/auth/login", body),
+  logout: () => post<{ ok: true }>("/api/auth/logout"),
 
   // Rooms
   listRooms: () => jfetch<{ rooms: RoomSummary[] }>("/api/rooms"),
@@ -89,11 +84,7 @@ export const api = {
     name: string;
     isPublic?: boolean;
     difficulty?: Difficulty;
-  }) =>
-    jfetch<{ room: RoomSummary }>("/api/rooms", {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
+  }) => post<{ room: RoomSummary }>("/api/rooms", body),
   getRoom: (id: string) =>
     jfetch<{ room: RoomDetail; messages: ChatMessage[] }>(`/api/rooms/${id}`),
   // The room this captain is still seated in, or null. Used on page load to
@@ -103,14 +94,10 @@ export const api = {
   // is the thing asked.
   getActiveRoom: () => jfetch<{ room: RoomDetail | null }>("/api/rooms/active"),
   joinRoomById: (id: string) =>
-    jfetch<{ room: RoomSummary }>(`/api/rooms/${id}/join`, { method: "POST" }),
+    post<{ room: RoomSummary }>(`/api/rooms/${id}/join`),
   joinRoomByCode: (code: string) =>
-    jfetch<{ room: RoomSummary }>("/api/rooms/join", {
-      method: "POST",
-      body: JSON.stringify({ code }),
-    }),
-  leaveRoom: (id: string) =>
-    jfetch<{ ok: true }>(`/api/rooms/${id}/leave`, { method: "POST" }),
+    post<{ room: RoomSummary }>("/api/rooms/join", { code }),
+  leaveRoom: (id: string) => post<{ ok: true }>(`/api/rooms/${id}/leave`),
 
   // Game state
   getGameState: (roomId: string) =>
@@ -136,7 +123,7 @@ export const api = {
     ),
 
   // Captain's Legacy (persistent Renown, across every voyage the account has played).
-  // The current user's own legacy also carries their Daily Check-In status.
+  // The current user's own legacy also carries their daily check in status.
   getLegacy: () =>
     jfetch<{ legacy: CaptainLegacySummary; checkIn: CheckInStatus }>(
       "/api/legacy",
@@ -144,23 +131,43 @@ export const api = {
   getLegacyFor: (userId: string) =>
     jfetch<{ legacy: CaptainLegacySummary }>(`/api/legacy/${userId}`),
   getLegaciesFor: (userIds: string[]) =>
-    jfetch<{ legacies: Record<string, CaptainLegacySummary> }>(
+    post<{ legacies: Record<string, CaptainLegacySummary> }>(
       "/api/legacy/batch",
-      {
-        method: "POST",
-        body: JSON.stringify({ userIds }),
-      },
+      { userIds },
     ),
 
-  // Daily Check-In: claim today's reward. Returns claimed:false (not an
-  // error) when today was already claimed, so the caller can just re-render.
+  // Daily check in: claim today's reward. Returns claimed:false (not an
+  // error) when today was already claimed, so the caller can just rerender.
   checkIn: () =>
-    jfetch<{
+    post<{
       claimed: boolean;
       day?: number;
       xpGained?: number;
       leveledUp?: boolean;
       legacy: CaptainLegacySummary;
       checkIn: CheckInStatus;
-    }>("/api/check-in", { method: "POST" }),
+    }>("/api/checkin"),
+
+  // Admin console (see src/lib/admin and the README's admin section).
+  admin: {
+    status: () =>
+      jfetch<{ role: Role; configured: boolean }>("/api/admin/status"),
+    claim: (key: string) =>
+      post<{ role: "admin"; previousAdmin: string | null }>(
+        "/api/admin/claim",
+        { key },
+      ),
+    players: (query: string, page: number) =>
+      jfetch<{ players: AdminPlayer[]; total: number; page: number }>(
+        `/api/admin/players?q=${encodeURIComponent(query)}&page=${page}`,
+      ),
+    ban: (id: string, reason: string) =>
+      post<{ ok: true }>(`/api/admin/players/${id}/ban`, { reason }),
+    unban: (id: string) => post<{ ok: true }>(`/api/admin/players/${id}/unban`),
+    setRole: (id: string, role: "moderator" | "player") =>
+      post<{ ok: true }>(`/api/admin/players/${id}/role`, { role }),
+    remove: (id: string) =>
+      jfetch<{ ok: true }>(`/api/admin/players/${id}`, { method: "DELETE" }),
+    log: () => jfetch<{ entries: ModerationLogEntry[] }>("/api/admin/log"),
+  },
 };

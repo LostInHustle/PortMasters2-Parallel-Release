@@ -20,11 +20,11 @@ import { Endgame } from "./phases/Endgame";
 // The dispatcher for every phase screen. Each phase used to be a nested
 // function component declared directly in this file (a 2500+ line single
 // file holding all twenty of them); they're now one module per phase under
-// ./phases, each still a module-level export for the same reason they were
+// ./phases, each still a module level export for the same reason they were
 // pulled out of GamePhasePanel's own body in the first place: a stable
-// component identity across renders, so React re-renders a phase in place
+// component identity across renders, so React rerenders a phase in place
 // on every game state update instead of unmounting and remounting the whole
-// subtree (which used to reset local useState mid-interaction, see
+// subtree (which used to reset local useState mid interaction, see
 // PhaseShared.tsx's ReadyFooter comment for the original incident).
 type Props = {
   game: GameState;

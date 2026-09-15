@@ -1,7 +1,7 @@
 // =====================================================================
-// Integration test: the three room-wide harbor systems merged via PR #12
+// Integration test: the three room wide harbor systems merged via PR #12
 // The Harbor Pulse, Word on the Docks, and Tidewatch Alerts, driven
-// through the real phase-transition functions the way a live voyage
+// through the real phase transition functions the way a live voyage
 // actually calls them, rather than one function tested in isolation (see
 // unit.game.ts for that level of coverage).
 //
@@ -9,11 +9,11 @@
 // rng are seeded purely from (ctx.seedBase, voyageEpoch, currentRound),
 // see the "[ONLINE] Deterministic port market per (room, round)" comment on
 // startPhase1 in engine.ts, so a freshly created state with currentRound
-// set directly reproduces bit-for-bit the same Phase 1 a state that
+// set directly reproduces bit for bit the same Phase 1 a state that
 // actually played every prior round would see. That makes the Harbor Pulse
-// and Tidewatch card-count tests below exact and reproducible without
+// and Tidewatch card count tests below exact and reproducible without
 // simulating whole voyages; only the Word on the Docks suite, which depends
-// on genuinely completing orders round over round, drives a real multi-round
+// on genuinely completing orders round over round, drives a real multi round
 // loop (boon draft and pirate rolls are unseeded there too, so that suite
 // is written as a statistical invariant check across several trials, the
 // same style the "fair_winds identity guarantees" suite in
@@ -63,7 +63,7 @@ function rawEntries(card: ResourceCard) {
 }
 
 // ---------- The Harbor Pulse ----------
-suite("Harbor Pulse: price nudge is item-surgical and direction-correct");
+suite("Harbor Pulse: price nudge is item surgical and direction correct");
 
 test("a positive Hemp pulse never lowers Hemp's price and never touches any other item's price, across every round of a Fair Winds voyage", () => {
   let hempIncreaseSeen = false;
@@ -154,23 +154,23 @@ test("a negative Tea pulse never raises Tea's price, across every round of a Fai
 });
 
 suite(
-  "Harbor Pulse: end-to-end pipeline (buy -> tally -> aggregate -> apply -> reprice)",
+  "Harbor Pulse: end to end pipeline (buy -> tally -> aggregate -> apply -> reprice)",
 );
 
 test("what a captain buys in round 1 shapes round 2's prices through the exact same formula the server runs", () => {
   const round1 = stateAtRound("fair_winds", 1);
   startPhase1(round1, ctx, []);
   // An eager captain who buys the entire board, the simplest way to
-  // guarantee a non-empty, non-trivial tally to feed into the pipeline.
+  // guarantee a nonempty, real tally to feed into the pipeline.
   round1.purchasedCards = round1.resourceCards.map((c) => c.id);
   const tally = tallyPurchasesByResource(round1);
   assert(
     Object.keys(tally).length > 0,
-    "round 1 produced a non-empty purchase tally",
+    "round 1 produced a nonempty purchase tally",
   );
 
   // This is the exact function src/server/realtime.ts calls (computeHarborPulse,
-  // now shared from src/lib/game/harborPulse.ts), not a re-implementation of
+  // now shared from src/lib/game/harborPulse.ts), not a reimplementation of
   // its formula, so this test breaks if the two ever drift apart.
   const pulse = computeHarborPulse(tally);
 
@@ -268,11 +268,11 @@ test("tidewatchSurge never touches voyage length or difficulty identity", () => 
 });
 
 // ---------- Word on the Docks ----------
-// Unlike the two suites above, a real multi-round voyage is unavoidable here,
+// Unlike the two suites above, a real multi round voyage is unavoidable here,
 // the threshold is about genuinely completed trade orders, which depends
 // on what the (unseeded) boon draft and order board hand a captain. Written
 // as invariant checks across several independent trials rather than exact
-// per-round assertions, the same statistical style integration.voyage.ts
+// per round assertions, the same statistical style integration.voyage.ts
 // already uses for unseeded RNG.
 suite(
   "Word on the Docks: threshold signal stays consistent across real voyages",
@@ -290,7 +290,7 @@ function playSafeRound(
 ): "ok" | "bankrupt" | "endgame" {
   const logs: string[] = [];
   const choice = state.boonChoices[0];
-  if (!choice) return "bankrupt"; // defensive; never expected mid-voyage
+  if (!choice) return "bankrupt"; // defensive; never expected mid voyage
   selectBoon(state, ctxIn, choice.id, logs); // -> phase 1
 
   const RESERVE = state.fixedCost + state.maintenancePenalty + 50;
@@ -353,7 +353,7 @@ test("across independent trials, a claim (when it fires) always fires at exactly
     const r = runDocksTrial(i);
     assert(
       !r.claimEverResetOrChangedAfterFirstSet,
-      `trial ${i}: _pendingDocksClaim changed value after first being set, it must be a one-shot signal`,
+      `trial ${i}: _pendingDocksClaim changed value after first being set, it must be a one shot signal`,
     );
     if (r.claimTotalWhenFirstSet !== undefined) {
       trialsThatCrossedThreshold++;

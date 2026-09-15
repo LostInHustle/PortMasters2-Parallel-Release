@@ -2,7 +2,7 @@
 // The one risk the settlement phase turns on: whether raiders find the
 // hold this round, and the escort a captain can buy to rule that out.
 //
-// Both are resolved by the same one-shot latch, state.pirateAttackResolved,
+// Both are resolved by the same one shot latch, state.pirateAttackResolved,
 // which is why they belong together. Whichever runs first closes the
 // round's waters, so hiring an escort after the roll is refused and rolling
 // again after an escort cannot happen.
@@ -19,7 +19,7 @@ import { hasModule } from "./core";
 // maintenance come due, so a hit here can be exactly what tips a captain
 // into needing a financial aid request. Personal luck, the same as the
 // Salvage Crane refund or the Tax Evasion audit elsewhere in the engine:
-// rolled client-side, never a room-wide checkpoint.
+// rolled client side, never a room wide checkpoint.
 export function resolvePirateAttack(state: GameState, logs: string[]) {
   if (state.pirateAttackResolved) return;
   state.pirateAttackResolved = true;
@@ -31,7 +31,7 @@ export function resolvePirateAttack(state: GameState, logs: string[]) {
     state.currentRound,
     state.maxRounds,
   );
-  // A corrupt broker's leak (see purchaseIntel) adds a one-time bump on top.
+  // A corrupt broker's leak (see purchaseIntel) adds a one time bump on top.
   const leak = state.brokerTippedPirates
     ? difficultyConfig(state.difficulty).brokerCorruptionRisk
     : 0;

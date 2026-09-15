@@ -87,7 +87,7 @@ export function renownStartingGoldBonus(level: number): number {
 // ---------- Per difficulty breakdown ----------
 // Sea Master crowns and best score split by the tier they were earned on (see
 // Room.difficulty and src/lib/game/difficulty.ts). The account level
-// seaMasterCrowns and bestScore stay the all-tier totals; this is the breakdown
+// seaMasterCrowns and bestScore stay the all tier totals; this is the breakdown
 // behind them, so a crown won in a storm reads as the rarer thing it is, and a
 // future leaderboard can be segmented per tier rather than ranking every tier
 // against each other in one list. Keyed by plain string rather than the
@@ -96,7 +96,7 @@ export function renownStartingGoldBonus(level: number): number {
 export type DifficultyStats = { crowns: number; bestScore: number };
 export type StatsByDifficulty = Record<string, DifficultyStats>;
 
-// Deliberately defensive: this parses a free-form JSON column that rows written
+// Deliberately defensive: this parses a free form JSON column that rows written
 // before the column existed never populated, so anything missing or malformed
 // degrades to "no record yet" instead of throwing inside the voyage conclusion
 // write, which runs for every finisher at once.
@@ -174,3 +174,32 @@ export const DEFAULT_LEGACY_SUMMARY: CaptainLegacySummary = {
   meritIds: [],
   statsByDifficulty: {},
 };
+
+// The columns of a CaptainLegacy row this summary is built from, spelled
+// out structurally rather than imported from Prisma so this module stays
+// free of it. Every legacy route builds its response through here; a row
+// that does not exist yet is simply the default summary.
+export type LegacyRowLike = {
+  renownLevel: number;
+  renownXP: number;
+  voyagesCompleted: number;
+  seaMasterCrowns: number;
+  bestScore: number;
+  statsByDifficulty: string;
+};
+
+export function legacySummaryFromRow(
+  row: LegacyRowLike | null | undefined,
+  meritIds: string[],
+): CaptainLegacySummary {
+  if (!row) return { ...DEFAULT_LEGACY_SUMMARY, meritIds };
+  return {
+    renownLevel: row.renownLevel,
+    renownXP: row.renownXP,
+    voyagesCompleted: row.voyagesCompleted,
+    seaMasterCrowns: row.seaMasterCrowns,
+    bestScore: row.bestScore,
+    meritIds,
+    statsByDifficulty: parseStatsByDifficulty(row.statsByDifficulty),
+  };
+}

@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, type PublicUser, type RoomDetail } from "@/lib/api";
-import { disconnectSocket, setAuthToken } from "@/lib/realtime";
+import { api, type RoomDetail, type SelfUser } from "@/lib/api";
+import { disconnectSocket, onSessionRevoked } from "@/lib/realtime";
 import { AuthScreen } from "@/components/portmasters/AuthScreen";
 import { Lobby } from "@/components/portmasters/Lobby";
 import { GameRoom } from "@/components/portmasters/GameRoom";
@@ -11,9 +11,13 @@ import { Anchor } from "lucide-react";
 type Status = "loading" | "auth" | "lobby" | "game";
 
 export default function Home() {
-  const [user, setUser] = useState<PublicUser | null>(null);
+  const [user, setUser] = useState<SelfUser | null>(null);
   const [status, setStatus] = useState<Status>("loading");
   const [room, setRoom] = useState<RoomDetail | null>(null);
+  // Shown on the sign in screen when the server ended the session from
+  // its side (a ban, a deleted account), so the captain is told why
+  // instead of just finding themselves signed out.
+  const [signOutNotice, setSignOutNotice] = useState<string | null>(null);
 
   // Restore session on mount, and with it whichever room this captain is
   // still seated in.
@@ -36,7 +40,7 @@ export default function Home() {
     let alive = true;
     (async () => {
       try {
-        const [{ user: u, token }, active] = await Promise.all([
+        const [{ user: u }, active] = await Promise.all([
           api.me(),
           // Never let this decide whether the app loads at all: an
           // unauthenticated caller gets a 401 here, and a failure of any
@@ -48,7 +52,6 @@ export default function Home() {
           setStatus("auth");
           return;
         }
-        setAuthToken(token);
         setUser(u);
         if (active.room) {
           setRoom(active.room);
@@ -65,6 +68,18 @@ export default function Home() {
     };
   }, []);
 
+  useEffect(
+    () =>
+      onSessionRevoked((reason) => {
+        disconnectSocket();
+        setUser(null);
+        setRoom(null);
+        setSignOutNotice(reason);
+        setStatus("auth");
+      }),
+    [],
+  );
+
   async function handleLogout() {
     try {
       await api.logout();
@@ -75,7 +90,6 @@ export default function Home() {
     // lingers as "online" (and still occupying any room) until it happens
     // to drop on its own.
     disconnectSocket();
-    setAuthToken(null);
     setUser(null);
     setStatus("auth");
     setRoom(null);
@@ -97,34 +111,12 @@ export default function Home() {
   if (status === "auth" || !user) {
     return (
       <AuthScreen
-        onAuthed={(u, token) => {
-          setAuthToken(token);
+        notice={signOutNotice}
+        onAuthed={(u) => {
+          setSignOutNotice(null);
           setUser(u);
           setStatus("lobby");
         }}
-      />
-    );
-  }
-
-  if (status === "lobby") {
-    return (
-      <Lobby
-        me={user}
-        onEnterRoom={(r) => {
-          // Fetch full room detail (members + chat) before entering.
-          api
-            .getRoom(r.id)
-            .then(({ room: detail }) => {
-              setRoom(detail);
-              setStatus("game");
-            })
-            .catch(() => {
-              // Fall back to the summary if detail fetch fails.
-              setRoom({ ...r, isMember: true } as RoomDetail);
-              setStatus("game");
-            });
-        }}
-        onLogout={handleLogout}
       />
     );
   }
@@ -142,6 +134,24 @@ export default function Home() {
     );
   }
 
-  // Fallback to lobby.
-  return <Lobby me={user} onEnterRoom={() => {}} onLogout={handleLogout} />;
+  return (
+    <Lobby
+      me={user}
+      onEnterRoom={(r) => {
+        // Fetch full room detail (members + chat) before entering.
+        api
+          .getRoom(r.id)
+          .then(({ room: detail }) => {
+            setRoom(detail);
+            setStatus("game");
+          })
+          .catch(() => {
+            // Fall back to the summary if detail fetch fails.
+            setRoom({ ...r, isMember: true });
+            setStatus("game");
+          });
+      }}
+      onLogout={handleLogout}
+    />
+  );
 }

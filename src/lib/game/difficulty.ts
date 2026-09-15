@@ -2,7 +2,7 @@
 // PortMasters 2 Parallel Release: difficulty modes
 //
 // One data record defines every difficulty tier, and a thin layer of pure
-// selectors derives each in-game dial from it. This mirrors the original
+// selectors derives each in game dial from it. This mirrors the original
 // PortMasters 2 design (a single DIFFICULTIES record plus difficultyRules
 // helpers), rebuilt around the Parallel Release's own systems.
 //
@@ -28,7 +28,7 @@ export const DEFAULT_DIFFICULTY: Difficulty = "fair_winds";
 export interface DifficultyConfig {
   key: Difficulty;
   // Display metadata, read by the lobby switch, the room card chip, and the
-  // in-game status chip, so copy and numbers never drift from one source.
+  // in game status chip, so copy and numbers never drift from one source.
   name: string;
   badge: string;
   icon: string;
@@ -38,14 +38,14 @@ export interface DifficultyConfig {
   // Voyage length. Flows into GameState.maxRounds; the endgame check already
   // reads maxRounds, so a longer voyage needs nothing else.
   rounds: number;
-  // Starting stake and the flat per-round ship maintenance fee.
+  // Starting stake and the flat per round ship maintenance fee.
   startingGold: number;
   maintenance: number;
 
   // Market breadth. Both boards (port purchase and trade orders) start at the
   // base count and gain the same number of extra cards once the voyage reaches
   // each "charter" round, reproducing the original's widening market without a
-  // new-content library. An empty schedule (fair_winds) is a flat market.
+  // new content library. An empty schedule (fair_winds) is a flat market.
   purchaseCardsBase: number;
   orderCardsBase: number;
   // Content tier to the round its charter opens (see the tiered pools in
@@ -62,7 +62,7 @@ export interface DifficultyConfig {
   // a raid still takes every coin, faithful to the Parallel Release identity,
   // so difficulty escalates the chance rather than the loss fraction.
   pirateChance: readonly [number] | readonly [number, number];
-  // Escort fee as a fraction of current gold, the guaranteed-safe alternative
+  // Escort fee as a fraction of current gold, the guaranteed safe alternative
   // to risking the raid roll.
   escortCostRate: number;
 
@@ -288,7 +288,7 @@ export function marketCountsFor(
 
 // Which content tier's charter opens on exactly this round, if any, so the
 // caller can announce what actually arrived rather than a generic banner.
-export function charterTierOpeningOn(
+function charterTierOpeningOn(
   value: unknown,
   roundNo: number,
 ): number | undefined {
@@ -304,9 +304,9 @@ export function charterOpensOn(value: unknown, roundNo: number): boolean {
   return charterTierOpeningOn(value, roundNo) !== undefined;
 }
 
-// Raid probability for this round: the flat toll, or the second-half tier once
+// Raid probability for this round: the flat toll, or the second half tier once
 // the voyage passes its midpoint. Same midpoint rule the original used for its
-// pirate-loss curve (floor(maxRounds / 2)).
+// pirate loss curve (floor(maxRounds / 2)).
 export function pirateChanceFor(
   value: unknown,
   roundNo: number,

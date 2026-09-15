@@ -378,7 +378,7 @@ test("calcTransportCost: base formula, ship level discount, floor at 5 (no modul
   assertEqual(
     calcTransportCost(s, 5),
     5,
-    "5 items, ship level 3: max(5, 10-15)=5",
+    "5 items, ship level 3: max(5, 10 minus 15) = 5",
   );
 });
 
@@ -436,9 +436,9 @@ test("explainTransportCost mirrors calcTransportCost's final cost across module 
 
 test("calcVAT: no VAT when the margin is zero or negative", () => {
   const s = freshState();
-  // Sachet: materials Silk×1 (avg 8) + Tea×2 (avg 12) = 32, worker wage 20 -> break-even at 52
-  assertEqual(calcVAT(s, "Sachet", 52), 0, "exactly break-even");
-  assertEqual(calcVAT(s, "Sachet", 40), 0, "below break-even");
+  // Sachet: materials Silk×1 (avg 8) + Tea×2 (avg 12) = 32, worker wage 20 -> break even at 52
+  assertEqual(calcVAT(s, "Sachet", 52), 0, "exactly break even");
+  assertEqual(calcVAT(s, "Sachet", 40), 0, "below break even");
 });
 
 test("calcVAT: 5% of the margin above material + wage cost, floored", () => {
@@ -553,7 +553,7 @@ test("brokersFavorCommission: zero reward has zero commission; net payout is bou
     const net = reward - brokersFavorCommission(reward);
     assert(
       net >= prevNet,
-      `net payout should be non-decreasing in reward (reward=${reward})`,
+      `net payout should be never decreasing in reward (reward=${reward})`,
     );
     prevNet = net;
   }
@@ -655,7 +655,7 @@ test("renownStartingGoldBonus: +3/level above 1, capped at 60", () => {
   assertEqual(renownStartingGoldBonus(50), 60, "level 50: still capped");
 });
 
-test("parseStatsByDifficulty / recordVoyageInStats round-trip and degrade gracefully", () => {
+test("parseStatsByDifficulty / recordVoyageInStats round trip and degrade gracefully", () => {
   assertEqual(
     Object.keys(parseStatsByDifficulty(null)).length,
     0,
@@ -688,7 +688,7 @@ test("parseStatsByDifficulty / recordVoyageInStats round-trip and degrade gracef
 });
 
 // ---------- Merits ----------
-suite("difficulty-scoped merits");
+suite("difficulty scoped merits");
 
 test("open_water_captain requires open_waters and no bankruptcy", () => {
   const base = {
@@ -767,7 +767,7 @@ test("storm_sovereign requires a monsoon crown; eye_of_the_storm requires monsoo
       crowned: true,
       reputation: 200,
     }).includes("eye_of_the_storm"),
-    "eye_of_the_storm is monsoon-only",
+    "eye_of_the_storm is monsoon only",
   );
 });
 
@@ -796,20 +796,20 @@ test("every difficulty's tierUnlock rounds fall within its own voyage length", (
   }
 });
 
-// ---------- Harbor systems (Manifests 01-03) ----------
-// Pure-function coverage for the three room-wide harbor systems merged via
-// PR #12: The Harbor Pulse (price nudge), Word on the Docks (first-to-3
-// race), and Tidewatch Alerts (combined-reputation surge). Each system's
+// ---------- Harbor systems (Manifests 01 to 03) ----------
+// Pure function coverage for the three room wide harbor systems merged via
+// PR #12: The Harbor Pulse (price nudge), Word on the Docks (the race to
+// three orders), and Tidewatch Alerts (combined reputation surge). Each system's
 // authoritative "who won" or "did the room cross the line" arbitration
-// lives server-side in src/server/realtime.ts (roomPulseTallies,
+// lives server side in src/server/realtime.ts (roomPulseTallies,
 // roomDocksWinners, roomSurges), which needs a live socket connection to
-// exercise and is out of scope for this framework-free script; what's
+// exercise and is out of scope for this framework free script; what's
 // tested here is every piece of it that's a pure function reachable
 // without one: the pricing formula itself (computeHarborPulse, hoisted out
 // of realtime.ts into src/lib/game/harborPulse.ts for exactly this reason,
 // the same move pools.ts made for difficulty.ts) and every exported engine
 // function these systems added or touched.
-suite("harbor systems (Manifests 01-03)");
+suite("harbor systems (Manifests 01 to 03)");
 
 function orderCard(
   overrides: Partial<OrderCard> & { resources: OrderCard["resources"] },
@@ -853,10 +853,10 @@ test("computeHarborPulse: an item the room leaned into gets a positive nudge, cl
   assertClose(pulse.Hemp, PULSE_CAP, 1e-9, "clamped to +PULSE_CAP");
 });
 
-test("computeHarborPulse: a reported-but-untouched item still gets a negative nudge, clamped to -PULSE_CAP", () => {
+test("computeHarborPulse: a reported but untouched item still gets a negative nudge, clamped to -PULSE_CAP", () => {
   // Silk/Tea split the room's buying and Hemp gets none of it: share = 0,
   // unclamped nudge = (0 - 1/3) * 0.6 = -0.2, past the cap on the low side.
-  // (Filtering a genuinely zero-quantity entry out of the tally entirely is
+  // (Filtering a genuinely zero quantity entry out of the tally entirely is
   // addPulseReport's job, not this pure function's, see the next test.)
   const pulse = computeHarborPulse({ Hemp: 0, Silk: 50, Tea: 50 });
   assertClose(pulse.Hemp, -PULSE_CAP, 1e-9, "clamped to -PULSE_CAP");
@@ -867,8 +867,8 @@ test("computeHarborPulse: an underrepresented but present item still clamps at -
   assertClose(pulse.Hemp, -PULSE_CAP, 1e-9, "clamped to -PULSE_CAP");
 });
 
-test("computeHarborPulse: a total of zero (all reported quantities non-positive) is neutral", () => {
-  // addPulseReport already filters non-positive quantities before they ever
+test("computeHarborPulse: a total of zero (all reported quantities zero or negative) is neutral", () => {
+  // addPulseReport already filters zero or negative quantities before they ever
   // reach this function, but the pure function is defensive on its own
   // terms too: this pins that defensiveness down independently of the
   // caller that currently guarantees it.
@@ -878,7 +878,7 @@ test("computeHarborPulse: a total of zero (all reported quantities non-positive)
 
 // ----- The Harbor Pulse: tallyPurchasesByResource -----
 
-test("tallyPurchasesByResource: sums only purchased, non-product resource cards", () => {
+test("tallyPurchasesByResource: sums only purchased, raw resource cards", () => {
   const s = freshState();
   s.resourceCards = [
     {
@@ -895,7 +895,7 @@ test("tallyPurchasesByResource: sums only purchased, non-product resource cards"
       totalCost: 8,
       isProductCard: false,
     },
-    // Purchased but a finished-good card: the pulse is about raw goods, so
+    // Purchased but a finished good card: the pulse is about raw goods, so
     // this must never contribute, even though it's in purchasedCards below.
     {
       id: 2,
@@ -1008,7 +1008,7 @@ test("claimWordOnTheDocksReward: pays the reward exactly once per call and logs 
   assert(logs[0].includes("Word on the Docks"), "log names the system");
 });
 
-// ----- Word on the Docks: completeOrder's one-shot claim signal -----
+// ----- Word on the Docks: completeOrder's one shot claim signal -----
 
 test("completeOrder: _pendingDocksClaim is unset before the threshold, set exactly at it", () => {
   const s = freshState();
@@ -1033,7 +1033,7 @@ test("completeOrder: _pendingDocksClaim is unset before the threshold, set exact
   );
 });
 
-test("completeOrder: never re-fires _pendingDocksClaim past the threshold", () => {
+test("completeOrder: never sets _pendingDocksClaim a second time past the threshold", () => {
   const s = freshState();
   s.inventory.Hemp = 100;
   s.customerCards = Array.from(
@@ -1054,12 +1054,12 @@ test("completeOrder: never re-fires _pendingDocksClaim past the threshold", () =
   assertEqual(
     s._pendingDocksClaim,
     undefined,
-    "the === guard is one-shot: a 4th completed order never re-sets the claim",
+    "the === guard is one shot: a 4th completed order never resets the claim",
   );
 });
 
 // ----- Constant sanity: guards silent balance drift -----
-// These numbers are load-bearing in guideText()/tipsText() copy and in the
+// These numbers are load bearing in guideText()/tipsText() copy and in the
 // server's arbitration logic; a change here should be a deliberate design
 // decision, not a typo that silently desyncs the rules text from the code.
 
@@ -1086,7 +1086,7 @@ function stateWithLoanGiven(): GameState {
   return s;
 }
 
-test("receiveRepayment credits Gold and removes the closed loan (the ordinary, non-redirected path)", () => {
+test("receiveRepayment credits Gold and removes the closed loan (the ordinary, unredirected path)", () => {
   const s = stateWithLoanGiven();
   const before = s.money;
   const logs: string[] = [];

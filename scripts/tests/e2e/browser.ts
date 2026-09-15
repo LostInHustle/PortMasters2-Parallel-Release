@@ -2,7 +2,7 @@
 // Playwright wiring for the E2E scenario suite: one shared Chromium
 // instance for the whole run, with a helper that hands a scenario an
 // authenticated tab for a given TestClient without repeating the
-// cookie-injection boilerplate at every call site.
+// cookie injection boilerplate at every call site.
 // =====================================================================
 import {
   chromium,
@@ -29,7 +29,7 @@ export async function closeBrowser(): Promise<void> {
 
 // Every captain who hasn't seen the "Welcome aboard" tutorial before (i.e.
 // every fresh browser context, since it's gated on a localStorage flag;
-// see TUTORIAL_SEEN_KEY in GameRoom.tsx) gets it auto-opened ~600ms after
+// see TUTORIAL_SEEN_KEY in GameRoom.tsx) gets it opened automatically ~600ms after
 // mount. It's a Radix Dialog, which applies aria-hidden to the rest of the
 // page while open, so every getByRole query against the game underneath
 // (Start the Voyage, Lock In Boon, Hire Weaver, ...) resolves to nothing

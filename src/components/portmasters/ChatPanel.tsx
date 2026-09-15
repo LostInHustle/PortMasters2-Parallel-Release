@@ -12,8 +12,8 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 /**
- * A self-contained chat surface. Two modes: room, messages broadcast to a
- * room channel (socket `chat:room`); dm, 1-to-1 messages with another user
+ * A self contained chat surface. Two modes: room, messages broadcast to a
+ * room channel (socket `chat:room`); dm, one to one messages with another user
  * (socket `chat:dm`).
  *
  * The socket is passed in (shared singleton). Initial history is fetched
@@ -52,8 +52,8 @@ export function ChatPanel({
 
   // Seed with initial messages if they change (e.g. switching DM target, or
   // the parent's history fetch resolving after this already mounted). Done as
-  // a render-time adjustment rather than in an effect: React throws away the
-  // in-progress render and immediately re-renders with the new state, instead
+  // a render time adjustment rather than in an effect: React throws away the
+  // in progress render and immediately rerenders with the new state, instead
   // of committing one pass and then cascading a second one, which is what an
   // effect calling setState synchronously does (react-hooks/set-state-in-effect).
   // The trigger is the same pair the old effect's dependency list used, the
@@ -73,7 +73,7 @@ export function ChatPanel({
     if (!socket) return;
     // Dedupe against the list itself rather than a separate ref of seen ids.
     // Returning `prev` untouched for a message already present means React
-    // bails out on the identical reference, so a duplicate costs no re-render,
+    // bails out on the identical reference, so a duplicate costs no rerender,
     // and there is no parallel bookkeeping to keep in sync when the seeded
     // history changes underneath it.
     const onRoom = (data: { roomId: string; message: ChatMessage }) => {
@@ -126,7 +126,7 @@ export function ChatPanel({
     };
   }, [socket, mode, roomId, other?.id, me.id]);
 
-  // Auto-scroll to bottom on new messages.
+  // Auto scroll to bottom on new messages.
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;

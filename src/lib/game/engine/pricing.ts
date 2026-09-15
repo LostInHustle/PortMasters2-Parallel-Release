@@ -10,8 +10,8 @@
 //
 // The explain* functions are deliberate duplicates of their calc*
 // counterparts rather than the calc* functions delegating to them. That
-// keeps the balance-critical math, ported verbatim from the original
-// single-player build, from ever having to change shape to accommodate a
+// keeps the balance critical math, ported verbatim from the original
+// single player build, from ever having to change shape to accommodate a
 // tooltip. The cost of that choice is that a balance change has to be made
 // in two places; the benefit is that a tooltip bug can never become a
 // pricing bug.
@@ -72,9 +72,9 @@ export function calcTransportCost(
   return Math.max(0, cost);
 }
 
-// A separate, display-only mirror of calcTransportCost above. Kept as its
+// A separate, display only mirror of calcTransportCost above. Kept as its
 // own function rather than having calcTransportCost delegate to it, so the
-// balance-critical "preserved verbatim" math above never has to change to
+// balance critical "preserved verbatim" math above never has to change to
 // accommodate a tooltip.
 export function explainTransportCost(
   state: GameState,
@@ -160,7 +160,7 @@ export function calcVAT(
   return 0;
 }
 
-// Display-only mirror of calcVAT above, same reasoning as
+// Display only mirror of calcVAT above, same reasoning as
 // explainTransportCost: the tooltip gets its own copy of the math instead
 // of touching the function the actual sale relies on.
 export function explainVAT(
@@ -215,8 +215,8 @@ export function calcIncomeTax(state: GameState, preTax: number): number {
 }
 
 // ---------- Market card pricing ----------
-// The same math as getCardFinalCost, but reported as a step-by-step
-// breakdown so the buying-phase tooltip can show exactly where a price
+// The same math as getCardFinalCost, but reported as a step by step
+// breakdown so the buying phase tooltip can show exactly where a price
 // came from: base cost, then whatever boon or module touched it.
 export function explainCardPrice(
   state: GameState,
@@ -340,13 +340,13 @@ export function explainExpectedPrice(
 }
 
 // ---------- Wages ----------
-// The canonical per-worker, per-round wage for a given type, given every
-// currently active modifier. There is no separate one-time "hiring fee"
+// The canonical per worker, per round wage for a given type, given every
+// currently active modifier. There is no separate one time "hiring fee"
 // in this game (see hireWorker, which never touches state.money);
 // the number this returns is what Phase 3 actually charges for that
 // worker, so every place that shows or charges a wage, this function,
 // payWages, and the Pending Payroll preview in WorkerMgmt (GamePhasePanel.tsx),
-// must all read from here rather than re-deriving the formula themselves.
+// must all read from here rather than working the formula out again themselves.
 // Root cause of the Master's Apprentice bug: payWages and that preview
 // used to hardcode WAGES[type] with only the Artisan's Workshop
 // surcharge, so hire_discount silently never reduced the actual wage

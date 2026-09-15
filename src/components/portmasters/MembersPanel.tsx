@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Socket } from "socket.io-client";
 import type { PublicUser } from "@/lib/api";
-import { useRoomRoster } from "@/lib/use-room-roster";
+import { useRoomRoster } from "@/lib/useRoomRoster";
 import { Avatar, OnlineDot, Pill } from "./shared";
 import { cn } from "@/lib/utils";
 import {
@@ -46,11 +46,11 @@ export function MembersPanel({
     initialMembers,
   );
   const [systemNotes, setSystemNotes] = useState<string[]>([]);
-  // Named viewerIsHost, not isHost, so it never shadows the per-row "is this
+  // Named viewerIsHost, not isHost, so it never shadows the per row "is this
   // row the host" check further down.
   const viewerIsHost = me.id === hostId;
 
-  // The room channel itself is joined (and re-joined on every reconnect)
+  // The room channel itself is joined (and rejoined on every reconnect)
   // from GameRoom.tsx, since that needs to happen exactly once per
   // connection regardless of which panels happen to be mounted.
   useEffect(() => {
@@ -64,7 +64,7 @@ export function MembersPanel({
       // IMPORTANT: detach the listener only. Do not emit "room:leave" here.
       // That event does exist and is genuinely used, but only from
       // handleLeave in GameRoom.tsx, for a deliberate departure. This cleanup
-      // runs on any unmount (a tab switch, a re-render under a different
+      // runs on any unmount (a tab switch, a rerender under a different
       // key), when the captain has not left at all, and dropping the channel
       // then would silently break every later room scoped event (ready votes,
       // status broadcasts, barter, aid) with no error and no recovery short

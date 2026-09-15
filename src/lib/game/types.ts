@@ -77,8 +77,8 @@ export type Worker = {
 // A loan between two captains. The same shape is used on both sides: the
 // borrower's `debts` list and the lender's `loansGiven` list each hold one
 // of these per outstanding loan, kept in sync through the aid:* socket
-// events (see src/lib/use-aid.ts) rather than any shared server record,
-// the same trust model bartering already uses for cross-player state.
+// events (see src/lib/useAid.ts) rather than any shared server record,
+// the same trust model bartering already uses for cross player state.
 export type Loan = {
   id: string;
   counterpartyId: string;
@@ -96,13 +96,13 @@ export type GameState = {
   // The room's difficulty tier (see src/lib/game/difficulty.ts), stamped onto
   // this state when the voyage is created and refreshed from the room on every
   // load, so the engine derives voyage length, market breadth, and raid odds
-  // from a single room-wide source. Every captain in a room carries their own
+  // from a single room wide source. Every captain in a room carries their own
   // copy of the same room value, which is what keeps their conclusion aligned.
   difficulty: Difficulty;
   // The room's voyage epoch (see Room.voyageEpoch in prisma/schema.prisma),
   // stamped onto this state when the voyage is created and folded into the
   // deterministic seed so a restart (which bumps the epoch) rerolls every
-  // captain's market, orders, and Broker intel into a brand-new voyage.
+  // captain's market, orders, and Broker intel into a brand new voyage.
   voyageEpoch: number;
   totalRevenue: number;
   totalCosts: number;
@@ -172,12 +172,12 @@ export type GameState = {
   // content is visible, all of which stay the host's own choice.
   tidewatchSurge: boolean;
   // The captain's persistent Renown level (see src/lib/game/legacy.ts),
-  // copied onto the voyage state so the engine can gate Renown-locked skills
+  // copied onto the voyage state so the engine can gate Renown locked skills
   // like Broker's Favor without reaching back into account data. Personal to
   // each captain, exactly like money, so it never touches the shared room
   // seed. Refreshed from the captain's legacy on every load / restart.
   renownLevel: number;
-  // Broker's Favor is a once-per-voyage skill (unlocks at Renown Level 5, see
+  // Broker's Favor is a once per voyage skill (unlocks at Renown Level 5, see
   // BROKERS_FAVOR_UNLOCK_LEVEL). Flipped true the moment it is used and reset
   // only by starting a fresh voyage (createInitialGameState / restartGame),
   // never in endRound, which is what keeps it to one use per game rather than
@@ -186,8 +186,8 @@ export type GameState = {
   equippedModules: Module[];
   // Each round's boon and module draft pools, fixed once rolled (see
   // startBoonDrafting / startModuleDrafting in engine.ts) so reopening the
-  // draft screen, backing out, or reloading the page never re-rolls them.
-  // The only way to get a new pool mid-round is the corresponding swap
+  // draft screen, backing out, or reloading the page never rerolls them.
+  // The only way to get a new pool mid round is the corresponding swap
   // action below, each capped at one use per round.
   boonChoices: Boon[];
   boonSwapUsed: boolean;
@@ -196,8 +196,8 @@ export type GameState = {
   _newModule?: Module;
   // Reset every round in startBoonDrafting, same as boonSwapUsed/
   // moduleSwapUsed above. Resolved once per round, in Phase 3, before the
-  // wages-and-maintenance settlement: either a 20% chance of losing every
-  // Gold on hand, or a guaranteed-safe escort for 10% of it.
+  // wages and maintenance settlement: either a 20% chance of losing every
+  // Gold on hand, or a guaranteed safe escort for 10% of it.
   pirateAttackResolved: boolean;
   escortHired: boolean;
   // Set when a corrupt broker leaked this captain's position (Monsoon only,
@@ -231,7 +231,7 @@ export type GameState = {
 // rather than hand written, because a hand written literal is what let charter
 // goods start life absent, and an absent key is what turned a purchase into
 // NaN (see normalizeInventory below and addOwnedAmount in ./engine).
-export function initialInventory(): Record<string, number> {
+function initialInventory(): Record<string, number> {
   const inv: Record<string, number> = {};
   for (const item of ITEMS) inv[item] = STARTING_STOCK[item] ?? 0;
   return inv;
@@ -257,7 +257,7 @@ export function normalizeInventory(raw: unknown): Record<string, number> {
   return out;
 }
 
-export function emptyWorkerRoster(): Record<WorkerTypeId, Worker[]> {
+function emptyWorkerRoster(): Record<WorkerTypeId, Worker[]> {
   return Object.fromEntries(
     WORKER_TYPE_IDS.map((id) => [id, [] as Worker[]]),
   ) as unknown as Record<WorkerTypeId, Worker[]>;
@@ -294,8 +294,8 @@ export function normalizeWorkerRoster(
 }
 
 export type GameContext = {
-  // Per-captain deterministic seed identity, "roomId:userId" (see
-  // src/lib/use-game-session.ts). Combined with the per-voyage epoch on
+  // Per captain deterministic seed identity, "roomId:userId" (see
+  // src/lib/useGameSession.ts). Combined with the per voyage epoch on
   // GameState, this gives every captain their own market, orders, and Broker
   // intel, reproducible on reload but different from every other captain and
   // rerolled whenever the host restarts the voyage.
@@ -303,7 +303,7 @@ export type GameContext = {
 };
 
 // startingGoldBonus comes from the captain's persistent Renown level (see
-// src/lib/game/legacy.ts and use-game-session.ts's START_FRESH handling)
+// src/lib/game/legacy.ts and useGameSession.ts's START_FRESH handling)
 // so a captain with a long track record starts every fresh voyage a
 // little ahead, never behind. Defaults to 0 for any caller that doesn't
 // know the captain's Renown yet, so every existing call site keeps
@@ -381,7 +381,7 @@ export function createInitialGameState(
     // actually has. An omitted key isn't one of those, so a transient
     // signal left set from the voyage just abandoned (mid module draft,
     // say) would otherwise survive the restart untouched and misread by
-    // the new voyage (startModuleDrafting treats a non-undefined
+    // the new voyage (startModuleDrafting treats a defined
     // _draftChoices as "already rolled" and skips rolling a fresh pool).
     _pendingDocksClaim: undefined,
     _draftChoices: undefined,

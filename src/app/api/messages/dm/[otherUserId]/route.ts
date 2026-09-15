@@ -1,7 +1,8 @@
 // GET /api/messages/dm/[otherUserId]: direct message history with another user
 import { NextRequest, NextResponse } from "next/server";
-import { db, PUBLIC_USER_SELECT } from "@/lib/db";
-import { getCurrentUser, publicUser } from "@/lib/api-auth";
+import { db } from "@/lib/db";
+import { getCurrentUser } from "@/lib/apiAuth";
+import { PUBLIC_USER_SELECT, publicUser } from "@/lib/publicUser";
 
 export async function GET(
   _req: NextRequest,
@@ -32,15 +33,11 @@ export async function GET(
     },
     orderBy: { createdAt: "asc" },
     take: 200,
-    include: {
-      sender: {
-        select: PUBLIC_USER_SELECT,
-      },
-    },
+    include: { sender: { select: PUBLIC_USER_SELECT } },
   });
 
   return NextResponse.json({
-    other: publicUser(other),
+    other,
     messages: msgs.map((m) => ({
       id: m.id,
       content: m.content,

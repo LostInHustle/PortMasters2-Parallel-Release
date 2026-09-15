@@ -23,8 +23,9 @@
 // up to a hundred rows on every single page load for a caller that throws
 // them away.
 import { NextResponse } from "next/server";
-import { db, PUBLIC_USER_SELECT } from "@/lib/db";
-import { getCurrentUser, publicUser } from "@/lib/api-auth";
+import { db } from "@/lib/db";
+import { getCurrentUser } from "@/lib/apiAuth";
+import { ROOM_SUMMARY_INCLUDE, roomSummary } from "@/lib/rooms";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -43,40 +44,12 @@ export async function GET() {
 
   const room = await db.room.findUnique({
     where: { id: membership.roomId },
-    include: {
-      members: {
-        include: {
-          user: {
-            select: PUBLIC_USER_SELECT,
-          },
-        },
-      },
-      host: {
-        select: PUBLIC_USER_SELECT,
-      },
-    },
+    include: ROOM_SUMMARY_INCLUDE,
   });
   // A membership row whose room is gone should not happen (the relation
   // cascades on delete), but report "no active room" rather than a 404: the
   // caller's only real question is whether to restore or show the Lobby.
   if (!room) return NextResponse.json({ room: null });
 
-  return NextResponse.json({
-    room: {
-      id: room.id,
-      code: room.code,
-      name: room.name,
-      isPublic: room.isPublic,
-      started: room.started,
-      difficulty: room.difficulty,
-      createdAt: room.createdAt,
-      host: publicUser(room.host),
-      memberCount: room.members.length,
-      members: room.members.map((m) => ({
-        ...publicUser(m.user),
-        joinedAt: m.joinedAt,
-      })),
-      isMember: true,
-    },
-  });
+  return NextResponse.json({ room: { ...roomSummary(room), isMember: true } });
 }

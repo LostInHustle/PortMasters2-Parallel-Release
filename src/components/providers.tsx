@@ -14,10 +14,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
     >
       <TooltipProvider>
         {children}
-        {/* Only direct action feedback (save confirmation, copy-code,
+        {/* Only direct action feedback (save confirmation, copy code,
             restart errors) still goes through sonner; ambient event
             notifications (ledger, chat, DMs) have their own notification
-            center now (see NotificationCenter.tsx). Bottom-right keeps
+            center now (see NotificationCenter.tsx). Bottom right keeps
             even these rare toasts away from the center game board. */}
         <SonnerToaster position="bottom-right" richColors closeButton />
       </TooltipProvider>

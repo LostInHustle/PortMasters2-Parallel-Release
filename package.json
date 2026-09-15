@@ -23,13 +23,14 @@
     "test:harbor": "tsx scripts/tests/integration.harbor.ts",
     "test:convoy": "tsx scripts/tests/integration.convoy.ts",
     "test:backing": "tsx scripts/tests/integration.backing.ts",
-    "test": "npm run test:unit && npm run test:session && npm run test:persistence && npm run test:barter && npm run test:workers && npm run test:drafting && npm run test:effects && npm run test:integration && npm run test:harbor && npm run test:convoy && npm run test:backing",
+    "test:admin": "tsx scripts/tests/unit.admin.ts",
+    "test": "npm run test:unit && npm run test:session && npm run test:persistence && npm run test:barter && npm run test:workers && npm run test:drafting && npm run test:effects && npm run test:integration && npm run test:harbor && npm run test:convoy && npm run test:backing && npm run test:admin",
     "test:e2e": "tsx scripts/tests/e2e/index.ts",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset",
-    "db:clean": "tsx scripts/reset-db.ts"
+    "db:clean": "tsx scripts/resetDb.ts"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.8.0",

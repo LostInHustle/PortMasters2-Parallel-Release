@@ -2,8 +2,13 @@
 // POST /api/rooms: create a room
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { db, PUBLIC_USER_SELECT } from "@/lib/db";
-import { getCurrentUser, generateRoomCode, publicUser } from "@/lib/api-auth";
+import { db } from "@/lib/db";
+import { getCurrentUser } from "@/lib/apiAuth";
+import {
+  generateRoomCode,
+  ROOM_SUMMARY_INCLUDE,
+  roomSummary,
+} from "@/lib/rooms";
 import { normalizeRoomName } from "@/lib/utils";
 import { normalizeDifficulty } from "@/lib/game/difficulty";
 
@@ -14,48 +19,18 @@ export async function GET() {
 
   const rooms = await db.room.findMany({
     where: { isPublic: true },
-    include: {
-      members: {
-        include: {
-          user: {
-            select: PUBLIC_USER_SELECT,
-          },
-        },
-      },
-      host: {
-        select: PUBLIC_USER_SELECT,
-      },
-    },
+    include: ROOM_SUMMARY_INCLUDE,
     orderBy: { createdAt: "desc" },
     take: 50,
   });
 
-  return NextResponse.json({
-    rooms: rooms.map((r) => ({
-      id: r.id,
-      code: r.code,
-      name: r.name,
-      isPublic: r.isPublic,
-      started: r.started,
-      difficulty: r.difficulty,
-      createdAt: r.createdAt,
-      host: publicUser(r.host),
-      memberCount: r.members.length,
-      members: r.members.map((m) => ({
-        ...publicUser(m.user),
-        joinedAt: m.joinedAt,
-      })),
-    })),
-  });
+  return NextResponse.json({ rooms: rooms.map(roomSummary) });
 }
 
 const CreateSchema = z.object({
   name: z.string().min(1).max(40),
   isPublic: z.boolean().optional().default(true),
-  // Optional so existing callers keep working; any unknown value is coerced to
-  // the entry tier by normalizeDifficulty below. Phase A only ever sends the
-  // default, but the field is accepted now so the lobby switch (a later phase)
-  // needs no route change.
+  // Any unknown value is coerced to the entry tier by normalizeDifficulty.
   difficulty: z.string().optional(),
 });
 
@@ -78,47 +53,18 @@ export async function POST(req: NextRequest) {
     );
   }
   const { name, isPublic } = parsed.data;
-  const difficulty = normalizeDifficulty(parsed.data.difficulty);
 
-  // Ensure host isn't already in another room as host of a duplicate; allow multiple.
   const room = await db.room.create({
     data: {
       code: generateRoomCode(),
       name: normalizeRoomName(name),
       hostId: user.id,
       isPublic,
-      difficulty,
+      difficulty: normalizeDifficulty(parsed.data.difficulty),
       members: { create: [{ userId: user.id }] },
     },
-    include: {
-      members: {
-        include: {
-          user: {
-            select: PUBLIC_USER_SELECT,
-          },
-        },
-      },
-      host: {
-        select: PUBLIC_USER_SELECT,
-      },
-    },
+    include: ROOM_SUMMARY_INCLUDE,
   });
 
-  return NextResponse.json({
-    room: {
-      id: room.id,
-      code: room.code,
-      name: room.name,
-      isPublic: room.isPublic,
-      started: room.started,
-      difficulty: room.difficulty,
-      createdAt: room.createdAt,
-      host: publicUser(room.host),
-      memberCount: room.members.length,
-      members: room.members.map((m) => ({
-        ...publicUser(m.user),
-        joinedAt: m.joinedAt,
-      })),
-    },
-  });
+  return NextResponse.json({ room: roomSummary(room) });
 }

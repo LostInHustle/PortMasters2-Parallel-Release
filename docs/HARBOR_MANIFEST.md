@@ -101,7 +101,7 @@ New mechanism. Effort: moderate. **Shipped.**
 
 **Why this fits.** The sibling codebase this game gets compared against has no lending system at all, so there was never anything there to react to. This grows directly out of loan history this project already records and has not yet made socially meaningful.
 
-**System notes.** One additional small record splitting an existing debt entry between two lenders, built on top of the `aid:*` socket events already wired in `src/server/realtime.ts` and `src/lib/use-aid.ts`.
+**System notes.** One additional small record splitting an existing debt entry between two lenders, built on top of the `aid:*` socket events already wired in `src/server/realtime.ts` and `src/lib/useAid.ts`.
 
 ### 06. Partial Sight
 
@@ -231,7 +231,7 @@ New mechanism. Effort: light. **Shipped.**
 
 **Why this fits.** This is a plain gap in this project's own social surface, not a reaction to anything in the sibling codebase. A game whose entire pitch is a small group of real people talking to each other in real time needs some way to handle one disruptive person that costs less than resetting everyone else's progress, and today it has none.
 
-**System notes.** Built as a per-room `Set<userId>` in memory (`roomMutedUsers`), not a schema column: a mute only ever lasts "for the remainder of the voyage," and every other per-voyage-only flag in this file (`roomSurges`, `roomDocksWinners`, and so on) already follows that same in-memory, cleared-on-restart convention. Checked by `chat:room` in `src/server/realtime.ts` before a message is even persisted, host only, gated the same way `room:restart` already is. The muted set rides along on the existing `room:members` broadcast as `mutedUserIds` rather than a new event, so the roster, the host's own mute control, and the muted captain's own client all learn about a change from the one broadcast every client already listens to.
+**System notes.** Built as a per room `Set<userId>` in memory (`roomMutedUsers`), not a schema column: a mute only ever lasts "for the remainder of the voyage," and every other flag that lasts only one voyage in this file (`roomSurges`, `roomDocksWinners`, and so on) already follows that same in memory convention of clearing on restart. Checked by `chat:room` in `src/server/realtime.ts` before a message is even persisted, host only, gated the same way `room:restart` already is. The muted set rides along on the existing `room:members` broadcast as `mutedUserIds` rather than a new event, so the roster, the host's own mute control, and the muted captain's own client all learn about a change from the one broadcast every client already listens to.
 
 ## V. Getting more captains to the table
 
@@ -261,7 +261,7 @@ New mechanism. Effort: light. **Shipped.**
 
 **Why this fits.** It is a small, self contained fix to a specific, confirmed detail already sitting in the constants file, the kind of basic accessibility care that costs very little and excludes nobody who does not choose to use it.
 
-**System notes.** Built as `COLORS_COLORBLIND_SAFE` in `src/lib/game/constants.ts`, shaped exactly like the existing `COLORS` constant, anchored on the Okabe and Ito palette so every hue stays distinguishable under the common forms of color vision deficiency, separated by lightness and saturation as well as hue rather than hue alone. `useColorPreference` in `src/lib/use-color-preference.ts` reads and writes the choice to `localStorage`, matching how the onboarding tutorial's own seen flag already persists; a `colorFor` function it returns threads down as an optional prop through every panel that colors a good's name (`GameStatusPanel`, `PlayerDetailModal`, and the Purchase, Barter, Worker, and Orders phase panels), falling back to the plain `COLORS` lookup for any caller that does not pass it. No engine or database change, exactly as proposed.
+**System notes.** Built as `COLORS_COLORBLIND_SAFE` in `src/lib/game/constants.ts`, shaped exactly like the existing `COLORS` constant, anchored on the Okabe and Ito palette so every hue stays distinguishable under the common forms of color vision deficiency, separated by lightness and saturation as well as hue rather than hue alone. `useColorPreference` in `src/lib/useColorPreference.ts` reads and writes the choice to `localStorage`, matching how the onboarding tutorial's own seen flag already persists; a `colorFor` function it returns threads down as an optional prop through every panel that colors a good's name (`GameStatusPanel`, `PlayerDetailModal`, and the Purchase, Barter, Worker, and Orders phase panels), falling back to the plain `COLORS` lookup for any caller that does not pass it. No engine or database change, exactly as proposed.
 
 ### 17. Quick Start Match
 
@@ -287,11 +287,11 @@ New interface. Effort: light. **Shipped**, with a correction below to what "the 
 
 **The situation today, corrected.** By the time this entry was actually picked up, `MembersPanel.tsx` had already grown a live, always visible roster row per captain (round, phase, gold, Reputation, no click required), built from the same `game:status` broadcast this entry's original proposal assumed was still locked behind a one captain, one click, one modal design. That earlier claim, checked directly against the source rather than assumed, did not hold up. What the roster panel does not solve is layout: it sits in the right column of the three column desktop grid, and on any screen under the `lg` breakpoint it stacks to the very bottom of the page, behind the phase panel, so a captain on a phone has to scroll past everything else to see it.
 
-**What we actually add.** A second, genuinely distinct component: a slim horizontal strip mounted directly under the header, full width, on every screen size, so the whole harbor's headline numbers are visible without scrolling past anything, on desktop and mobile alike. It does not replace the roster panel, which still owns the fuller per-captain view, the click through to the detail popup, and now the Harbor Watch mute control too; it exists specifically to close the mobile-layout gap the roster panel's own stacking order left open.
+**What we actually add.** A second, genuinely distinct component: a slim horizontal strip mounted directly under the header, full width, on every screen size, so the whole harbor's headline numbers are visible without scrolling past anything, on desktop and mobile alike. It does not replace the roster panel, which still owns the fuller view of each captain, the click through to the detail popup, and now the Harbor Watch mute control too; it exists specifically to close the gap in the mobile layout the roster panel's own stacking order left open.
 
 **Why this fits.** It still asks for no new server data. The server already computes and sends everything this needs over `game:status`, exactly as originally proposed; only the actual gap being closed changed, from "there is no glance view at all" to "the glance view that already exists is not always on screen."
 
-**System notes.** `src/components/portmasters/FleetTicker.tsx`, a new component with its own self-contained `room:members`/`game:status` subscription, the same pattern `MembersPanel.tsx` already uses rather than threading a second copy of that state down from `GameRoom.tsx`. No server change required at all.
+**System notes.** `src/components/portmasters/FleetTicker.tsx`, a new component with its own self contained `room:members`/`game:status` subscription, the same pattern `MembersPanel.tsx` already uses rather than threading a second copy of that state down from `GameRoom.tsx`. No server change required at all.
 
 ## Suggested order of work
 

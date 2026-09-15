@@ -312,11 +312,11 @@ Five surgical edits, all reading `state.difficulty`:
 
 Determinism note: card _counts_ are a pure function of (difficulty, round), which are identical for every captain in the room, so the per captain seeded draw still produces each captain's own market while the _structure_ stays consistent room wide. The mandate order and any guaranteed intel order continue to be appended with the captain's own local randomness, exactly as the existing Broker's Favor and Whisper guarantees already are, so they never perturb the shared seed.
 
-### 4.5 Session bootstrap: `src/lib/use-game-session.ts` and `src/lib/use-phase-sync.ts`
+### 4.5 Session bootstrap: `src/lib/useGameSession.ts` and `src/lib/usePhaseSync.ts`
 
 - The `GET /api/game/state` route already returns a `checkpoint` for a fresh captain; add `difficulty` to that payload (Section 4.6) and, importantly, return it even when a saved state exists, so a load can refresh `state.difficulty` from the room the same way it already refreshes `renownLevel`. This guards against a stale difficulty on a save that predates a restart which changed it.
 - `START_FRESH` and the `INIT` path pass the room difficulty into `createInitialGameState`.
-- `use-phase-sync.ts` `onRestarted` passes the room difficulty into `restartGame` (the server already sends `voyageEpoch` on `room:restarted`; add `difficulty` to that broadcast).
+- `usePhaseSync.ts` `onRestarted` passes the room difficulty into `restartGame` (the server already sends `voyageEpoch` on `room:restarted`; add `difficulty` to that broadcast).
 
 ### 4.6 API routes
 
@@ -351,7 +351,7 @@ Determinism note: card _counts_ are a pure function of (difficulty, round), whic
 
 The plumbing is separable from the balance, so we ship in de risked slices. Each phase is independently shippable and reversible.
 
-**Phase A: framework and rename (zero gameplay change). Implemented.** Introduce `difficulty.ts`, the schema migration, and thread `difficulty` through every touch point in Section 4, but ship only Fair Winds with today's exact values under its new name. Every existing room defaults to Fair Winds. This proves the plumbing (room property, per captain threading, UI chip, conclusion multiplier of 1.0) with no balance surface at all. Fully backward compatible, and verified: Fair Winds resolves to the pre-difficulty constants exactly.
+**Phase A: framework and rename (zero gameplay change). Implemented.** Introduce `difficulty.ts`, the schema migration, and thread `difficulty` through every touch point in Section 4, but ship only Fair Winds with today's exact values under its new name. Every existing room defaults to Fair Winds. This proves the plumbing (room property, per captain threading, UI chip, conclusion multiplier of 1.0) with no balance surface at all. Fully backward compatible, and verified: Fair Winds resolves exactly to the constants from before difficulty tiers existed.
 
 **Phase B: Open Waters. Implemented.** Turn on the 12 round tier: charter growth to 8 then 10 cards, the pirate step up, higher escort cost, mandates on rounds 4, 8, and 12, and the 1.25 Renown multiplier, plus the host only lobby switch that makes a tier selectable at all. Still to do: playtest with two to four captains and tune the mandate rewards and the second half pirate chance.
 
@@ -422,8 +422,8 @@ All five product questions are resolved.
 | `src/app/api/rooms/route.ts`                                                | Create schema, persist, and list difficulty.                                                       |
 | `src/app/api/rooms/[id]/route.ts`, join routes                              | Return difficulty.                                                                                 |
 | `src/app/api/game/state/route.ts`                                           | Return `difficulty` in checkpoint and alongside a saved state.                                     |
-| `src/lib/use-game-session.ts`                                               | Thread difficulty into fresh and restored state.                                                   |
-| `src/lib/use-phase-sync.ts`                                                 | Thread difficulty into `restartGame` on `room:restarted`.                                          |
+| `src/lib/useGameSession.ts`                                                 | Thread difficulty into fresh and restored state.                                                   |
+| `src/lib/usePhaseSync.ts`                                                   | Thread difficulty into `restartGame` on `room:restarted`.                                          |
 | `src/server/realtime.ts`                                                    | Carry difficulty in room payloads; apply Renown multiplier and difficulty merits at conclusion.    |
 | `src/components/portmasters/Lobby.tsx`                                      | Difficulty selector at creation; badge in room list.                                               |
 | `src/components/portmasters/game/GameStatusPanel.tsx`, `GamePhasePanel.tsx` | Difficulty chip.                                                                                   |

@@ -1,8 +1,8 @@
 // =====================================================================
-// Minimal assert-based test harness for the game-logic test scripts in
+// Minimal assert based test harness for the game logic test scripts in
 // this directory. No framework dependency (jest/vitest aren't installed
 // in this project), just enough structure to group assertions, report
-// failures with context, and exit non-zero on the first regression a CI
+// failures with context, and exit nonzero on the first regression a CI
 // or a developer needs to notice.
 // =====================================================================
 

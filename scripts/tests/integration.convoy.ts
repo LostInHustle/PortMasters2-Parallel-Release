@@ -1,13 +1,13 @@
 // =====================================================================
 // Integration test: Convoy Ventures (Manifest 04), merged as its own
-// commit after the three room-wide harbor systems in integration.harbor.ts.
+// commit after the three room wide harbor systems in integration.harbor.ts.
 //
 // This feature's server side (src/server/realtime.ts) went through three
 // real bugs before this suite existed: an infinite Gold duplication
 // exploit (two captains could fund the same venture repeatedly, each fill
 // paying out more than was put in with nothing offsetting it), a deadline
 // that could land on or past a voyage's own final round, handing out Gold
-// with no round left to spend it, and a solo self-fulfillment exploit (one
+// with no round left to spend it, and a solo self fulfillment exploit (one
 // captain alone could post a venture and instantly fund the whole target
 // themselves, printing Gold and burning the room's one shared chance for
 // personal gain instead of the room's). All three fixes live in the pure
@@ -79,7 +79,7 @@ test("malformed input degrades to an empty map instead of throwing", () => {
     assertEqual(
       ventureTotal(parsed),
       0,
-      `malformed input "${raw}" should parse to an empty, zero-total map`,
+      `malformed input "${raw}" should parse to an empty, zero total map`,
     );
   }
 });
@@ -127,8 +127,8 @@ test("a venture already at or past target accepts nothing further", () => {
 });
 
 // ---------- computeAcceptedContribution: the per contributor share cap ----------
-// [MANIFEST 04 fix] The solo self-fulfillment fix: reported after the
-// repeat-fill exploit was closed, a single captain could still post a
+// [MANIFEST 04 fix] The solo self fulfillment fix: reported after the
+// repeat fill exploit was closed, a single captain could still post a
 // venture and instantly fund the entire target alone, printing Gold and
 // burning the room's one shared chance for personal gain. Isolated from
 // the overflow cap above by passing a very large targetGold headroom, so
@@ -312,7 +312,7 @@ test("a solo funded fill is now impossible end to end: the per contributor cap a
   assertEqual(
     acceptedA,
     capA,
-    "A's own contribution is held exactly at the per-contributor cap, not the full target",
+    "A's own contribution is held exactly at the per contributor cap, not the full target",
   );
   const contributions: VentureContributions = {
     a: { name: "A", amount: acceptedA },
@@ -337,7 +337,7 @@ test("a solo funded fill is now impossible end to end: the per contributor cap a
   );
 });
 
-// ---------- computeVentureDeadlineBounds: the final-round fix ----------
+// ---------- computeVentureDeadlineBounds: the final round fix ----------
 suite(
   "Convoy Ventures: a deadline can never land on, or past, the voyage's own final round",
 );
@@ -407,7 +407,7 @@ test("well before a voyage's end, the cap is simply the flat CONVOY_VENTURE_MAX_
   assertEqual(
     bounds!.maxRound,
     1 + CONVOY_VENTURE_MAX_ROUNDS_AHEAD,
-    "far from the voyage's end, the ordinary rounds-ahead window applies unmodified",
+    "far from the voyage's end, the ordinary rounds ahead window applies unmodified",
   );
 });
 

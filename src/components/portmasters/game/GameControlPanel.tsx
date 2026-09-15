@@ -51,7 +51,7 @@ export function GameControlPanel({
     startDisabled = true;
     nextDisabled = true;
   } else if (game.phase === 0) {
-    // Starting the voyage is a one-shot host action, not a per-player
+    // Starting the voyage is a one shot host action, not a per player
     // ready vote, so there's no "waiting" state for this button. It's
     // either disabled (not host, or not enough captains yet) or armed.
     if (!isHost) {
@@ -80,7 +80,7 @@ export function GameControlPanel({
     nextDisabled = true;
   }
 
-  // The ready-vote "waiting" state only ever applies to the recurring
+  // The ready vote "waiting" state only ever applies to the recurring
   // Next Phase transitions (phase 0's Start Game is handled above on its
   // own terms), so it always routes to that button.
   if (waiting) {

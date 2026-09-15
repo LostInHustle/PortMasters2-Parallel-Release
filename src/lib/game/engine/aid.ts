@@ -1,11 +1,11 @@
 // =====================================================================
 // Loans between captains: the local Gold and ledger half of each step.
 //
-// A loan is real cross-player state, the same category of problem as a
+// A loan is real cross player state, the same category of problem as a
 // barter trade. Both sides need to agree it happened, but neither side's
 // Gold total is the server's to know, so posting a request and finding a
 // captain to help happen over the aid:* socket events
-// (src/server/realtime.ts, src/lib/use-aid.ts) while the functions here
+// (src/server/realtime.ts, src/lib/useAid.ts) while the functions here
 // only move the money on whichever client they run on.
 //
 // grantHelperReputation lives here rather than in ./backingState because
@@ -93,9 +93,9 @@ export function grantLoan(
   }
 }
 
-// Voluntary, captain-initiated repayment. The caller (GameRoom.tsx) reads
+// Voluntary, captain initiated repayment. The caller (GameRoom.tsx) reads
 // the debt's amount and lender from state.debts before calling this, the
-// same already-known-values pattern the Bartering panel uses for posting
+// same already known values pattern the Bartering panel uses for posting
 // an offer, so it can relay the matching aid:repay itself right after.
 export function repayLoan(state: GameState, debtId: string, logs: string[]) {
   const debt = state.debts.find((d) => d.id === debtId);
@@ -146,7 +146,7 @@ export function clearRedirectedLoan(
 // before: any loan a captain hasn't already repaid by then gets forced
 // through, paying whatever can be covered. Falling short of the full
 // amount owed is what flags defaultedDebt for the endgame screen, rather
-// than bankrupting mid-voyage, since by this point the voyage is ending
+// than bankrupting mid voyage, since by this point the voyage is ending
 // for everyone regardless.
 export function settleOutstandingDebts(state: GameState, logs: string[]) {
   if (!state.debts.length) return;

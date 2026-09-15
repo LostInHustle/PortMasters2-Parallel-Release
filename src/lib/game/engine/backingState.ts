@@ -1,5 +1,5 @@
 // =====================================================================
-// [MANIFEST 05: Backing] The client-side Gold effects of backing another
+// [MANIFEST 05: Backing] The client side Gold effects of backing another
 // captain's loan. The resolution math itself (how much of a pledge is
 // actually called on versus returned) is pure and already lives in
 // ../backing.ts; this file is only the part that moves money on whichever

@@ -13,7 +13,7 @@
 //
 // genRawOrder, genProductOrder and genMixedOrder are exported rather than
 // private because Phase 2 (./orders) draws the trade board with the same
-// generators. They were file-private before the split purely because
+// generators. They were file private before the split purely because
 // everything lived in one file.
 // =====================================================================
 import {
@@ -30,7 +30,7 @@ import {
   unlockedResourceDraw,
   unlockedResources,
 } from "../pools";
-import { createRng, pick, randInt, weightedPick, type Rng } from "../rng";
+import { createRng, pick, randInt, type Rng } from "../rng";
 import type { GameContext, GameState, OrderCard, ResourceCard } from "../types";
 import { addOwnedAmount } from "./core";
 import { getCardFinalCost } from "./pricing";
@@ -129,7 +129,7 @@ export function genProductOrder(
 // that captain's own purchase history. orderRng below is a fixed
 // deterministic stream (seeded per captain and per voyage, see the file
 // header), so letting the draw depend on mutable intel state made a
-// captain's own orders non-reproducible: regenerating the draw after a
+// captain's own orders unreproducible: regenerating the draw after a
 // reload, with different intel state, silently shifted every order after
 // the one the intel touched. See startPhase2 for where the intel guarantee
 // happens now: entirely after, and independent of, this draw.
@@ -179,7 +179,7 @@ function genProductPurchaseCard(
 // this round, e.g. { Silk: 0.08 } meaning Silk runs 8% pricier this round
 // because the room leaned into it last round. Optional and defaulted to an
 // empty object so every existing call site (and every test of the
-// preserved-verbatim economy) keeps producing identical prices when no
+// preserved verbatim economy) keeps producing identical prices when no
 // pulse is in play, which is always true on round 1.
 function genResourceCard(
   rng: Rng,
@@ -221,11 +221,11 @@ function genResourceCard(
 
 // [MANIFEST 01: The Harbor Pulse] What this captain bought this Phase 1,
 // summed by raw resource only (Hemp, Silk, Tea), the same set genResourceCard
-// prices. Finished-product purchase cards (genProductPurchaseCard) don't
+// prices. Finished product purchase cards (genProductPurchaseCard) don't
 // count, the pulse is about the harbor leaning into a raw good, not about who
 // bought a finished Sachet. Read once, right before completePhase1 clears
 // purchasedCards/resourceCards, and relayed to the server (see
-// src/lib/use-phase-sync.ts) so it can fold this captain's draw into the
+// src/lib/usePhaseSync.ts) so it can fold this captain's draw into the
 // room wide tally the next round's pulse is built from.
 export function tallyPurchasesByResource(
   state: GameState,
@@ -246,8 +246,8 @@ export function tallyPurchasesByResource(
 // computed for this round onto local state, so genResourceCard picks it up
 // the moment startPhase1 runs below. A plain setter kept as its own function,
 // the same convention purchaseIntel/receiveLoan/etc already follow, so the
-// client's phase-advance handler can call it through the same act() dispatch
-// as every other socket-driven state change.
+// client's phase advance handler can call it through the same act() dispatch
+// as every other socket driven state change.
 export function applyHarborPulse(
   state: GameState,
   pulse: Record<string, number>,
@@ -259,7 +259,7 @@ export function applyHarborPulse(
 // instant the server confirms the combined Reputation threshold was crossed
 // (see the game:status handler in src/server/realtime.ts). A one direction
 // flip: nothing in this codebase ever sets tidewatchSurge back to false
-// mid-voyage, and a fresh voyage already resets it through
+// mid voyage, and a fresh voyage already resets it through
 // createInitialGameState. Logged once here, at the moment it happens,
 // rather than every round afterward in startPhase1.
 export function applyTidewatchSurge(state: GameState, logs: string[]) {
