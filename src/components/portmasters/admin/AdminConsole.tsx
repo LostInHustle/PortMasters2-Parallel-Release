@@ -44,7 +44,9 @@ export function AdminConsole({
   me: SelfUser;
   onSignOut: () => void;
   // Called if the server says this account no longer holds a staff role,
-  // which happens when someone else presents the key and takes the seat.
+  // which happens to a moderator the admin dismissed while their console
+  // was still open. The admin seat itself never moves, so it never fires
+  // for the admin.
   onRoleChanged: (role: Role) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -57,8 +59,9 @@ export function AdminConsole({
   const [loadingLog, setLoadingLog] = useState(true);
   const [pending, setPending] = useState<PendingAction | null>(null);
 
-  // A 403 from any console route means the seat moved out from under this
-  // account; re-ask the server rather than guessing from the message.
+  // A 403 from any console route means this account's authority changed
+  // while the console was open; ask the server rather than guessing from
+  // the message.
   const recheckRole = useCallback(async () => {
     try {
       const status = await api.admin.status();

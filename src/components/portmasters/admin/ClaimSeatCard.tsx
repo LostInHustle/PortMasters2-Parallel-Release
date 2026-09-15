@@ -10,17 +10,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar } from "../shared";
 
-// The form an ordinary player sees at /admin: present the admin key and
-// the account becomes the one admin. Moderators never see this, since a
-// moderator badge is handed out from the console by the admin, not
-// claimed with a key.
+// What an ordinary player sees at /admin. While nobody holds the seat, it
+// is the form for presenting the admin key; once someone does, it is a
+// closed door, because the seat is claimed exactly once and the key never
+// moves it. Moderators never see this at all, since a moderator badge is
+// handed out from the console by the admin, not claimed with a key.
 export function ClaimSeatCard({
   me,
   configured,
+  seatTaken,
   onClaimed,
 }: {
   me: SelfUser;
   configured: boolean;
+  seatTaken: boolean;
   onClaimed: () => void;
 }) {
   const [key, setKey] = useState("");
@@ -33,11 +36,9 @@ export function ClaimSeatCard({
     setBusy(true);
     setError(null);
     try {
-      const { previousAdmin } = await api.admin.claim(key.trim());
+      await api.admin.claim(key.trim());
       toast.success("The admin seat is yours", {
-        description: previousAdmin
-          ? `${previousAdmin} has stepped down to an ordinary captain.`
-          : "You are the first admin of this harbor.",
+        description: "You are this harbor's one admin, from now on.",
       });
       setKey("");
       onClaimed();
@@ -75,7 +76,19 @@ export function ClaimSeatCard({
         </div>
       </div>
 
-      {configured ? (
+      {!configured ? (
+        <div className="rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-800 dark:text-amber-200 text-sm px-3.5 py-3 leading-relaxed">
+          This server has no admin key configured, so the office is closed. Set{" "}
+          <code className="font-mono text-xs">ADMIN_KEY</code> in the server
+          environment and restart it to open the door.
+        </div>
+      ) : seatTaken ? (
+        <div className="rounded-xl bg-black/[0.03] dark:bg-white/[0.04] text-sm text-muted-foreground px-3.5 py-3 leading-relaxed">
+          This harbor already has its admin, and the seat never changes hands.
+          Moderators are appointed by the admin from inside the office, so if
+          you need a badge, ask them.
+        </div>
+      ) : (
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-1.5">
             <Label className="text-sm font-medium">Admin key</Label>
@@ -92,9 +105,9 @@ export function ClaimSeatCard({
               />
             </div>
             <p className="text-[11px] text-muted-foreground leading-relaxed">
-              Whoever presents the key holds the admin seat. If another account
-              holds it today, it moves to this one and they go back to being an
-              ordinary captain.
+              The first account to present the key becomes this harbor's one
+              admin, for good. The seat never moves afterwards, so present it
+              from the account you mean to keep.
             </p>
           </div>
           {error && (
@@ -116,12 +129,6 @@ export function ClaimSeatCard({
             )}
           </Button>
         </form>
-      ) : (
-        <div className="rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-800 dark:text-amber-200 text-sm px-3.5 py-3 leading-relaxed">
-          This server has no admin key configured, so the office is closed. Set{" "}
-          <code className="font-mono text-xs">ADMIN_KEY</code> in the server
-          environment and restart it to open the door.
-        </div>
       )}
     </motion.div>
   );

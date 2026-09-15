@@ -37,13 +37,13 @@ model User {
   updatedAt    DateTime @updatedAt
 
   // "player", "moderator" or "admin" (see src/lib/admin/rules.ts). There is
-  // only ever one admin: the account that most recently presented the
-  // ADMIN_KEY from the server environment at POST /api/admin/claim, which
-  // demotes whoever held the seat before. Moderators are appointed by the
-  // admin from the console and can ban and unban players; only the admin
-  // can delete an account or change anyone's role. A plain string rather
-  // than an enum because SQLite has no enum type and the set is checked in
-  // code anyway.
+  // only ever one admin: the first account to present the ADMIN_KEY from
+  // the server environment at POST /api/admin/claim, and the seat never
+  // moves afterwards, not even for the same key (see claimAdminSeat in
+  // src/lib/admin/actions.ts). Moderators are appointed by the admin from
+  // the console and can ban and unban players; only the admin can delete
+  // an account or change anyone's role. A plain string rather than an enum
+  // because SQLite has no enum type and the set is checked in code anyway.
   role String @default("player")
 
   // Set while the account is banned, cleared on unban. A banned captain

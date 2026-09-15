@@ -18,7 +18,7 @@ import { ClaimSeatCard } from "@/components/portmasters/admin/ClaimSeatCard";
 type View =
   | { kind: "loading" }
   | { kind: "signedOut" }
-  | { kind: "claim"; me: SelfUser; configured: boolean }
+  | { kind: "claim"; me: SelfUser; configured: boolean; seatTaken: boolean }
   | { kind: "console"; me: SelfUser };
 
 export default function AdminPage() {
@@ -36,7 +36,12 @@ export default function AdminPage() {
       setView(
         isStaff(me.role)
           ? { kind: "console", me }
-          : { kind: "claim", me, configured: status.configured },
+          : {
+              kind: "claim",
+              me,
+              configured: status.configured,
+              seatTaken: status.seatTaken,
+            },
       );
     } catch {
       setView({ kind: "signedOut" });
@@ -50,12 +55,22 @@ export default function AdminPage() {
     return () => clearTimeout(t);
   }, [load]);
 
+  // A role can only ever move in two directions from here: a player who
+  // just claimed the empty seat becomes the admin, and a moderator who was
+  // dismissed while the console was open becomes a player again. In the
+  // second case the seat is necessarily still taken, so the claim view is
+  // a closed door rather than a form.
   const onRoleChanged = useCallback((role: Role) => {
     setView((v) =>
       v.kind === "claim" || v.kind === "console"
         ? isStaff(role)
           ? { kind: "console", me: { ...v.me, role } }
-          : { kind: "claim", me: { ...v.me, role }, configured: true }
+          : {
+              kind: "claim",
+              me: { ...v.me, role },
+              configured: true,
+              seatTaken: true,
+            }
         : v,
     );
   }, []);
@@ -95,6 +110,7 @@ export default function AdminPage() {
           <ClaimSeatCard
             me={view.me}
             configured={view.configured}
+            seatTaken={view.seatTaken}
             onClaimed={() => onRoleChanged("admin")}
           />
           <p className="text-center text-xs text-muted-foreground">

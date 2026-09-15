@@ -151,12 +151,11 @@ export const api = {
   // Admin console (see src/lib/admin and the README's admin section).
   admin: {
     status: () =>
-      jfetch<{ role: Role; configured: boolean }>("/api/admin/status"),
-    claim: (key: string) =>
-      post<{ role: "admin"; previousAdmin: string | null }>(
-        "/api/admin/claim",
-        { key },
+      jfetch<{ role: Role; configured: boolean; seatTaken: boolean }>(
+        "/api/admin/status",
       ),
+    claim: (key: string) =>
+      post<{ role: "admin" }>("/api/admin/claim", { key }),
     players: (query: string, page: number) =>
       jfetch<{ players: AdminPlayer[]; total: number; page: number }>(
         `/api/admin/players?q=${encodeURIComponent(query)}&page=${page}`,

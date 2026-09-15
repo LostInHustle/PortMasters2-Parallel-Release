@@ -109,33 +109,39 @@ export async function listModerationLog(
 
 // ---------- Claiming the seat ----------
 
-// Whoever holds the key holds the seat. Presenting it from a new account
-// moves the seat there and returns the previous holder to an ordinary
-// player, which is the fail safe choice: the usual reason to move the
-// seat is that the old account is lost or no longer trusted, and the new
-// admin can hand back a moderator badge with one click if they want to.
+export async function adminSeatTaken(): Promise<boolean> {
+  const holder = await db.user.findFirst({
+    where: { role: "admin" },
+    select: { id: true },
+  });
+  return holder !== null;
+}
+
+// The seat is claimed once and then never again. The first account to
+// present the key becomes the one admin for good; from then on the key
+// opens nothing, not for another account and not a second time for the
+// admin themselves. There is no handover through the key by design: if the
+// admin account is ever lost, an operator clears the role in the database
+// by hand (see the README), and only then does the key work once more.
+//
+// A single UPDATE rather than a read followed by a write, so two accounts
+// presenting the key in the same instant cannot both pass a "nobody holds
+// it yet" check that each ran before the other wrote. SQLite applies the
+// statement atomically: the subquery and the write see the same state, so
+// exactly one of them changes a row.
 export async function claimAdminSeat(claimant: {
   id: string;
   displayName: string;
-}): Promise<{ previousAdmin: { id: string; displayName: string } | null }> {
-  const previous = await db.user.findFirst({
-    where: { role: "admin", NOT: { id: claimant.id } },
-    select: { id: true, displayName: true },
-  });
-  await db.$transaction([
-    db.user.updateMany({
-      where: { role: "admin", NOT: { id: claimant.id } },
-      data: { role: "player" },
-    }),
-    db.user.update({ where: { id: claimant.id }, data: { role: "admin" } }),
-  ]);
-  await record(
-    claimant,
-    "claim",
-    claimant,
-    previous ? `took the seat over from ${previous.displayName}` : undefined,
-  );
-  return { previousAdmin: previous };
+}): Promise<"claimed" | "taken"> {
+  const changed = await db.$executeRaw`
+    UPDATE "User"
+    SET "role" = 'admin'
+    WHERE "id" = ${claimant.id}
+      AND "role" <> 'admin'
+      AND NOT EXISTS (SELECT 1 FROM "User" WHERE "role" = 'admin')`;
+  if (changed === 0) return "taken";
+  await record(claimant, "claim", claimant);
+  return "claimed";
 }
 
 // ---------- Reading players ----------

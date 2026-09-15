@@ -12,7 +12,7 @@ import { TestClient, statusOf, uniqueUsername } from "../api";
 import { openAuthedPage } from "../browser";
 import { E2E_ADMIN_KEY } from "../server";
 
-type Status = { role: string; configured: boolean };
+type Status = { role: string; configured: boolean; seatTaken: boolean };
 type Roster = {
   players: {
     id: string;
@@ -29,22 +29,26 @@ type Log = {
 export async function run(baseUrl: string): Promise<void> {
   suite("E2E: the admin console");
 
-  const admin = new TestClient(baseUrl);
-  const mod = new TestClient(baseUrl);
+  // `admin` and `mod` are the two accounts that race for the seat below;
+  // whichever wins is the admin for the rest of the scenario, so both are
+  // reassignable and the log assertions read names off the clients.
+  let admin = new TestClient(baseUrl);
+  let mod = new TestClient(baseUrl);
   const player = new TestClient(baseUrl);
-  const adminName = uniqueUsername("adm");
-  const modName = uniqueUsername("mod");
+  let adminName = uniqueUsername("adm");
+  let modName = uniqueUsername("mod");
   const playerName = uniqueUsername("ply");
   await admin.register(adminName, "testpass123", "Harbor Master");
   await mod.register(modName, "testpass123", "Dockmaster");
   await player.register(playerName, "testpass123", "Deckhand");
-  const modId = mod.user!.id;
+  let modId = mod.user!.id;
   const playerId = player.user!.id;
 
   await test("a fresh account sees the claim form, not the console", async () => {
     const status = await admin.get<Status>("/api/admin/status");
     assertEqual(status.role, "player", "role before claiming");
     assert(status.configured, "the test server carries an ADMIN_KEY");
+    assert(!status.seatTaken, "nobody holds the seat on a fresh database");
     assertEqual(
       await statusOf(admin.get("/api/admin/players")),
       403,
@@ -52,37 +56,60 @@ export async function run(baseUrl: string): Promise<void> {
     );
   });
 
-  await test("the wrong key is refused and the right key takes the seat", async () => {
+  await test("the wrong key is refused, and the seat goes to exactly one of two accounts presenting the right key at the same instant", async () => {
     assertEqual(
       await statusOf(admin.post("/api/admin/claim", { key: "not it" })),
       403,
       "wrong key",
     );
-    const claimed = await admin.post<{
-      role: string;
-      previousAdmin: string | null;
-    }>("/api/admin/claim", { key: E2E_ADMIN_KEY });
-    assertEqual(claimed.role, "admin", "claimed role");
-    assertEqual(claimed.previousAdmin, null, "nobody held the seat before");
-    const { user } = await admin.me();
-    assertEqual(user?.role, "admin", "the session now reports admin");
+    // Both requests are in flight together; the single UPDATE behind the
+    // claim is what guarantees only one of them lands.
+    const [first, second] = await Promise.all([
+      statusOf(admin.post("/api/admin/claim", { key: E2E_ADMIN_KEY })),
+      statusOf(mod.post("/api/admin/claim", { key: E2E_ADMIN_KEY })),
+    ]);
+    assert(
+      [first, second].sort().join(",") === "200,409",
+      `expected one claim to succeed and one to be refused, got ${first} and ${second}`,
+    );
+    const adminRole = (await admin.me()).user?.role;
+    const modRole = (await mod.me()).user?.role;
+    assert(
+      (adminRole === "admin") !== (modRole === "admin"),
+      "exactly one of the two accounts holds the seat",
+    );
+    // Whichever account won is the admin for the rest of the scenario.
+    if (modRole === "admin") {
+      [admin, mod] = [mod, admin];
+      [adminName, modName] = [modName, adminName];
+      modId = mod.user!.id;
+    }
+    assert(
+      (await admin.get<Status>("/api/admin/status")).seatTaken,
+      "status now reports the seat as taken",
+    );
   });
 
-  await test("presenting the key from another account moves the seat and demotes the old admin", async () => {
-    await mod.post("/api/admin/claim", { key: E2E_ADMIN_KEY });
-    assertEqual((await mod.me()).user?.role, "admin", "the seat moved");
+  await test("once taken, the seat is refused to everyone, the admin included, even with the right key", async () => {
+    assertEqual(
+      await statusOf(mod.post("/api/admin/claim", { key: E2E_ADMIN_KEY })),
+      409,
+      "another account cannot take the seat",
+    );
+    assertEqual(
+      await statusOf(admin.post("/api/admin/claim", { key: E2E_ADMIN_KEY })),
+      409,
+      "the admin cannot claim it a second time",
+    );
     assertEqual(
       (await admin.me()).user?.role,
-      "player",
-      "the old admin stepped down",
+      "admin",
+      "the admin keeps the seat",
     );
-    // Hand it back for the rest of the scenario.
-    await admin.post("/api/admin/claim", { key: E2E_ADMIN_KEY });
-    assertEqual((await admin.me()).user?.role, "admin", "the seat came back");
     assertEqual(
       (await mod.me()).user?.role,
       "player",
-      "and the other account stepped down",
+      "the other account gained nothing",
     );
   });
 
@@ -170,7 +197,9 @@ export async function run(baseUrl: string): Promise<void> {
     assert(actions.includes("unban"), "unban was logged");
     assert(actions.includes("delete"), "delete was logged");
     assert(
-      mine.some((e) => e.action === "ban" && e.actorName === "Dockmaster"),
+      mine.some(
+        (e) => e.action === "ban" && e.actorName === mod.user!.displayName,
+      ),
       "the log names the moderator who banned",
     );
   });
@@ -182,7 +211,10 @@ export async function run(baseUrl: string): Promise<void> {
       await page
         .getByRole("heading", { name: "Harbor Office" })
         .waitFor({ timeout: 10_000 });
-      await page.getByText("Dockmaster").first().waitFor({ timeout: 10_000 });
+      await page
+        .getByText(mod.user!.displayName)
+        .first()
+        .waitFor({ timeout: 10_000 });
       const body = await page.textContent("body");
       assert(
         !!body && body.includes("Moderation log"),
@@ -197,16 +229,20 @@ export async function run(baseUrl: string): Promise<void> {
     }
   });
 
-  await test("the browser shows the claim form to an ordinary captain", async () => {
+  await test("the browser shows an ordinary captain a closed door once the seat is taken", async () => {
     const someone = new TestClient(baseUrl);
     await someone.register(uniqueUsername("vis"), "testpass123", "Visitor");
     const { context, page } = await openAuthedPage(baseUrl, someone);
     try {
       await page.goto(`${baseUrl}/admin`, { waitUntil: "networkidle" });
       await page
-        .getByRole("button", { name: "Take the seat" })
+        .getByText("already has its admin")
         .waitFor({ timeout: 10_000 });
       const body = await page.textContent("body");
+      assert(
+        !!body && !body.includes("Take the seat"),
+        "no key form once the seat is taken",
+      );
       assert(
         !!body && !body.includes("Moderation log"),
         "no console for a player",

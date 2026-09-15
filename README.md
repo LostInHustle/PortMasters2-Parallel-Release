@@ -93,13 +93,15 @@ A voyage resets everything inside it. Three things survive:
 
 Moderation lives at `/admin`, behind the same sign in as the game. There are three roles.
 
-| Role      | How you get it                                                  | What you can do                                                                              |
-| --------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| Player    | Register                                                        | Play                                                                                         |
-| Moderator | Appointed by the admin from the console                         | Open the office, search the roster, ban and unban players, read the moderation log           |
-| Admin     | Present the `ADMIN_KEY` from the server environment at `/admin` | Everything a moderator can, plus appoint and dismiss moderators and delete accounts outright |
+| Role      | How you get it                                                                  | What you can do                                                                              |
+| --------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Player    | Register                                                                        | Play                                                                                         |
+| Moderator | Appointed by the admin from the console                                         | Open the office, search the roster, ban and unban players, read the moderation log           |
+| Admin     | Be the first to present the `ADMIN_KEY` from the server environment at `/admin` | Everything a moderator can, plus appoint and dismiss moderators and delete accounts outright |
 
-There is exactly one admin. The key is the root credential: whoever presents it takes the seat, and whoever held it before goes back to being an ordinary player. That is deliberate. The usual reason to move the seat is that the old account is lost or no longer trusted, and the new admin can hand a moderator badge back with one click. Wrong guesses at the key are throttled per account, five within fifteen minutes, so a signed in captain cannot sit there trying keys.
+There is exactly one admin, and the seat is claimed exactly once. The first account to present the key becomes the admin for good; from then on the key opens nothing, not for another account and not a second time for the admin themselves, so present it from the account you mean to keep. The claim is a single atomic database statement, so two accounts presenting the key in the same instant still produce one admin. Wrong guesses at the key are throttled per account, five within fifteen minutes, so a signed in captain cannot sit there trying keys.
+
+The one way the seat ever moves is by hand, outside the game, by whoever operates the server. If the admin account is lost, clear its role in the database (`npx prisma studio`, or `UPDATE User SET role = 'player' WHERE role = 'admin'` against the SQLite file) and the key works exactly once more. Nothing in the app or its API can do this.
 
 A ban is immediate and complete. The reason is required and the banned captain sees it the next time they try to sign in. Every one of their sessions is revoked, their seat in any harbor is given up (handing the host crown on if they held it), and the realtime layer drops their sockets with a notice, so a captain sitting in a voyage is back at the sign in screen within a second, told why, and the rest of the room sees who left and why. Banning a moderator also removes their badge. Lifting a ban restores everything except that badge.
 
@@ -107,7 +109,7 @@ Deleting an account is the one thing here that cannot be undone. The account lea
 
 Nobody can act on their own account, moderators cannot touch each other or the admin, and every action is written to a log that outlives the accounts it mentions, with the actor's name, the target's name, and the reason. The rules themselves are one pure function, `canModerate` in [src/lib/admin/rules.ts](src/lib/admin/rules.ts), tested in `npm run test:admin`; the console only ever shows a button the server would also allow.
 
-If the server has no `ADMIN_KEY`, the office is closed: the claim form says so, and every console route answers 503 or 403. Nothing else about the game changes.
+If the server has no `ADMIN_KEY`, the office is closed: the claim page says so, and every console route answers 503 or 403. Once the seat is taken, an ordinary player visiting `/admin` sees a closed door instead of the key form. Nothing else about the game changes.
 
 ## How the pieces fit together
 

@@ -5,13 +5,13 @@
 // scripts/tests/unit.admin.ts) and every route enforces the very same
 // rules instead of each spelling out its own checks.
 //
-// The shape of authority is deliberately small. One admin, appointed by
-// presenting the ADMIN_KEY from the server environment. Any number of
-// moderators, appointed by the admin. Moderators handle the day to day
-// (banning and unbanning players); anything permanent or structural,
-// deleting an account or changing a role, stays with the admin. Nobody,
-// admin included, can act on themselves: an admin who wants out hands
-// the seat over by having the next admin claim it.
+// The shape of authority is deliberately small. One admin, the first
+// account to present the ADMIN_KEY from the server environment, holding
+// the seat for good. Any number of moderators, appointed by the admin.
+// Moderators handle the day to day (banning and unbanning players);
+// anything permanent or structural, deleting an account or changing a
+// role, stays with the admin. Nobody, admin included, can act on their
+// own account.
 // =====================================================================
 
 export type Role = "player" | "moderator" | "admin";

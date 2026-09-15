@@ -2,10 +2,11 @@
 //
 // The key lives only in the server environment (see the README's admin
 // console section); nothing in the repository or the database ever holds
-// it. Whoever presents it becomes the one admin, and whoever held the
-// seat before goes back to being a player (see claimAdminSeat). Wrong
-// guesses are throttled per account, because a signed in captain typing
-// keys at this form is the only brute force this console can face.
+// it. The first account to present it becomes the one admin, permanently:
+// once the seat is taken this route refuses everyone, key or no key, the
+// admin included (see claimAdminSeat). Wrong guesses are throttled per
+// account, because a signed in captain typing keys at this form is the
+// only brute force this console can face.
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireSignedIn } from "@/lib/admin/guard";
@@ -19,6 +20,9 @@ import { KeyAttemptThrottle } from "@/lib/admin/rules";
 const Schema = z.object({ key: z.string().min(1).max(512) });
 
 const attempts = new KeyAttemptThrottle();
+
+const SEAT_TAKEN_MESSAGE =
+  "The admin seat is already taken. There is only ever one admin, and the key cannot move it or claim it again.";
 
 export async function POST(req: NextRequest) {
   const user = await requireSignedIn();
@@ -66,11 +70,10 @@ export async function POST(req: NextRequest) {
       { status: 403 },
     );
   }
-
   attempts.clear(user.id);
-  const { previousAdmin } = await claimAdminSeat(user);
-  return NextResponse.json({
-    role: "admin",
-    previousAdmin: previousAdmin?.displayName ?? null,
-  });
+
+  if ((await claimAdminSeat(user)) === "taken") {
+    return NextResponse.json({ error: SEAT_TAKEN_MESSAGE }, { status: 409 });
+  }
+  return NextResponse.json({ role: "admin" });
 }

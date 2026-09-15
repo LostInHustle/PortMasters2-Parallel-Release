@@ -40,7 +40,7 @@ Railway’s filesystem is cleared on every deploy, so the SQLite file must live 
 
 ### Opening the Harbor Office
 
-The admin console at `/admin` stays closed until the service has an `ADMIN_KEY` variable. Set it on the Railway service alongside `DATABASE_URL`, using something long and random, then sign in to the deployed game with the account that should run the harbor, open `/admin`, and present the key. That account becomes the one admin and can appoint moderators from there. The key is never written to the database, so rotating it is just changing the variable and redeploying; the current admin keeps the seat until someone presents the new key from a different account.
+The admin console at `/admin` stays closed until the service has an `ADMIN_KEY` variable. Set it on the Railway service alongside `DATABASE_URL`, using something long and random, then sign in to the deployed game with the account that should run the harbor, open `/admin`, and present the key. That account becomes the one admin, permanently, and can appoint moderators from there. Choose the account with care: the seat is claimed exactly once, and after that the key opens nothing for anyone, the admin included. The key is never written to the database, so rotating it is just changing the variable and redeploying. If the admin account is ever lost, the seat is released only by hand, by clearing that account's `role` column in the database, after which the key works exactly once more.
 
 ### Picking up a schema change
 
