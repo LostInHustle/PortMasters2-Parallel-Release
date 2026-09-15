@@ -282,7 +282,7 @@
     background-clip: content-box;
   }
 
-  /* ---------- Artisan identity palette ----------
+  /* ========== Artisan identity palette ==========
      One hue per artisan type (see WORKER_TYPES in src/lib/game/constants.ts),
      chosen to echo what that craft actually makes: indigo cloth for the
      weavers, brocade violet for the master, sachet rose, copper, celadon,

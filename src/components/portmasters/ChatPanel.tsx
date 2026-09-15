@@ -8,7 +8,7 @@ import { Avatar } from "./shared";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { SendHorizontal, Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { clockTime, cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 /**
@@ -207,10 +207,7 @@ export function ChatPanel({
                     {m.content}
                   </div>
                   <span className="text-[9px] text-muted-foreground/70 mt-0.5 px-1">
-                    {new Date(m.createdAt).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {clockTime(m.createdAt)}
                   </span>
                 </div>
               </motion.div>

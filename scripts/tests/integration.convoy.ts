@@ -50,7 +50,7 @@ import {
 } from "../../src/lib/game/engine";
 import { createInitialGameState } from "../../src/lib/game/types";
 
-// ---------- parseVentureContributions / ventureTotal ----------
+// ========== parseVentureContributions / ventureTotal ==========
 suite("Convoy Ventures: contribution parsing is defensive");
 
 test("a well formed contributions blob round trips exactly", () => {
@@ -84,7 +84,7 @@ test("malformed input degrades to an empty map instead of throwing", () => {
   }
 });
 
-// ---------- computeAcceptedContribution: the overflow cap ----------
+// ========== computeAcceptedContribution: the overflow cap ==========
 // Isolated from the per contributor share cap below by passing
 // maxContributorShare 1 (effectively no per captain limit), so these
 // suites each test exactly one of the two stacked caps at a time.
@@ -126,7 +126,7 @@ test("a venture already at or past target accepts nothing further", () => {
   );
 });
 
-// ---------- computeAcceptedContribution: the per contributor share cap ----------
+// ========== computeAcceptedContribution: the per contributor share cap ==========
 // [MANIFEST 04 fix] The solo self fulfillment fix: reported after the
 // repeat fill exploit was closed, a single captain could still post a
 // venture and instantly fund the entire target alone, printing Gold and
@@ -234,7 +234,7 @@ test("the reported repro, closed: two captains funding a venture together still 
   );
 });
 
-// ---------- computeSettlements / settlementRateFor: the exploit fix ----------
+// ========== computeSettlements / settlementRateFor: the exploit fix ==========
 suite("Convoy Ventures: settlement payouts match the documented rates exactly");
 
 test("filled pays out CONVOY_VENTURE_PAYOUT_MULTIPLIER times each contributor's own stake", () => {
@@ -337,7 +337,7 @@ test("a solo funded fill is now impossible end to end: the per contributor cap a
   );
 });
 
-// ---------- computeVentureDeadlineBounds: the final round fix ----------
+// ========== computeVentureDeadlineBounds: the final round fix ==========
 suite(
   "Convoy Ventures: a deadline can never land on, or past, the voyage's own final round",
 );
@@ -411,7 +411,7 @@ test("well before a voyage's end, the cap is simply the flat CONVOY_VENTURE_MAX_
   );
 });
 
-// ---------- Engine side: the Gold effect itself ----------
+// ========== Engine side: the Gold effect itself ==========
 suite("Convoy Ventures: the engine functions apply Gold exactly as settled");
 
 test("contributeToVenture escrows the exact amount, and refuses a contribution the captain can't afford", () => {

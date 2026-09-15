@@ -11,12 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scrollArea";
-import {
-  APP_NAME,
-  guideText,
-  tipsText,
-  tutorialSteps,
-} from "@/lib/game/constants";
+import { tutorialSteps } from "@/lib/game/constants";
 import type { Difficulty } from "@/lib/game/difficulty";
 import {
   unlockedProducts,
@@ -28,14 +23,12 @@ import { phaseLabel } from "@/lib/game/engine";
 import type { PlayerDetailData } from "@/lib/usePlayerDetail";
 import type { PublicUser } from "@/lib/api";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
-import { cn } from "@/lib/utils";
+import { clockTime, cn } from "@/lib/utils";
 import { itemColorResolver } from "@/lib/useColorPreference";
 import { Avatar, Pill, ItemIcon } from "../shared";
 import { CaptainLegacyCard } from "../CaptainLegacyCard";
 import {
   Sparkles,
-  BookOpen,
-  Lightbulb,
   ChevronLeft,
   ChevronRight,
   Coins,
@@ -49,63 +42,39 @@ import {
 } from "lucide-react";
 import type { NotificationItem } from "@/lib/useNotifications";
 
-export function GuideModal({
+// The Navigation Guide and the Trade Strategy Advice are the same modal
+// around different text: a title, an icon, and a block of tier aware copy
+// from src/lib/game/constants.ts. One component, two call sites.
+export function TextModal({
   open,
   onOpenChange,
-  difficulty,
+  title,
+  description,
+  icon,
+  text,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  difficulty: Difficulty;
+  title: string;
+  // Read by screen readers only; the visible content is the text itself.
+  description: string;
+  icon: React.ReactNode;
+  text: string;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <BookOpen className="h-5 w-5 text-teal-600 dark:text-teal-400" />
-            Navigation Guide
+            {icon}
+            {title}
           </DialogTitle>
           <DialogDescription className="sr-only">
-            {APP_NAME} rules and shortcuts
+            {description}
           </DialogDescription>
         </DialogHeader>
         <pre className="whitespace-pre-wrap font-sans text-[12px] leading-relaxed bg-muted/40 rounded-lg p-3.5 max-h-[60vh] overflow-y-auto pm-scroll">
-          {guideText(difficulty)}
-        </pre>
-        <div className="flex justify-end">
-          <Button variant="secondary" onClick={() => onOpenChange(false)}>
-            Close
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-export function TipsModal({
-  open,
-  onOpenChange,
-  difficulty,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  difficulty: Difficulty;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Lightbulb className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-            Trade Strategy Advice
-          </DialogTitle>
-          <DialogDescription className="sr-only">
-            Bankruptcy avoidance strategies
-          </DialogDescription>
-        </DialogHeader>
-        <pre className="whitespace-pre-wrap font-sans text-[12px] leading-relaxed bg-muted/40 rounded-lg p-3.5 max-h-[60vh] overflow-y-auto pm-scroll">
-          {tipsText(difficulty)}
+          {text}
         </pre>
         <div className="flex justify-end">
           <Button variant="secondary" onClick={() => onOpenChange(false)}>
@@ -169,10 +138,7 @@ export function NotificationHistoryModal({
                   <div className="text-sm font-semibold mb-1 flex items-center gap-1.5">
                     <span className="text-base">{n.icon}</span> {n.title}
                     <span className="ml-auto text-[10px] text-muted-foreground font-normal">
-                      {new Date(n.at).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {clockTime(n.at)}
                     </span>
                   </div>
                   <div className="space-y-0.5">

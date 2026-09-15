@@ -96,7 +96,7 @@ export async function startTestServer(): Promise<TestServer> {
   } catch (err) {
     child.kill();
     throw new Error(
-      `${(err as Error).message}\n--- server output ---\n${startupLog.join("")}`,
+      `${(err as Error).message}\n=== server output ===\n${startupLog.join("")}`,
     );
   }
 

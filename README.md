@@ -1,6 +1,6 @@
 # PortMasters 2 Parallel Release
 
-A browser based multiplayer trading game set on the maritime Silk Road. Captains gather in a shared harbor, and once at least two of them are in the room the host sets sail. Everyone then plays the same voyage in lockstep: draft a boon, buy at port, barter with the other captains, put artisans to work, fill trade orders, settle wages and pirates, refit at the shipyard. Whoever ends the voyage with the highest Reputation is crowned Sea Master.
+A browser based multiplayer trading game set on the maritime Silk Road. Captains gather in a shared harbor, and once at least two of them are in the room the host sets sail. Everyone then plays the same voyage in lockstep: draft a boon, buy at port, barter with the other captains, put artisans to work, fill trade orders, settle wages and pirates, refit at the shipyard. Whoever ends the voyage with the highest Reputation is crowned Sea Master. Progression carries across voyages, three difficulty tiers change how hard the sea pushes back, and a small moderation console keeps the harbor civil.
 
 ## Quick start
 
@@ -64,7 +64,7 @@ The host picks a tier when creating the room. It sets the length of the voyage, 
 | 🌊 Open Waters    | 12     | rounds 4 and 8  | 22% rising to 30% | 1.25x  | The charter opens twice and the market swells from six cards to ten, with pirates that bite past the midpoint.                    |
 | ⛈️ Monsoon Season | 16     | rounds 6 and 11 | 28% rising to 38% | 1.6x   | Back loaded and unforgiving. The largest imperial mandates fall late, and a corrupt broker may leak your position to the pirates. |
 
-A charter opens the next tier of goods, ports and artisans mid voyage: porcelain clay and copper ore with their potters and coppersmiths first, then spices and pearls with their perfumers and jewelers. Fair Winds never leaves the founding trade, which is what keeps the entry tier exactly the game it has always been. The full design rationale lives in [docs/DIFFICULTY_MODES_PROPOSAL.md](docs/DIFFICULTY_MODES_PROPOSAL.md).
+A charter opens the next tier of goods, ports and artisans mid voyage: porcelain clay and copper ore with their potters and coppersmiths first, then spices and pearls with their perfumers and jewelers. Fair Winds never leaves the founding trade, which is what keeps the entry tier exactly the game it has always been. The full design rationale lives in [docs/DIFFICULTY_TIERS.md](docs/DIFFICULTY_TIERS.md).
 
 ### Harbor systems
 
@@ -121,6 +121,8 @@ If the server has no `ADMIN_KEY`, the office is closed: the claim page says so, 
 
 **The server does not run the game rules.** Every client runs the same deterministic simulation in [src/lib/game/engine.ts](src/lib/game/engine.ts), seeded off the room id, so every captain sees identical markets and orders without the server computing anything. [src/server/realtime.ts](src/server/realtime.ts) does something much narrower: it tracks who has readied up for the round and phase the room is sitting at, and tells everyone to advance once the active players have all readied. It also owns the host only transitions that are not part of that vote (starting and restarting a voyage) and the harbor systems above, which are genuinely shared state and therefore genuinely the server's business.
 
+The API routes and the socket server never call each other, with one deliberate exception. A ban or a deletion has to reach a captain who is connected right now, so the socket server registers a tiny hook on `globalThis` when it attaches ([src/lib/admin/bridge.ts](src/lib/admin/bridge.ts)) and the admin actions call it after the database is already correct. It has to be `globalThis` because Next compiles the routes into their own module graph while `server.ts` loads the socket server through `tsx`: same process, two copies of every module, so an ordinary module level variable set on one side is invisible to the other. The same reason [src/lib/db.ts](src/lib/db.ts) keeps its Prisma client there.
+
 That split is the single most useful thing to know before changing anything: ask which side owns the behavior before you touch it.
 
 ### What that costs, and where the line is
@@ -161,7 +163,7 @@ Tailwind v4 is configured entirely in CSS. The theme lives in the `@theme` block
 | `prisma.config.ts`                       | Where the Prisma CLI reads its connection string. Prisma 7 moved this out of the schema file.                                                                                                                                                                                                                                                                                                                                                                                  |
 | `generated/prisma`                       | Generated client output. Gitignored, rebuilt by `prisma generate`.                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `scripts/tests`                          | The test suite, plain `tsx` scripts with no runner, plus the Playwright scenarios under `e2e/`.                                                                                                                                                                                                                                                                                                                                                                                |
-| `docs/`                                  | The Harbor Manifest (the design source for all eighteen planned systems), the harbor feature guide, the deployment guide, the difficulty tier proposal, and the original single player snapshot.                                                                                                                                                                                                                                                                               |
+| `docs/`                                  | The Harbor Manifest (the design source for all eighteen planned systems), the harbor feature guide, the deployment guide, the difficulty tier design record, and the original single player snapshot.                                                                                                                                                                                                                                                                          |
 
 ## Development
 
@@ -180,6 +182,7 @@ Then run `npm run db:push` once. It is tempting to skip and assume the database 
 | `npm run start`       | Applies pending migrations with `prisma migrate deploy`, then serves the production build. Does not build for you.                                            |
 | `npm run lint`        | ESLint through the flat config in `eslint.config.mjs`.                                                                                                        |
 | `npm test`            | The whole suite, twelve files in sequence.                                                                                                                    |
+| `npm run test:e2e`    | The Playwright scenarios against an isolated instance of the app. Slower, and not part of `npm test`.                                                         |
 | `npm run db:push`     | Syncs the schema straight to the database without recording a migration. Fastest way to a working local database.                                             |
 | `npm run db:migrate`  | `prisma migrate dev`. The right tool once you have actually changed `schema.prisma` and want the change recorded. Prompts for a name.                         |
 | `npm run db:generate` | Regenerates the client into `generated/prisma` without touching the database.                                                                                 |

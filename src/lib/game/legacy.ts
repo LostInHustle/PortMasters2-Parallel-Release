@@ -3,7 +3,7 @@
 // Persistent, cross voyage progression tied to a captain's account
 // rather than any single room. A voyage's Gold, cargo, and ship level
 // always reset (see the restart flow in src/server/realtime.ts), but the
-// Reputation banked on the way to Round 8 is now worth something once
+// Reputation banked on the way to the final round is now worth something once
 // the voyage ends too: it becomes Renown XP, carried across every harbor
 // that captain ever sails in. Pure functions only, so both the client
 // (the Captain's Legacy card) and the server (src/server/realtime.ts,
@@ -84,7 +84,7 @@ export function renownStartingGoldBonus(level: number): number {
   );
 }
 
-// ---------- Per difficulty breakdown ----------
+// ========== Per difficulty breakdown ==========
 // Sea Master crowns and best score split by the tier they were earned on (see
 // Room.difficulty and src/lib/game/difficulty.ts). The account level
 // seaMasterCrowns and bestScore stay the all tier totals; this is the breakdown

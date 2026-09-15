@@ -68,7 +68,7 @@ import {
 import { computeBackingResolution } from "../lib/game/backing";
 import { computeHarborPulse } from "../lib/game/harborPulse";
 
-// ---------- Types ----------
+// ========== Types ==========
 type SocketState = {
   userId: string;
   user: PublicUser;
@@ -101,7 +101,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
     pingInterval: 25000,
   });
 
-  // ---------- In memory presence ----------
+  // ========== In memory presence ==========
   const sockets = new Map<string, SocketState>(); // socketId -> state
   // userId -> Set<socketId>  (a user may have multiple tabs)
   const userSockets = new Map<string, Set<string>>();
@@ -218,7 +218,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
     if (!set || set.size === 0) forgetStatus(roomId, userId);
   }
 
-  // ---------- Abandoned room cleanup ----------
+  // ========== Abandoned room cleanup ==========
   // A player who closes their tab (crash, lost connection, refresh) never
   // sends an explicit "leave", so without this their seat would stay
   // occupied forever and the room would never empty out. Closing the tab
@@ -294,7 +294,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
     departureTimers.set(key, t);
   }
 
-  // ---------- Phase/round ready check ----------
+  // ========== Phase/round ready check ==========
   // The room's shared checkpoint: the round + phase every captain is
   // expected to be at. Phase is kept as a string here purely for
   // comparison. This file never runs game rules, it only counts who has
@@ -432,7 +432,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
     });
   }
 
-  // ---------- Voyage conclusion & Captain's Legacy ----------
+  // ========== Voyage conclusion & Captain's Legacy ==========
   // Fires once per room, the moment every current member has reported
   // reaching either "endgame" or "bankruptcy": the whole harbor's voyage
   // is over for everyone still seated in it, the same "who's actually
@@ -781,7 +781,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
     });
   }
 
-  // ---------- Bartering ----------
+  // ========== Bartering ==========
   // The one piece of real cross player state this file owns. Everything
   // else here is either a vote count or a relay; an open barter offer is
   // an actual object two different captains' inventories need to agree
@@ -868,7 +868,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
     broadcastBarter(roomId);
   }
 
-  // ---------- Financial aid ----------
+  // ========== Financial aid ==========
   // A captain short on Gold for this round's wages or maintenance can ask
   // the rest of the harbor for a loan before being forced into a bankrupt
   // payment. Structurally the same problem as a barter offer (real
@@ -916,7 +916,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
     broadcastAid(roomId);
   }
 
-  // ---------- Backing ----------
+  // ========== Backing ==========
   // [MANIFEST 05] A granted loan (see aid:help above) used to vanish from
   // this server's view entirely the moment it was handed over: the two
   // captains it involved were the only ones who ever knew it existed. This
@@ -1177,7 +1177,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
   }
   void hydrateLoans();
 
-  // ---------- The Harbor Pulse ----------
+  // ========== The Harbor Pulse ==========
   // [MANIFEST 01] Every client already knows what it bought this round; this
   // just adds up everyone's reports so the next round's market can lean
   // toward or away from whatever the room actually did, instead of every
@@ -1213,7 +1213,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
     byRound.set(round, existing);
   }
 
-  // ---------- Word on the Docks ----------
+  // ========== Word on the Docks ==========
   // [MANIFEST 02] A spontaneous, room wide race layered alongside the
   // scheduled Imperial Mandates (see difficulty.ts), which stay untouched.
   // Whoever's own client is first to report crossing the completed orders
@@ -1223,7 +1223,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
   // this is keyed by room, not by round, and cleared on restart below.
   const roomDocksWinners = new Map<string, { userId: string; name: string }>();
 
-  // ---------- Tidewatch Alerts ----------
+  // ========== Tidewatch Alerts ==========
   // [MANIFEST 03] Never a difficulty dial: voyage length, tier content, and
   // card count baseline all stay entirely the host's choice (see
   // difficulty.ts). This only reads Reputation every captain is already
@@ -1243,7 +1243,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
     return total;
   }
 
-  // ---------- Convoy Ventures ----------
+  // ========== Convoy Ventures ==========
   // [MANIFEST 04] Persisted through the ConvoyVenture Prisma model rather
   // than kept in memory like the barter and aid boards: a venture can sit
   // open across many rounds, not one phase, so losing it to a server
@@ -1394,7 +1394,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
     if (anyResolved) await broadcastVentures(roomId, voyageEpoch);
   }
 
-  // ---------- Authentication ----------
+  // ========== Authentication ==========
   // The session cookie rides on the WebSocket handshake like on any other
   // same origin request, so this reads it off the raw Cookie header and
   // validates it through the very same getUserFromToken the API routes
@@ -1451,7 +1451,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
     return user;
   }
 
-  // ---------- Connection handling ----------
+  // ========== Connection handling ==========
   io.on("connection", (socket) => {
     sockets.set(socket.id, {
       userId: "",
@@ -2099,7 +2099,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
       },
     );
 
-    // ---------- Bartering ----------
+    // ========== Bartering ==========
     // A fresh snapshot of the room's open offers, independent of the
     // broadcasts below, lets the Bartering phase panel ask for the
     // current board the moment it mounts, mirroring "phase:state:request".
@@ -2288,7 +2288,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
       },
     );
 
-    // ---------- Financial aid ----------
+    // ========== Financial aid ==========
     socket.on("aid:state:request", (payload: { roomId?: string }) => {
       const s = requireAuth();
       if (!s) return;
@@ -2402,7 +2402,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
     // loan, the same shape as a direct message: no room wide state to
     // keep here, just forward to every socket the lender currently has
     // open so their own client can credit itself. Covers both a
-    // voluntary repayment and the forced one at Round 8's end (see
+    // voluntary repayment and the forced one at the final round's end (see
     // settleOutstandingDebts in src/lib/game/engine.ts) since, from the
     // lender's side, receiving the Gold back looks identical either way.
     socket.on(
@@ -2615,7 +2615,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
       },
     );
 
-    // ---------- On demand player detail (cargo, workers, logs) ----------
+    // ========== On demand player detail (cargo, workers, logs) ==========
     // Kept out of the constant game:status heartbeat on purpose. Most of
     // the room never needs this, only whoever just opened that one
     // captain's detail popup, so it's a direct request/response relay
@@ -2829,7 +2829,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
       socket.emit("phase:ready_update", await readyStatePayload(roomId, cp));
     });
 
-    // ---------- Starting the voyage ----------
+    // ========== Starting the voyage ==========
     // The one transition that isn't a per player ready vote: only the
     // host can fire it, and only once the harbor has at least two
     // captains in it. Everyone else is told to go via "room:started"
@@ -2890,7 +2890,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
       }
     });
 
-    // ---------- Restarting the voyage ----------
+    // ========== Restarting the voyage ==========
     // Host only, same as starting it. Unlike "room:start" this is allowed
     // whether the room has set sail or not, since a harbor that never left
     // port still benefits from a clean slate. The part that actually fixes
@@ -2964,9 +2964,9 @@ export function attachRealtime(httpServer: HttpServer): Server {
         // under the old voyage's round numbers would otherwise leak into the
         // new voyage's identically numbered rounds.
         roomPulseTallies.delete(roomId);
-        // A brand new voyage means a brand new race to be first to three
-        // completed orders, so the old one's winner (if any) can't linger
-        // and silently block every claim in the new voyage.
+        // A brand new voyage means a brand new Word on the Docks race, so
+        // the old one's winner (if any) can't linger and silently block
+        // every claim in the new voyage.
         roomDocksWinners.delete(roomId);
         // A brand new voyage starts with nobody's Reputation counted yet, so
         // the room can earn its own Tidewatch surge all over again rather
@@ -3025,7 +3025,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
     });
   });
 
-  // ---------- Moderation ----------
+  // ========== Moderation ==========
   // The one thing the admin console needs from this file: a way to reach a
   // captain who is connected right now. The database side of a ban or a
   // deletion is already done by the time this runs (sessions revoked,
@@ -3082,7 +3082,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
     onlineUserIds: () => Array.from(userSockets.keys()),
   });
 
-  // ---------- Boot time membership reconciliation ----------
+  // ========== Boot time membership reconciliation ==========
   // Every map above (sockets, userSockets, departureTimers, roomCheckpoints,
   // roomStatuses) starts this function call empty on every process boot,
   // but Room/RoomMember in the database persist across it. Without this, a

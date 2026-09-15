@@ -80,7 +80,7 @@ export function Lobby({
   const [newName, setNewName] = useState("");
   const [isPublic, setIsPublic] = useState(true);
   // The host picks one tier for the whole harbor (see src/lib/game/difficulty.ts).
-  // It is fixed at creation; changing it afterwards means restarting the voyage.
+  // It is fixed for the life of the room; a different tier means a new room.
   const [difficulty, setDifficulty] = useState<Difficulty>("fair_winds");
   const [joinCode, setJoinCode] = useState("");
   const [joining, setJoining] = useState<string | null>(null);
@@ -755,8 +755,8 @@ export function Lobby({
           <p className="text-xs text-muted-foreground leading-relaxed">
             Every Renown level grants a small Gold bonus at the start of your
             next fresh voyage. It grows from the Reputation you bank on the way
-            to Round 8, so it only ever goes up, even on a voyage that ends in
-            bankruptcy.
+            to the final round, so it only ever goes up, even on a voyage that
+            ends in bankruptcy.
           </p>
         </DialogContent>
       </Dialog>

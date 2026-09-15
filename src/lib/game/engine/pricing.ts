@@ -50,7 +50,7 @@ function boonNameForModifierKey(key: string): string {
   return BOONS.find((b) => key in b.modifiers)?.name ?? "Active boon";
 }
 
-// ---------- Transport ----------
+// ========== Transport ==========
 export function calcTransportCost(
   state: GameState,
   totalItems: number,
@@ -136,7 +136,7 @@ export function explainTransportCost(
   return { base, steps, final: Math.max(0, cost) };
 }
 
-// ---------- Taxes ----------
+// ========== Taxes ==========
 export function calcVAT(
   state: GameState,
   product: string,
@@ -214,7 +214,7 @@ export function calcIncomeTax(state: GameState, preTax: number): number {
   return tax;
 }
 
-// ---------- Market card pricing ----------
+// ========== Market card pricing ==========
 // The same math as getCardFinalCost, but reported as a step by step
 // breakdown so the buying phase tooltip can show exactly where a price
 // came from: base cost, then whatever boon or module touched it.
@@ -339,7 +339,7 @@ export function explainExpectedPrice(
   return { min, max, isProduct: !isResource, modifiers };
 }
 
-// ---------- Wages ----------
+// ========== Wages ==========
 // The canonical per worker, per round wage for a given type, given every
 // currently active modifier. There is no separate one time "hiring fee"
 // in this game (see hireWorker, which never touches state.money);
@@ -359,7 +359,7 @@ export function getHireCost(state: GameState, type: string): number {
   return wage;
 }
 
-// ---------- Broker's Favor ----------
+// ========== Broker's Favor ==========
 // The Broker's cut on a Broker's Favor order, a saturating curve rather
 // than a flat rate. Net payout climbs almost one for one with reward at
 // first (a small order keeps the feel of a low flat rate) but bends hard as

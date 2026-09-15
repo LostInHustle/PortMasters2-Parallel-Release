@@ -1,8 +1,8 @@
-# New Features Guide: What They Do and How to Tell They're Working
+# Harbor Feature Guide: what each system does and how to tell it is working
 
-This document is written for a player sitting down to actually play the game, not for a developer reading code. It explains each new feature in plain language, tells you exactly where to look on screen, and walks through a specific set of steps you (and a friend, since most of these need two or more captains in the same harbor) can follow to confirm each one is really working while you play.
+This document is written for a player sitting down to actually play the game, not for a developer reading code. It explains each harbor system in plain language, tells you exactly where to look on screen, and walks through a specific set of steps you (and a friend, since most of these need two or more captains in the same harbor) can follow to confirm each one is really working while you play.
 
-Ten of these features exist in the game right now. Seven more are planned but not yet built, and one was dropped, so you will not find any of those eight if you go looking, that is expected and not a bug. The status list at the very bottom of this document tells you exactly which is which, so check there first if you are ever unsure whether something should be visible yet.
+Ten of the eighteen systems in the [Harbor Manifest](HARBOR_MANIFEST.md) exist in the game right now, plus two additions outside that list: direct barter offers and the Harbor Office. Seven manifest entries are planned but not yet built, and one was dropped, so you will not find any of those eight if you go looking; that is expected and not a bug. The status list at the very bottom tells you exactly which is which, so check there first if you are ever unsure whether something should be visible yet.
 
 ## Before you start: where to actually look
 
@@ -13,9 +13,9 @@ Every feature below announces itself, or can be confirmed, through one or more o
 3. **The Harbor Roster (Members panel).** The list of every captain currently in your harbor, each showing their live Gold and Reputation. This is how you check on the whole room's numbers, not just your own.
 4. **Your own status panel and the Port Purchase board.** Your personal Gold, Reputation, and the cards actually available to buy each round. This is where you check whether a change actually affected your own game, as opposed to just being announced.
 
-Two of the three features below (Word on the Docks and Tidewatch Alerts) are loud: they trigger a toast, a chat message, or both, the moment they happen. One of them (The Harbor Pulse) is deliberately quiet and has no on screen announcement at all, which is explained in its own section below, along with the most reliable way to still confirm it is doing something.
+Most of the systems below are loud: they trigger a toast, a chat message, or both, the moment they happen. The Harbor Pulse is deliberately quiet and has no on screen announcement at all, which is explained in its own section, along with the most reliable way to still confirm it is doing something.
 
-You will need at least two people playing in the same harbor to properly test any of these three. All three depend on things multiple captains do together (buying, trading, building Reputation), so testing alone in a room by yourself will not reliably trigger any of them.
+You will need at least two people playing in the same harbor to properly test almost all of these. They depend on things multiple captains do together (buying, trading, lending, building Reputation), so testing alone in a room by yourself will not reliably trigger them. The two exceptions, the Colorblind Safe Palette and the Harbor Office, say so in their own sections.
 
 ---
 
@@ -137,7 +137,7 @@ And one more limit beyond that: no single captain can ever fund more than half o
 
 Open your own captain's rail (the panel that normally shows your Gold, Reputation, cargo, and so on) and switch to the Dues tab, the same tab that already shows your outstanding loans. Convoy Ventures live directly underneath the loans section.
 
-To post a venture, fill in a Gold target and how many rounds ahead the deadline should be, then press Post. To back an existing venture, type in how much Gold you want to contribute and press Back It. If the venture is already very close to its target, you might ask to contribute more than it actually still needs; the game will only ever take the amount still required to exactly reach the target, and tells you so immediately, it will never take more from you than the venture can actually use.
+To post a venture, fill in a Gold target and how many rounds ahead the deadline should be, then press Post. To back an existing venture, type in how much Gold you want to contribute and press Back it. If the venture is already very close to its target, you might ask to contribute more than it actually still needs; the game will only ever take the amount still required to exactly reach the target, and tells you so immediately, it will never take more from you than the venture can actually use.
 
 ### What you will actually see on screen
 
@@ -179,7 +179,7 @@ If instead the borrower comes up short, your pledge is what covers the gap, up t
 
 Only one captain can back any given loan, and you cannot back a loan you are already the lender or the borrower on, since you already have your own stake in how that one turns out.
 
-One ceiling covers both sides of helping. Across a whole voyage, everything you earn from lending Gold and from backing someone else's loan is capped together, and the cap depends on how long the voyage is: 96 Reputation on Fair Winds, 120 on Open Waters, 144 on Monsoon Season. A longer voyage offers more chances to help and holds far more Gold by its midpoint, so one fixed number for all three would have been mean to the long tier and generous to the short one. Each of those is worth five times its own number in Gold lent, so even the shortest tier covers three sizeable bailouts without cutting you off. The ceiling exists because without it two captains could agree in chat to pass one large loan back and forth, banking a fifth of it as Reputation each time. Without that ceiling, two captains could agree in chat to pass one large loan back and forth, banking a fifth of it as Reputation each time, which is why it exists.
+One ceiling covers both sides of helping. Across a whole voyage, everything you earn from lending Gold and from backing someone else's loan is capped together, and the cap depends on how long the voyage is: 96 Reputation on Fair Winds, 120 on Open Waters, 144 on Monsoon Season. A longer voyage offers more chances to help and holds far more Gold by its midpoint, so one fixed number for all three would have been mean to the long tier and generous to the short one. Each of those is worth five times its own number in Gold lent, so even the shortest tier covers three sizeable bailouts without cutting you off. The ceiling exists because without it two captains could agree in chat to pass one large loan back and forth, banking a fifth of it as Reputation each time.
 
 ### Where to find it and how to use it
 
@@ -261,12 +261,12 @@ Only the host sees this control. On the Harbor Roster, hover the row of any capt
 
 You will need at least two captains, one of whom is the host, and it helps to have a third to confirm what an uninvolved captain sees.
 
-1. As the host, hover a other captain captain's row on the Harbor Roster and click the speaker icon to mute them.
+1. As the host, hover another captain's row on the Harbor Roster and click the speaker icon to mute them.
 2. Confirm every captain in the room, not just the host, sees the "muted" tag appear on that captain's roster row.
 3. On the muted captain's own screen, confirm their room chat input is replaced with the explanatory note, and confirm they cannot send a room chat message.
 4. Confirm the muted captain can still send and receive direct messages normally, and confirm they can still read the room chat that others post, they simply cannot post to it themselves.
 5. As the host, click the speaker icon again to unmute them. Confirm their message box returns to normal immediately, and confirm the "muted" tag disappears from their roster row for everyone.
-6. To confirm this is host only, try to find a mute control on a other captain captain's own view of the roster. There should not be one, on any row, including their own.
+6. To confirm this is host only, try to find a mute control on another captain's own view of the roster. There should not be one, on any row, including their own.
 7. To confirm a mute does not survive a restart, mute a captain, then have the host restart the voyage. Confirm the newly started voyage shows nobody as muted.
 
 ---
@@ -361,6 +361,40 @@ You will need three captains for the most convincing version of this test, thoug
 
 ---
 
+## Also new: the Harbor Office
+
+This one is not a harbor system either. It is the moderation console for the whole game, and it matters to ordinary players for exactly one reason: it is where a ban comes from, so it is worth knowing what one looks like from the receiving end.
+
+### What it actually does, in plain words
+
+There is one admin for the whole game and any number of moderators the admin appoints. A moderator can ban a captain and lift the ban again; the admin can also appoint and dismiss moderators and delete accounts outright, one at a time or several at once. Every action is written to a log with the name of whoever did it.
+
+A ban is immediate. The banned captain is signed out everywhere at once, dropped from whatever harbor they were sailing in, and cannot sign in again until the ban is lifted. Their Renown and merits are untouched; a lifted ban gives back exactly the account they had.
+
+### Where to find it and how to use it
+
+If you are a moderator or the admin, a "Harbor Office" chip appears in the lobby header next to your Renown, and the office itself is at `/admin`. Every other captain who opens `/admin` sees either the form for presenting the admin key, while nobody holds the seat yet, or a closed door once someone does. Presenting the key is a one time thing: the first account to do it is the admin for good, and the key never moves the seat afterwards, so do it from the account you mean to keep.
+
+### What you will actually see on screen
+
+- **If you are banned while playing:** your screen returns to the sign in page within a second, with a note at the top explaining that you were banned and the reason given. Trying to sign in again shows the same reason. Everyone still in your harbor sees a system line in chat saying you were banned and why, and your seat is freed the same way as if you had left.
+- **If you are a moderator:** the office lists every account with a search box, a checkbox per captain, and Ban or Lift ban buttons on each row. Selecting several captains brings up a bar to ban or unban them together with one reason; the confirmation dialog says exactly who will be reached and who will be skipped and why (already banned, the admin, another moderator, yourself).
+- **If you are the admin:** the same, plus Make moderator, Remove moderator and Delete on each row, Delete in the selection bar, and a Clear log button on the moderation log. Clearing the log leaves one entry behind recording that you cleared it and how many entries went.
+
+### Step by step: how to confirm it is working
+
+A single captain can confirm the claim flow alone on a fresh server; the rest needs at least two accounts.
+
+1. On a server with `ADMIN_KEY` set and no admin yet, sign in, open `/admin`, and present the key. Confirm the office opens, the lobby header now shows the Harbor Office chip, and the log's first entry says you took the seat.
+2. Sign in as a second account in another browser and open `/admin`. Confirm it shows the closed door, and confirm that presenting the key from this account is refused.
+3. As the admin, make the second account a moderator, then reload their `/admin`. Confirm the office opens for them without the Delete or Make moderator buttons.
+4. As the moderator, ban a third account while that account is sitting in a harbor. Confirm the banned captain lands on the sign in page with the reason, confirm the harbor's chat shows the system line, and confirm the roster no longer lists them.
+5. Lift the ban and confirm the third account can sign in again with everything intact.
+6. As the moderator, try the Delete button on any row. Confirm there is none. As the admin, delete the third account and confirm it can no longer sign in.
+7. As the admin, clear the log. Confirm one entry remains, naming you and the number of entries removed.
+
+---
+
 ## Feature 10: Ledger Integrity Pass
 
 ### What it actually does, in plain words
@@ -387,18 +421,18 @@ The reason it exists now rather than later is that Trading Houses, Ages of the L
 
 Nothing, in ordinary play. This is the one feature here with no interface at all. A normal voyage never approaches the ceiling, the response to a save is unchanged whether or not it tripped, and a captain who does trip it is told nothing, deliberately, so that a tampering client learns nothing about the guard.
 
-The only visible trace is server side: a `[integrity]` warning in the process log, and `integritySuspect` set on that captain's row in the `GameState` table.
+The only visible trace is server side: a `[integrity]` warning in the process log, and `integritySeverity` ("suspect" or "impossible") together with `integrityNote` set on that captain's row in the `GameState` table.
 
 ### Step by step: how to confirm it is working
 
 You need a way to send a request directly, since the game itself will never produce a tripping save.
 
-1. Register a captain, create a room, and have a second captain join so the voyage can start. Play a round or two normally, then confirm nothing has been flagged: `integritySuspect` on your `GameState` row is still false, and the server log is quiet.
+1. Register a captain, create a room, and have a second captain join so the voyage can start. Play a round or two normally, then confirm nothing has been flagged: `integritySeverity` on your `GameState` row is still empty, and the server log is quiet.
 2. With the same session cookie, `PUT /api/game/state` with that room's id and a data object containing `money` set to 9999999. Confirm the response is the ordinary success, identical in shape to a normal save.
 3. Confirm the server log now carries one `[integrity]` line naming the field, the claimed value and the ceiling it exceeded.
-4. Confirm `integritySuspect` on that row is now true and `integrityNote` records what tripped.
-5. Save normally again, and confirm the flag stays true. It is never cleared automatically, since the point is that the account claimed it at least once.
-6. To confirm the guard cannot fire on real play, finish a voyage at the top merchant rating and confirm the flag is still false.
+4. Confirm `integritySeverity` on that row now reads "impossible" and `integrityNote` records what tripped.
+5. Save normally again, and confirm the mark stays. It is never cleared automatically, since the point is that the account claimed it at least once.
+6. To confirm the guard cannot fire on real play, finish a voyage at the top merchant rating and confirm the column is still empty.
 7. To confirm the consequence, have one captain report an impossible Reputation and finish the voyage. Confirm they still appear in the standings, confirm their Renown XP for that voyage is zero, confirm no new merits were granted, and confirm the crown went to the highest scoring honest captain rather than to nobody.
 8. To confirm the memory, do the same thing in reverse. Send one impossible save early in a voyage, then play on and finish with entirely ordinary Gold and Reputation. The figures you finish on would pass on their own, so this is the case the stored mark exists for: confirm the voyage still banks no Renown and no merits, and that the server log names an earlier save as the reason rather than the final total.
 
@@ -422,7 +456,7 @@ You need a way to send a request directly, since the game itself will never prod
 
 ## Status: what exists in the game right now versus what is still planned
 
-This document now covers the ten features that actually exist in the game as of this writing. Seven more are planned and one has been dropped, so please do not go looking for those eight, if you do not see something described here, it almost certainly just has not been built yet rather than being broken.
+This document covers the ten manifest systems that exist in the game as of this writing, plus direct barter offers and the Harbor Office, which sit outside the manifest. Seven manifest entries are planned and one has been dropped, so please do not go looking for those eight; if you do not see something described here, it almost certainly just has not been built yet rather than being broken.
 
 The design source for all eighteen, with what each one does and why, now lives in [HARBOR_MANIFEST.md](HARBOR_MANIFEST.md) alongside this file. Where the two disagree, that file is right about intent and this one is right about what is actually playable.
 

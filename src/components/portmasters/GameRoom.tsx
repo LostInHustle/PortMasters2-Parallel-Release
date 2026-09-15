@@ -12,7 +12,10 @@ import {
 import type { VoyageCompleteEvent } from "@/lib/realtime";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import {
+  APP_NAME,
   BROKERS_FAVOR_UNLOCK_LEVEL,
+  guideText,
+  tipsText,
   WORD_ON_THE_DOCKS_THRESHOLD,
 } from "@/lib/game/constants";
 import { meritById } from "@/lib/game/merits";
@@ -44,8 +47,7 @@ import { GameStatusPanel } from "./game/GameStatusPanel";
 import { GamePhasePanel } from "./game/GamePhasePanel";
 import { GameControlPanel } from "./game/GameControlPanel";
 import {
-  GuideModal,
-  TipsModal,
+  TextModal,
   RumorBoardModal,
   TutorialModal,
   RestartConfirmModal,
@@ -62,8 +64,10 @@ import { ScrollArea } from "@/components/ui/scrollArea";
 import { toast } from "sonner";
 import {
   Anchor,
+  BookOpen,
   DoorOpen,
   Copy,
+  Lightbulb,
   Users,
   MessageCircle,
   Ship,
@@ -109,7 +113,6 @@ export function GameRoom({
   const { state, act, ctx, flush, startingGoldBonus } = useGameSession(
     room.id,
     socket,
-    true,
     me.id,
   );
   const phaseSync = usePhaseSync(
@@ -185,7 +188,7 @@ export function GameRoom({
     [act],
   );
   // I'm the lender, being repaid: either a captain paying me back early,
-  // or a forced settlement at the end of Round 8 (see the
+  // or a forced settlement at the end of the final round (see the
   // _pendingDebtSettlements effect below), identical from this side.
   const onAidRepaid = useCallback(
     (loan: RepaidLoan) => {
@@ -1059,15 +1062,23 @@ export function GameRoom({
         </div>
       </main>
 
-      <GuideModal
+      <TextModal
         open={guideOpen}
         onOpenChange={setGuideOpen}
-        difficulty={state.game.difficulty}
+        title="Navigation Guide"
+        description={`${APP_NAME} rules and shortcuts`}
+        icon={<BookOpen className="h-5 w-5 text-teal-600 dark:text-teal-400" />}
+        text={guideText(state.game.difficulty)}
       />
-      <TipsModal
+      <TextModal
         open={tipsOpen}
         onOpenChange={setTipsOpen}
-        difficulty={state.game.difficulty}
+        title="Trade Strategy Advice"
+        description="Bankruptcy avoidance strategies"
+        icon={
+          <Lightbulb className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+        }
+        text={tipsText(state.game.difficulty)}
       />
       <RumorBoardModal
         open={rumorOpen}

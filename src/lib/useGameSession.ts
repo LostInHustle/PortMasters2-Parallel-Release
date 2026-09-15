@@ -48,11 +48,7 @@ export type SessionState = {
 
 export type Action =
   | { type: "INIT"; game: GameState; logs: string[] }
-  | {
-      type: "APPLY";
-      fn: (g: GameState, logs: string[]) => void;
-      postDraft?: boolean;
-    }
+  | { type: "APPLY"; fn: (g: GameState, logs: string[]) => void }
   | {
       type: "START_FRESH";
       checkpoint?: { round: number; phase: string } | null;
@@ -108,17 +104,31 @@ export function reducer(state: SessionState, action: Action): SessionState {
   }
 }
 
+// The status line every captain broadcasts to the room (see the game:status
+// handler in src/server/realtime.ts), sent both on change and on a heartbeat.
+function statusOf(roomId: string, game: GameState) {
+  return {
+    roomId,
+    round: game.currentRound,
+    phase: game.phase,
+    phaseLabel: phaseLabel(game),
+    gold: game.money,
+    reputation: game.score,
+    shipLevel: game.shipLevel,
+    gameOver: game.gameOver,
+  };
+}
+
 export function useGameSession(
   roomId: string,
   socket: Socket | null,
-  enabled: boolean,
-  userId: string = "",
+  userId: string,
 ) {
   // The captain's own deterministic seed identity. Folding userId in is what
   // gives every captain their own market, orders, and Broker intel instead of
   // the room wide identical economy this used to derive from roomId alone.
   const ctx: GameContext = useMemo(
-    () => ({ seedBase: userId ? `${roomId}:${userId}` : roomId }),
+    () => ({ seedBase: `${roomId}:${userId}` }),
     [roomId, userId],
   );
   const [state, dispatch] = useReducer(reducer, {
@@ -138,7 +148,6 @@ export function useGameSession(
 
   // Load saved state on mount / room change.
   useEffect(() => {
-    if (!enabled) return;
     let alive = true;
 
     // Safety net: if the API call hangs (network hiccup, server spinning up),
@@ -263,52 +272,33 @@ export function useGameSession(
       alive = false;
       clearTimeout(timeoutId);
     };
-  }, [roomId, enabled, ctx]);
+  }, [roomId, ctx]);
 
   // Broadcast live status to the room on every game change.
   const broadcastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (!enabled || !state.loaded || !socket) return;
+    if (!state.loaded || !socket) return;
     if (broadcastTimer.current) clearTimeout(broadcastTimer.current);
     broadcastTimer.current = setTimeout(() => {
-      socket.emit("game:status", {
-        roomId,
-        round: state.game.currentRound,
-        phase: state.game.phase,
-        phaseLabel: phaseLabel(state.game),
-        gold: state.game.money,
-        reputation: state.game.score,
-        shipLevel: state.game.shipLevel,
-        gameOver: state.game.gameOver,
-      });
+      socket.emit("game:status", statusOf(roomId, state.game));
     }, 120);
     return () => {
       if (broadcastTimer.current) clearTimeout(broadcastTimer.current);
     };
-  }, [state.game, state.loaded, socket, roomId, enabled]);
+  }, [state.game, state.loaded, socket, roomId]);
 
   // Heartbeat: rebroadcast status every 8s so the server side cache stays
   // fresh and late joiners (or reconnects after a realtime restart) hydrate.
   useEffect(() => {
-    if (!enabled || !state.loaded || !socket) return;
+    if (!state.loaded || !socket) return;
     const t = setInterval(() => {
-      socket.emit("game:status", {
-        roomId,
-        round: state.game.currentRound,
-        phase: state.game.phase,
-        phaseLabel: phaseLabel(state.game),
-        gold: state.game.money,
-        reputation: state.game.score,
-        shipLevel: state.game.shipLevel,
-        gameOver: state.game.gameOver,
-      });
+      socket.emit("game:status", statusOf(roomId, state.game));
     }, 8000);
     return () => clearInterval(t);
   }, [
     state.loaded,
     socket,
     roomId,
-    enabled,
     state.game.currentRound,
     state.game.phase,
     state.game.money,
@@ -325,7 +315,7 @@ export function useGameSession(
   const dirtyRef = useRef(false);
 
   useEffect(() => {
-    if (!enabled || !state.loaded) return;
+    if (!state.loaded) return;
     latestGameRef.current = state.game;
     dirtyRef.current = true;
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -346,7 +336,7 @@ export function useGameSession(
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
-  }, [state.game, state.loaded, roomId, enabled]);
+  }, [state.game, state.loaded, roomId]);
 
   // Flush any unsaved changes immediately. Call this before deliberately
   // leaving a room so the debounce window above can't silently drop the

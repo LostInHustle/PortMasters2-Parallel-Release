@@ -25,7 +25,7 @@ import {
 } from "./constants";
 import { DIFFICULTIES } from "./difficulty";
 
-// ---------- Deriving the ceiling ----------
+// ========== Deriving the ceiling ==========
 // Every number below is read from the live game data rather than written
 // out by hand, the same reasoning merits.ts follows when it reads its own
 // thresholds from MERCHANT_RATINGS: a charter that adds a richer good or a
@@ -112,7 +112,7 @@ const SUSPECT_FRACTION = 10;
 
 export type IntegritySeverity = "ok" | "suspect" | "impossible";
 
-// ---------- Reading a save ----------
+// ========== Reading a save ==========
 // Both fields are optional, and that is the point. An earlier version
 // required both and returned null if either was missing or the wrong type,
 // which meant a save could skip the guard entirely simply by leaving one of

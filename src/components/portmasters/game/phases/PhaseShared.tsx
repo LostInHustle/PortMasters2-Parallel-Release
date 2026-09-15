@@ -17,7 +17,7 @@ export type Barter = ReturnType<typeof useBarter>;
 export type Aid = ReturnType<typeof useAid>;
 export type Backing = ReturnType<typeof useBacking>;
 
-// ---------- Shared "ready" footer ----------
+// ========== Shared "ready" footer ==========
 // Every phase component takes its data as explicit props rather than
 // closing over a parent's scope, and lives as a module level export rather
 // than a nested function component. Nested function components used to be

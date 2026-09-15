@@ -10,7 +10,7 @@ import type { Prisma } from "../../generated/prisma";
 import { db } from "./db";
 import { PUBLIC_USER_SELECT, publicUser } from "./publicUser";
 
-// ---------- Codes ----------
+// ========== Codes ==========
 // Six characters from an alphabet with no lookalikes (no 0/O, no 1/I),
 // so a code read aloud across a table survives the trip.
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -24,7 +24,7 @@ export function generateRoomCode(): string {
   return out;
 }
 
-// ---------- Summaries ----------
+// ========== Summaries ==========
 // The include every room read needs to produce a RoomSummary
 // (see src/lib/api.ts for the client side type), and the one function
 // that shapes it. Six routes used to each spell out the same eleven
@@ -56,7 +56,7 @@ export function roomSummary(room: RoomWithRoster) {
   };
 }
 
-// ---------- Joining ----------
+// ========== Joining ==========
 // The voyage locks once it starts: someone who hadn't already joined
 // can't slip in mid voyage, but a returning member (a brief disconnect,
 // a refresh) is always welcome back to their own seat. Membership is an
@@ -87,7 +87,7 @@ export async function joinRoom(
   return { ok: true, room: roomSummary(fresh) };
 }
 
-// ---------- Leaving ----------
+// ========== Leaving ==========
 // Drop their seat, hand off the host crown if they were holding it, and
 // remove the room entirely once nobody is left in it.
 export type LeaveRoomResult =

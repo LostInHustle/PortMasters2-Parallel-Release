@@ -62,7 +62,7 @@ function rawEntries(card: ResourceCard) {
   return card.isProductCard ? [] : card.resources;
 }
 
-// ---------- The Harbor Pulse ----------
+// ========== The Harbor Pulse ==========
 suite("Harbor Pulse: price nudge is item surgical and direction correct");
 
 test("a positive Hemp pulse never lowers Hemp's price and never touches any other item's price, across every round of a Fair Winds voyage", () => {
@@ -216,7 +216,7 @@ test("what a captain buys in round 1 shapes round 2's prices through the exact s
   );
 });
 
-// ---------- Tidewatch Alerts ----------
+// ========== Tidewatch Alerts ==========
 suite(
   "Tidewatch Alerts: the +1 cargo lot applies on top of the tier's own schedule",
 );
@@ -267,7 +267,7 @@ test("tidewatchSurge never touches voyage length or difficulty identity", () => 
   );
 });
 
-// ---------- Word on the Docks ----------
+// ========== Word on the Docks ==========
 // Unlike the two suites above, a real multi round voyage is unavoidable here,
 // the threshold is about genuinely completed trade orders, which depends
 // on what the (unseeded) boon draft and order board hand a captain. Written

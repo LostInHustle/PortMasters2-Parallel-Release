@@ -34,7 +34,7 @@ export const GLOSSARY: Record<string, string> = {
 
   // Core stats
   Reputation:
-    "Your score for the voyage, roughly your accumulated trading profit. Highest reputation after round 8 wins.",
+    "Your score for the voyage, roughly your accumulated trading profit. Highest reputation when the voyage ends wins.",
   Gold: "Your spendable funds. Hit zero with bills still due and the voyage ends in bankruptcy.",
   VAT: "A 5% tax on the profit margin of finished good sales (selling price minus material cost minus wage). Raw material sales aren't taxed this way.",
   "Income Tax":
@@ -57,8 +57,8 @@ export const GLOSSARY: Record<string, string> = {
   Escort:
     "Guarantees safe passage from that round's pirate attack, for a cost of 10% of your current Gold. Once hired, the round's pirates are no longer a risk.",
   "Financial Aid":
-    "A loan from another captain when you can't cover this round's wages or maintenance on your own. The lender's Gold transfers to you immediately; you owe it back before the voyage ends, or it's deducted automatically and handed to them at Round 8.",
-  Debt: "Gold you owe another captain after taking a loan. Repay it any time before Round 8 ends. If you still can't cover it by then, the amount still owed comes straight out of your funds and you're marked bankrupt when the voyage finishes.",
+    "A loan from another captain when you can't cover this round's wages or maintenance on your own. The lender's Gold transfers to you immediately; you owe it back before the voyage ends, or it's deducted automatically and handed to them on the final round.",
+  Debt: "Gold you owe another captain after taking a loan. Repay it any time before the final round ends. If you still can't cover it by then, the amount still owed comes straight out of your funds and you're marked bankrupt when the voyage finishes.",
 };
 
 for (const b of BOONS) GLOSSARY[b.name] = b.desc;

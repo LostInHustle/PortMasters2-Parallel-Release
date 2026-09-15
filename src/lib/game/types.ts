@@ -207,11 +207,11 @@ export type GameState = {
   brokerTippedPirates: boolean;
   // Loans currently owed to other captains (debts) and by other captains
   // to this one (loansGiven). Settled voluntarily at any time, or forced
-  // at the end of Round 8 (see settleOutstandingDebts in engine.ts).
+  // at the end of the final round (see settleOutstandingDebts in engine/aid.ts).
   debts: Loan[];
   loansGiven: Loan[];
   // Set only by settleOutstandingDebts, when a forced repayment at the end
-  // of Round 8 still couldn't fully cover what was owed. Drives the
+  // of the final round still couldn't fully cover what was owed. Drives the
   // endgame screen's outcome instead of the normal merchant rank.
   defaultedDebt: boolean;
   // Transient: a signal for the React layer to relay over the aid:repay

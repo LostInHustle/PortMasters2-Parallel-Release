@@ -142,7 +142,7 @@ export function clearRedirectedLoan(
   logs.push(`🤝 Your bequest was paid out to ${redirectedToName}`);
 }
 
-// Called once, at the true end of Round 8 (see endRound below), never
+// Called once, at the true end of the final round (see endRound in ./lifecycle), never
 // before: any loan a captain hasn't already repaid by then gets forced
 // through, paying whatever can be covered. Falling short of the full
 // amount owed is what flags defaultedDebt for the endgame screen, rather

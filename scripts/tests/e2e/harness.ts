@@ -7,8 +7,8 @@
 // page.click(...)` inside a test body, and making the shared test()
 // async without every caller awaiting it would let summary() run before
 // any results land (await, even on a plain value, always yields at least
-// one microtask). Rather than risk that regression across six passing
-// suites, this is its own module: same shape, `test()` awaited by design.
+// one microtask). Rather than risk that regression across every passing
+// suite, this is its own module: same shape, `test()` awaited by design.
 // The pure assertion helpers have no state to duplicate, so they're
 // reexported straight from the original.
 // =====================================================================

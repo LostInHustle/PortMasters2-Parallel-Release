@@ -91,7 +91,7 @@ function freshState(
   return createInitialGameState(0, 1, 0, difficulty);
 }
 
-// ---------- Difficulty selectors ----------
+// ========== Difficulty selectors ==========
 suite("difficulty selectors");
 
 test("normalizeDifficulty falls back to fair_winds on garbage input", () => {
@@ -233,7 +233,7 @@ test("mandateIndexFor matches each tier's schedule exactly", () => {
   assertEqual(mandateIndexFor("monsoon", 16), 2, "monsoon round 16 -> large");
 });
 
-// ---------- Content pools ----------
+// ========== Content pools ==========
 suite("content pools");
 
 test("unlockedResources: fair_winds only ever sees the founding trio", () => {
@@ -368,7 +368,7 @@ test("isCharterGood: tier1/tier2 goods are charter goods, founding trade is not"
   }
 });
 
-// ---------- Price / VAT / transport math ----------
+// ========== Price / VAT / transport math ==========
 suite("price and tax math");
 
 test("calcTransportCost: base formula, ship level discount, floor at 5 (no modules)", () => {
@@ -629,7 +629,7 @@ test("merchantRatingForScore picks the highest threshold the score clears", () =
   );
 });
 
-// ---------- Legacy / Renown ----------
+// ========== Legacy / Renown ==========
 suite("legacy and renown");
 
 test("xpRequiredForLevel follows the documented triangular curve", () => {
@@ -687,7 +687,7 @@ test("parseStatsByDifficulty / recordVoyageInStats round trip and degrade gracef
   assertEqual(stats.monsoon.bestScore, 400, "best score still tracks the max");
 });
 
-// ---------- Merits ----------
+// ========== Merits ==========
 suite("difficulty scoped merits");
 
 test("open_water_captain requires open_waters and no bankruptcy", () => {
@@ -771,7 +771,7 @@ test("storm_sovereign requires a monsoon crown; eye_of_the_storm requires monsoo
   );
 });
 
-// ---------- Sanity on the config table itself ----------
+// ========== Sanity on the config table itself ==========
 suite("difficulty config integrity");
 
 test("every difficulty's mandate schedule only references valid MANDATE_TEMPLATES indices", () => {
@@ -796,7 +796,7 @@ test("every difficulty's tierUnlock rounds fall within its own voyage length", (
   }
 });
 
-// ---------- Harbor systems (Manifests 01 to 03) ----------
+// ========== Harbor systems (Manifests 01 to 03) ==========
 // Pure function coverage for the three room wide harbor systems merged via
 // PR #12: The Harbor Pulse (price nudge), Word on the Docks (the race to
 // three orders), and Tidewatch Alerts (combined reputation surge). Each system's
@@ -824,7 +824,7 @@ function orderCard(
   };
 }
 
-// ----- The Harbor Pulse: computeHarborPulse -----
+// ========== The Harbor Pulse: computeHarborPulse ==========
 
 test("computeHarborPulse: no tally (round 1, or nobody reported) is neutral", () => {
   assertEqual(
@@ -876,7 +876,7 @@ test("computeHarborPulse: a total of zero (all reported quantities zero or negat
   assertEqual(Object.keys(pulse).length, 0, "zero total -> {}");
 });
 
-// ----- The Harbor Pulse: tallyPurchasesByResource -----
+// ========== The Harbor Pulse: tallyPurchasesByResource ==========
 
 test("tallyPurchasesByResource: sums only purchased, raw resource cards", () => {
   const s = freshState();
@@ -965,7 +965,7 @@ test("tallyPurchasesByResource: nothing purchased yields an empty tally", () => 
   );
 });
 
-// ----- The Harbor Pulse: applyHarborPulse -----
+// ========== The Harbor Pulse: applyHarborPulse ==========
 
 test("applyHarborPulse replaces state.harborPulse wholesale, not a merge", () => {
   const s = freshState();
@@ -975,7 +975,7 @@ test("applyHarborPulse replaces state.harborPulse wholesale, not a merge", () =>
   assertEqual(s.harborPulse.Silk, undefined, "prior round's pulse is gone");
 });
 
-// ----- Tidewatch Alerts: applyTidewatchSurge -----
+// ========== Tidewatch Alerts: applyTidewatchSurge ==========
 
 test("applyTidewatchSurge: flips the flag once and logs exactly once", () => {
   const s = freshState();
@@ -996,7 +996,7 @@ test("applyTidewatchSurge: idempotent once already flipped, never a repeat annou
   assertEqual(s.tidewatchSurge, true, "flag stays true");
 });
 
-// ----- Word on the Docks: claimWordOnTheDocksReward -----
+// ========== Word on the Docks: claimWordOnTheDocksReward ==========
 
 test("claimWordOnTheDocksReward: pays the reward exactly once per call and logs it", () => {
   const s = freshState();
@@ -1008,7 +1008,7 @@ test("claimWordOnTheDocksReward: pays the reward exactly once per call and logs 
   assert(logs[0].includes("Word on the Docks"), "log names the system");
 });
 
-// ----- Word on the Docks: completeOrder's one shot claim signal -----
+// ========== Word on the Docks: completeOrder's one shot claim signal ==========
 
 test("completeOrder: _pendingDocksClaim is unset before the threshold, set exactly at it", () => {
   const s = freshState();
@@ -1058,7 +1058,7 @@ test("completeOrder: never sets _pendingDocksClaim a second time past the thresh
   );
 });
 
-// ----- Constant sanity: guards silent balance drift -----
+// ========== Constant sanity: guards silent balance drift ==========
 // These numbers are load bearing in guideText()/tipsText() copy and in the
 // server's arbitration logic; a change here should be a deliberate design
 // decision, not a typo that silently desyncs the rules text from the code.
@@ -1069,7 +1069,7 @@ test("harbor system constants match the documented design", () => {
   assertEqual(TIDEWATCH_SURGE_THRESHOLD, 500, "combined Reputation past 500");
 });
 
-// ---------- Bequest Routing (Manifest 07) ----------
+// ========== Bequest Routing (Manifest 07) ==========
 suite("Bequest Routing");
 
 function stateWithLoanGiven(): GameState {
@@ -1129,7 +1129,7 @@ test("clearRedirectedLoan only removes the matching debt, leaving any other outs
   assertEqual(s.loansGiven[0].id, "debt2", "debt2 is still tracked");
 });
 
-// ---------- [MANIFEST 13] Ledger Integrity Pass ----------
+// ========== [MANIFEST 13] Ledger Integrity Pass ==========
 // The guard only ever flags, never rejects, so the property that actually
 // matters is that ordinary play can never trip it. These pin both ends: a
 // real voyage's numbers stay plausible, and a forged one does not.

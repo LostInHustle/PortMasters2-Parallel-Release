@@ -97,7 +97,7 @@ export function usePhaseSync(
       setReady(data);
       const g = gameRef.current;
 
-      // ── Desync catch up ──────────────────────────────────────────
+      // ========== Desync catch up ==========
       // When the room's synchronized checkpoint has moved ahead of us
       // (we missed a phase:advance broadcast because of a transport
       // blip, common on tunnelled connections like ngrok), execute the
@@ -123,7 +123,7 @@ export function usePhaseSync(
         return;
       }
 
-      // ── Self heal a dropped ready vote ────────────────────────────
+      // ========== Self heal a dropped ready vote ==========
       // A vote emitted the instant a flaky transport blips (common on
       // tunnelled or long polling connections) can reach the server
       // stamped against the pre reconnect socket, fail that handler's

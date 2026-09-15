@@ -32,7 +32,7 @@ import {
 } from "../../src/lib/game/engine";
 import { createInitialGameState } from "../../src/lib/game/types";
 
-// ---------- computeBackingResolution ----------
+// ========== computeBackingResolution ==========
 suite(
   "Backing: computeBackingResolution decides exactly how much of a pledge is called on",
 );
@@ -75,7 +75,7 @@ test("an overpayment (more than the loan's own amount) is treated the same as fu
   assertEqual(refundAmount, 40, "the entire pledge comes back");
 });
 
-// ---------- Engine side: the Gold effects ----------
+// ========== Engine side: the Gold effects ==========
 suite("Backing: the engine functions apply Gold exactly as resolved");
 
 test("pledgeBacking escrows the exact amount, and refuses a pledge the captain can't afford", () => {
@@ -147,7 +147,7 @@ test("receiveBackedCoverage credits the lender exactly the amount the backer cov
   assert(logs.length > 0, "a log line is written");
 });
 
-// ---------- Forced settlement reporting ----------
+// ========== Forced settlement reporting ==========
 // The bug these cover: computeBackingResolution was always correct, but for a
 // total default nothing ever called it. settleOutstandingDebts only recorded a
 // settlement when the borrower paid something, and that record is the one
@@ -224,7 +224,7 @@ test("a borrower who can cover the debt reports it in full and does not default"
   assertEqual(refundAmount, 20, "the pledge comes back whole");
 });
 
-// ---------- The helper Reputation ceiling ----------
+// ========== The helper Reputation ceiling ==========
 // The exploit this closes needed no tampering at all: two captains agree in
 // chat, one requests a large loan, the other grants it and banks a fifth of
 // it as Reputation, and the Gold goes straight back. aid:post accepts any
@@ -362,7 +362,7 @@ test("a long voyage allows more helping than a short one, at the same loans", ()
   );
 });
 
-// ---------- Constant sanity ----------
+// ========== Constant sanity ==========
 suite("Backing: the Reputation bonus is documented correctly");
 
 test("BACKING_REPUTATION_PER_GOLD is exactly half AID_REPUTATION_PER_GOLD", () => {
@@ -373,7 +373,7 @@ test("BACKING_REPUTATION_PER_GOLD is exactly half AID_REPUTATION_PER_GOLD", () =
   );
 });
 
-// ---------- Voluntary repayment ----------
+// ========== Voluntary repayment ==========
 // repayLoan is the borrower paying a debt back early, by choice, rather
 // than having it seized at the end of the voyage by settleOutstandingDebts
 // (covered further up). It had no coverage of its own despite being the

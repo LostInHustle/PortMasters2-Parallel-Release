@@ -14,3 +14,12 @@ export function cn(...inputs: ClassValue[]) {
 export function normalizeRoomName(name: string): string {
   return name.replace(/\s+/g, " ").trim();
 }
+
+// The short hour and minute stamp beside a chat line or a notification, in
+// the viewer's own locale.
+export function clockTime(when: string | number | Date): string {
+  return new Date(when).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}

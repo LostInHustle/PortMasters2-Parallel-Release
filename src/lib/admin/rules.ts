@@ -79,7 +79,11 @@ export function canModerate(
   return { ok: true };
 }
 
-// ---------- Acting on several captains at once ----------
+// How many captains one page of the roster holds, shared by the route that
+// slices the list and the console that counts the pages.
+export const PLAYER_PAGE_SIZE = 25;
+
+// ========== Acting on several captains at once ==========
 // The bulk bar in the console and the bulk route on the server both need
 // the same answer: of these selected captains, which ones can this action
 // actually apply to, and why not the rest. Beyond the permission matrix
@@ -130,14 +134,14 @@ export function normalizeBanReason(raw: unknown): string | null {
   return reason;
 }
 
-// ---------- Admin key attempts ----------
+// ========== Admin key attempts ==========
 // The key is the root credential for the whole console, so guessing at it
 // is the one thing here worth slowing down. A handful of wrong tries per
 // account within a window, then a wait. Kept per account rather than per
 // address because every request here is already authenticated, and one
 // signed in account hammering the form is exactly the case to stop.
-export const KEY_ATTEMPT_LIMIT = 5;
-export const KEY_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
+const KEY_ATTEMPT_LIMIT = 5;
+const KEY_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
 
 export type ThrottleVerdict =
   { allowed: true } | { allowed: false; retryAfterMs: number };

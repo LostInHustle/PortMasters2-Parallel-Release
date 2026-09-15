@@ -24,6 +24,7 @@ import {
   bulkEligibility,
   canModerate,
   isStaff,
+  PLAYER_PAGE_SIZE,
   type BulkAction,
   type Role,
 } from "@/lib/admin/rules";
@@ -36,10 +37,9 @@ import { ModerationLog } from "./ModerationLog";
 import { PlayerActionDialog, type PendingAction } from "./PlayerActionDialog";
 import { BulkActionDialog } from "./BulkActionDialog";
 
-const PAGE_SIZE = 25;
 const SEARCH_DEBOUNCE_MS = 250;
 
-export function roleLabel(role: Role): string {
+function roleLabel(role: Role): string {
   return role === "admin"
     ? "Admin"
     : role === "moderator"
@@ -192,7 +192,7 @@ export function AdminConsole({
   const reach = (action: BulkAction) =>
     bulkEligibility(actor, action, selection).eligible.length;
 
-  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const pageCount = Math.max(1, Math.ceil(total / PLAYER_PAGE_SIZE));
 
   return (
     <div className="pm-canvas min-h-screen w-full">

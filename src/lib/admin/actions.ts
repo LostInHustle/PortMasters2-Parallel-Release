@@ -20,6 +20,7 @@ import {
   bulkEligibility,
   canModerate,
   normalizeRole,
+  PLAYER_PAGE_SIZE,
   type BulkAction,
   type LoggedAction,
   type ModerationAction,
@@ -40,7 +41,7 @@ export class ModerationError extends Error {
 
 export type Actor = { id: string; displayName: string; role: Role };
 
-// ---------- The admin key ----------
+// ========== The admin key ==========
 
 function configuredKey(): string {
   return (process.env.ADMIN_KEY ?? "").trim();
@@ -60,7 +61,7 @@ export function adminKeyMatches(candidate: string): boolean {
   return timingSafeEqual(expected, given);
 }
 
-// ---------- Audit log ----------
+// ========== Audit log ==========
 
 async function record(
   actor: { id: string; displayName: string },
@@ -110,7 +111,7 @@ export async function listModerationLog(
   }));
 }
 
-// ---------- Claiming the seat ----------
+// ========== Claiming the seat ==========
 
 export async function adminSeatTaken(): Promise<boolean> {
   const holder = await db.user.findFirst({
@@ -147,7 +148,7 @@ export async function claimAdminSeat(claimant: {
   return "claimed";
 }
 
-// ---------- Reading players ----------
+// ========== Reading players ==========
 
 export type AdminPlayer = {
   id: string;
@@ -162,8 +163,6 @@ export type AdminPlayer = {
   voyagesCompleted: number;
   online: boolean;
 };
-
-export const PLAYER_PAGE_SIZE = 25;
 
 export async function listPlayers(opts: {
   query?: string;
@@ -213,7 +212,7 @@ export async function listPlayers(opts: {
   };
 }
 
-// ---------- Acting on a player ----------
+// ========== Acting on a player ==========
 
 type Subject = {
   id: string;
@@ -339,7 +338,7 @@ export async function deletePlayer(
   return target;
 }
 
-// ---------- Acting on several captains at once ----------
+// ========== Acting on several captains at once ==========
 
 export type BulkOutcome = {
   done: Subject[];
@@ -421,7 +420,7 @@ export async function applyToMany(
   return outcome;
 }
 
-// ---------- Clearing the log ----------
+// ========== Clearing the log ==========
 
 // Wipes every entry, then writes one more recording that it happened and
 // how much went. A log that can vanish without trace is not an audit log;
