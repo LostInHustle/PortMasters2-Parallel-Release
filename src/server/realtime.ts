@@ -1439,6 +1439,10 @@ export function attachRealtime(httpServer: HttpServer): Server {
     state.userId = user.id;
     state.user = user;
     state.authed = true;
+    // The lobby channel is available to every signed in captain, including
+    // one who is currently aboard a room. Joining here keeps the channel
+    // scoped to authenticated sockets without a second auth check on send.
+    socket.join("lobby");
     let set = userSockets.get(user.id);
     if (!set) {
       set = new Set();
@@ -2713,6 +2717,36 @@ export function attachRealtime(httpServer: HttpServer): Server {
         });
       },
     );
+
+    socket.on("chat:lobby", async (payload: { content?: string }) => {
+      const s = requireAuth();
+      if (!s) return;
+      const content = (payload?.content ?? "").trim();
+      if (!content) return;
+      if (content.length > 1000) return;
+
+      const msg = await db.message.create({
+        data: {
+          roomId: null,
+          senderId: s.userId,
+          recipientId: null,
+          content,
+        },
+        include: {
+          sender: {
+            select: PUBLIC_USER_SELECT,
+          },
+        },
+      });
+      io.to("lobby").emit("chat:lobby", {
+        message: {
+          id: msg.id,
+          content: msg.content,
+          createdAt: msg.createdAt,
+          sender: publicUser(msg.sender),
+        },
+      });
+    });
 
     socket.on(
       "chat:dm",

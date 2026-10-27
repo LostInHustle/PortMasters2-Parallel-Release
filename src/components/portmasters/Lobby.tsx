@@ -18,7 +18,14 @@ import {
   difficultyConfig,
   type Difficulty,
 } from "@/lib/game/difficulty";
-import { Avatar, OnlineDot, Pill } from "./shared";
+import {
+  Avatar,
+  HarborCrest,
+  OnlineDot,
+  PanelHeading,
+  Pill,
+  SectionLabel,
+} from "./shared";
 import { ChatPanel } from "./ChatPanel";
 import { CaptainLegacyCard } from "./CaptainLegacyCard";
 import { Button } from "@/components/ui/button";
@@ -26,6 +33,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scrollArea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -34,7 +42,6 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import {
-  Anchor,
   LogOut,
   Plus,
   Ship,
@@ -43,6 +50,7 @@ import {
   KeyRound,
   Loader2,
   ArrowRight,
+  ArrowLeftRight,
   MessageCircle,
   RefreshCw,
   Gift,
@@ -92,6 +100,11 @@ export function Lobby({
   const [dmHistory, setDmHistory] = useState<ChatMessage[]>([]);
   const [dmLoading, setDmLoading] = useState(false);
 
+  // Harbor wide lobby chat, alongside the direct messages above.
+  const [chatTab, setChatTab] = useState<"harbor" | "direct">("harbor");
+  const [lobbyMessages, setLobbyMessages] = useState<ChatMessage[]>([]);
+  const [lobbyLoading, setLobbyLoading] = useState(true);
+
   const refreshRooms = useCallback(async () => {
     setLoadingRooms(true);
     try {
@@ -133,6 +146,24 @@ export function Lobby({
         }
       })
       .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Seed the lobby wide harbor chat with its recent history. Live messages
+  // arrive over the socket from here on.
+  useEffect(() => {
+    let alive = true;
+    api
+      .getLobbyChat()
+      .then(({ messages }) => {
+        if (alive) setLobbyMessages(messages);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (alive) setLobbyLoading(false);
+      });
     return () => {
       alive = false;
     };
@@ -252,6 +283,7 @@ export function Lobby({
 
   async function openDm(user: PublicUser) {
     if (user.id === me.id) return;
+    setChatTab("direct");
     setDmTarget(user);
     setDmLoading(true);
     setDmHistory([]);
@@ -288,34 +320,33 @@ export function Lobby({
   }, [dmTarget?.id]);
 
   const totalOnline = onlineUsers.length;
+  const otherOnline = onlineUsers.filter((u) => u.id !== me.id);
 
   return (
-    <div className="pm-canvas min-h-screen w-full">
+    <div className="pm-canvas flex min-h-[100dvh] w-full flex-col lg:h-[100dvh] lg:min-h-0 lg:overflow-hidden">
       {/* Top bar */}
-      <header className="sticky top-0 z-30 px-4 sm:px-6 py-3">
-        <div className="pm-glass rounded-2xl px-4 py-2.5 flex items-center justify-between gap-3 max-w-7xl mx-auto">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="pm-grad-primary h-9 w-9 rounded-xl flex items-center justify-center shrink-0">
-              <Anchor className="h-5 w-5 text-white" />
-            </div>
+      <header className="sticky top-0 z-30 shrink-0 px-4 py-3 sm:px-6 lg:static">
+        <div className="pm-glass mx-auto flex h-[60px] w-full max-w-[1280px] items-center justify-between gap-3 rounded-2xl px-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <HarborCrest className="h-9 w-9" />
             <div className="min-w-0">
-              <h1 className="font-bold leading-tight tracking-tight text-sm">
+              <h1 className="truncate text-sm leading-tight font-bold tracking-tight">
                 <span className="pm-text-sea">{APP_NAME}</span>
-                <span className="text-muted-foreground font-normal text-xs ml-2">
+                <span className="ml-2 hidden text-xs font-normal text-muted-foreground sm:inline">
                   Online
                 </span>
               </h1>
-              <p className="text-[11px] text-muted-foreground leading-tight">
+              <p className="text-[11px] leading-tight text-muted-foreground">
                 Lords of the Silk Road
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <Pill tone="emerald" className="hidden sm:inline-flex">
               <OnlineDot online={connected && authed} />{" "}
               {connected && authed ? "Online" : "Connecting…"}
             </Pill>
-            <Pill tone="sea" className="hidden sm:inline-flex">
+            <Pill tone="sea" className="hidden md:inline-flex">
               <Users className="h-3 w-3" /> {totalOnline} sailing
             </Pill>
             <button
@@ -334,6 +365,7 @@ export function Lobby({
             <button
               onClick={() => setLegacyOpen(true)}
               className="pm-pressable"
+              title="Captain's Legacy"
             >
               <Pill tone="gold">
                 <Star className="h-3 w-3" /> Renown{" "}
@@ -348,13 +380,13 @@ export function Lobby({
               >
                 <Pill tone="rose">
                   <ShieldCheck className="h-3 w-3" />{" "}
-                  <span className="hidden sm:inline">Harbor Office</span>
+                  <span className="hidden md:inline">Harbor Office</span>
                 </Pill>
               </Link>
             )}
-            <div className="flex items-center gap-2 pl-2 border-l border-black/5 dark:border-white/10">
+            <div className="flex items-center gap-2 border-l border-black/5 pl-2 dark:border-white/10">
               <Avatar hue={me.avatarHue} name={me.displayName} size={32} ring />
-              <div className="hidden sm:block leading-tight">
+              <div className="hidden leading-tight sm:block">
                 <div className="text-sm font-medium">{me.displayName}</div>
                 <div className="text-[10px] text-muted-foreground">
                   @{me.username}
@@ -375,21 +407,15 @@ export function Lobby({
       </header>
 
       {/* Body */}
-      <main className="px-4 sm:px-6 pb-10 max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4 mt-2">
+      <main className="mx-auto flex min-h-0 w-full max-w-[1280px] flex-1 flex-col px-4 pb-4 sm:px-6">
+        <div className="mt-2 grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:overflow-hidden">
           {/* Rooms */}
-          <section className="space-y-4">
-            <div className="pm-glass rounded-2xl p-5">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-lg font-semibold flex items-center gap-2">
-                    <Ship className="h-5 w-5 text-teal-600 dark:text-teal-400" />{" "}
-                    Open Harbors
-                  </h2>
-                  <p className="text-xs text-muted-foreground">
-                    Create a room or join one to set sail together.
-                  </p>
-                </div>
+          <section className="pm-glass flex min-h-0 flex-col rounded-2xl p-5 lg:h-full">
+            <PanelHeading
+              icon={Ship}
+              title="Open Harbors"
+              subtitle="Create a room or join one to set sail together."
+              action={
                 <Button
                   variant="ghost"
                   size="sm"
@@ -401,231 +427,236 @@ export function Lobby({
                     className={cn("h-4 w-4", loadingRooms && "animate-spin")}
                   />
                 </Button>
+              }
+            />
+
+            {/* Create */}
+            <div className="mt-3.5 mb-3.5 rounded-xl bg-black/[0.03] p-3.5 dark:bg-white/[0.04]">
+              <div className="mb-2.5 flex items-center gap-2">
+                <Plus className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+                <span className="text-sm font-medium">Chart a new harbor</span>
               </div>
-
-              {/* Create */}
-              <div className="rounded-xl bg-black/[0.03] dark:bg-white/[0.04] p-3.5 mb-3.5">
-                <div className="flex items-center gap-2 mb-2.5">
-                  <Plus className="h-4 w-4 text-teal-600 dark:text-teal-400" />
-                  <span className="text-sm font-medium">
-                    Chart a new harbor
-                  </span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2 items-end">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">
-                      Room name
-                    </Label>
-                    <Input
-                      value={newName}
-                      onChange={(e) => setNewName(e.target.value)}
-                      placeholder="e.g. Silk Run · Voyage 1"
-                      maxLength={40}
-                      className="h-10"
-                      onKeyDown={(e) => e.key === "Enter" && createRoom()}
-                    />
-                  </div>
-                  <div className="flex items-center gap-2 h-10 px-3 rounded-lg bg-background/60">
-                    <Switch
-                      checked={isPublic}
-                      onCheckedChange={setIsPublic}
-                      id="pub"
-                    />
-                    <Label htmlFor="pub" className="text-xs cursor-pointer">
-                      Public
-                    </Label>
-                  </div>
-                  <Button
-                    onClick={createRoom}
-                    disabled={busy || !newName.trim()}
-                    className="h-10 pm-grad-primary text-white rounded-lg"
-                  >
-                    {busy ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <>
-                        <Plus className="h-4 w-4 mr-1" /> Create
-                      </>
-                    )}
-                  </Button>
-                </div>
-
-                <div className="mt-3">
+              <div className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[1fr_auto_auto]">
+                <div className="space-y-1.5">
                   <Label className="text-xs text-muted-foreground">
-                    Waters
+                    Room name
                   </Label>
-                  <div className="mt-1.5 grid grid-cols-3 gap-1 rounded-full bg-background/60 p-1">
-                    {DIFFICULTY_ORDER.map((key) => {
-                      const cfg = DIFFICULTIES[key];
-                      const active = difficulty === key;
-                      return (
-                        <button
-                          key={key}
-                          type="button"
-                          onClick={() => setDifficulty(key)}
-                          aria-pressed={active}
-                          className="relative cursor-pointer rounded-full px-2 py-1.5 text-xs font-medium"
-                        >
-                          {active && (
-                            <motion.span
-                              layoutId="difficultyThumb"
-                              className="pm-grad-primary absolute inset-0 rounded-full"
-                              transition={{
-                                type: "spring",
-                                stiffness: 380,
-                                damping: 32,
-                              }}
-                            />
-                          )}
-                          <span
-                            className={cn(
-                              "relative z-10 flex items-center justify-center gap-1.5",
-                              active ? "text-white" : "text-muted-foreground",
-                            )}
-                          >
-                            <span>{cfg.icon}</span>
-                            <span className="truncate">{cfg.badge}</span>
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
-                    {DIFFICULTIES[difficulty].tagline}{" "}
-                    <span className="text-foreground/70">
-                      {DIFFICULTIES[difficulty].rounds} rounds.
-                    </span>
-                  </p>
+                  <Input
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder="e.g. Silk Run · Voyage 1"
+                    maxLength={40}
+                    className="h-10"
+                    onKeyDown={(e) => e.key === "Enter" && createRoom()}
+                  />
                 </div>
-              </div>
-
-              {/* Join by code */}
-              <div className="flex items-end gap-2 mb-4">
-                <div className="flex-1 space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">
-                    Join by code
+                <div className="flex h-10 items-center gap-2 rounded-lg bg-background/60 px-3">
+                  <Switch
+                    checked={isPublic}
+                    onCheckedChange={setIsPublic}
+                    id="pub"
+                  />
+                  <Label htmlFor="pub" className="cursor-pointer text-xs">
+                    Public
                   </Label>
-                  <div className="relative">
-                    <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      value={joinCode}
-                      onChange={(e) =>
-                        setJoinCode(e.target.value.toUpperCase().slice(0, 6))
-                      }
-                      placeholder="ABCDEF"
-                      className="h-10 pl-9 tracking-[0.3em] font-mono uppercase"
-                      onKeyDown={(e) => e.key === "Enter" && joinByCode()}
-                    />
-                  </div>
                 </div>
                 <Button
-                  onClick={joinByCode}
-                  disabled={busy || joinCode.trim().length !== 6}
-                  variant="secondary"
-                  className="h-10 rounded-lg"
+                  onClick={createRoom}
+                  disabled={busy || !newName.trim()}
+                  className="pm-grad-primary h-10 rounded-lg text-white"
                 >
-                  Join
+                  {busy ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Plus className="mr-1 h-4 w-4" /> Create
+                    </>
+                  )}
                 </Button>
               </div>
 
-              <AnimatePresence>
-                {error && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-300 text-xs px-3 py-2 mb-3"
-                  >
-                    {error}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Room list */}
-              <div className="space-y-2">
-                {loadingRooms && rooms.length === 0 ? (
-                  <div className="py-10 flex items-center justify-center text-muted-foreground text-sm">
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" /> Scanning
-                    the horizon…
-                  </div>
-                ) : rooms.length === 0 ? (
-                  <div className="py-10 text-center text-sm text-muted-foreground">
-                    No harbors open yet. Be the first to chart one above.
-                  </div>
-                ) : (
-                  rooms.map((room) => {
-                    const isMember = room.members.some((m) => m.id === me.id);
-                    const locked = room.started && !isMember;
+              <div className="mt-3">
+                <Label className="text-xs text-muted-foreground">Waters</Label>
+                <div className="mt-1.5 grid grid-cols-3 gap-1 rounded-full bg-background/60 p-1">
+                  {DIFFICULTY_ORDER.map((key) => {
+                    const cfg = DIFFICULTIES[key];
+                    const active = difficulty === key;
                     return (
-                      <motion.div
-                        key={room.id}
-                        layout
-                        className="group pm-glass rounded-xl p-3.5 flex items-center gap-3 hover:shadow-md transition-shadow"
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setDifficulty(key)}
+                        aria-pressed={active}
+                        className="relative cursor-pointer rounded-full px-2 py-1.5 text-xs font-medium"
                       >
-                        <div className="pm-grad-primary h-10 w-10 rounded-lg flex items-center justify-center shrink-0">
-                          <Ship className="h-5 w-5 text-white" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium truncate">
-                              {normalizeRoomName(room.name)}
-                            </span>
-                            <Pill tone="sea">
-                              {difficultyConfig(room.difficulty).icon}{" "}
-                              {difficultyConfig(room.difficulty).badge}
-                            </Pill>
-                            {room.host.id === me.id && (
-                              <Pill tone="gold">Host</Pill>
-                            )}
-                            {!room.isPublic && (
-                              <Pill tone="amber">Private</Pill>
-                            )}
-                            {room.started && <Pill tone="sea">⛵ Sailing</Pill>}
-                          </div>
-                          <div className="text-[11px] text-muted-foreground flex items-center gap-2 mt-0.5">
-                            <span>Hosted by {room.host.displayName}</span>
-                            <span>·</span>
-                            <span className="font-mono">{room.code}</span>
-                            <span>·</span>
-                            <span className="flex items-center gap-1">
-                              <Users className="h-3 w-3" /> {room.memberCount}
-                            </span>
-                          </div>
-                        </div>
-                        <Button
-                          size="sm"
-                          onClick={() => enterRoom(room)}
-                          disabled={joining === room.id || locked}
-                          title={
-                            locked
-                              ? "This voyage has already set sail"
-                              : undefined
-                          }
-                          className="rounded-lg pm-grad-primary text-white"
-                        >
-                          {joining === room.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : locked ? (
-                            "Locked"
-                          ) : (
-                            <>
-                              Enter <ArrowRight className="h-4 w-4 ml-1" />
-                            </>
+                        {active && (
+                          <motion.span
+                            layoutId="difficultyThumb"
+                            className="pm-grad-primary absolute inset-0 rounded-full"
+                            transition={{
+                              type: "spring",
+                              stiffness: 380,
+                              damping: 32,
+                            }}
+                          />
+                        )}
+                        <span
+                          className={cn(
+                            "relative z-10 flex items-center justify-center gap-1.5",
+                            active ? "text-white" : "text-muted-foreground",
                           )}
-                        </Button>
-                      </motion.div>
+                        >
+                          <span>{cfg.icon}</span>
+                          <span className="truncate">{cfg.badge}</span>
+                        </span>
+                      </button>
                     );
-                  })
-                )}
+                  })}
+                </div>
+                <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+                  {DIFFICULTIES[difficulty].tagline}{" "}
+                  <span className="text-foreground/70">
+                    {DIFFICULTIES[difficulty].rounds} rounds.
+                  </span>
+                </p>
               </div>
+            </div>
+
+            {/* Join by code */}
+            <div className="mb-4 flex items-end gap-2">
+              <div className="flex-1 space-y-1.5">
+                <Label className="text-xs text-muted-foreground">
+                  Join by code
+                </Label>
+                <div className="relative">
+                  <KeyRound className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={joinCode}
+                    onChange={(e) =>
+                      setJoinCode(e.target.value.toUpperCase().slice(0, 6))
+                    }
+                    placeholder="ABCDEF"
+                    className="h-10 pl-9 font-mono tracking-[0.3em] uppercase"
+                    onKeyDown={(e) => e.key === "Enter" && joinByCode()}
+                  />
+                </div>
+              </div>
+              <Button
+                onClick={joinByCode}
+                disabled={busy || joinCode.trim().length !== 6}
+                variant="secondary"
+                className="h-10 rounded-lg"
+              >
+                Join
+              </Button>
+            </div>
+
+            <AnimatePresence>
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mb-3 rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-600 dark:text-rose-300"
+                >
+                  {error}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <SectionLabel
+              className="mb-2 shrink-0"
+              trailing={
+                <span className="text-[10px] text-muted-foreground">
+                  {rooms.length} open
+                </span>
+              }
+            >
+              Harbors on the tide
+            </SectionLabel>
+
+            {/* Room list */}
+            <div className="pm-scroll -mx-1 min-h-0 flex-1 space-y-2 overflow-y-auto px-1 pb-1">
+              {loadingRooms && rooms.length === 0 ? (
+                <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Scanning the
+                  horizon…
+                </div>
+              ) : rooms.length === 0 ? (
+                <div className="py-10 text-center text-sm text-muted-foreground">
+                  No harbors open yet. Be the first to chart one above.
+                </div>
+              ) : (
+                rooms.map((room) => {
+                  const isMember = room.members.some((m) => m.id === me.id);
+                  const locked = room.started && !isMember;
+                  const roomTide = difficultyConfig(room.difficulty);
+                  return (
+                    <motion.div
+                      key={room.id}
+                      layout
+                      className="group pm-glass flex items-center gap-3 rounded-xl p-3.5 transition-shadow hover:shadow-md"
+                    >
+                      <div className="pm-grad-primary flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
+                        <Ship className="h-5 w-5 text-white" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="truncate font-medium">
+                            {normalizeRoomName(room.name)}
+                          </span>
+                          <Pill tone="sea">
+                            {roomTide.icon} {roomTide.badge}
+                          </Pill>
+                          {room.host.id === me.id && (
+                            <Pill tone="gold">Host</Pill>
+                          )}
+                          {!room.isPublic && <Pill tone="amber">Private</Pill>}
+                          {room.started && <Pill tone="sea">⛵ Sailing</Pill>}
+                        </div>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                          <span>Hosted by {room.host.displayName}</span>
+                          <span>·</span>
+                          <span className="font-mono">{room.code}</span>
+                          <span>·</span>
+                          <span className="flex items-center gap-1">
+                            <Users className="h-3 w-3" /> {room.memberCount}
+                          </span>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => enterRoom(room)}
+                        disabled={joining === room.id || locked}
+                        title={
+                          locked
+                            ? "This voyage has already set sail"
+                            : undefined
+                        }
+                        className="shrink-0 rounded-lg pm-grad-primary text-white"
+                      >
+                        {joining === room.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : locked ? (
+                          "Locked"
+                        ) : (
+                          <>
+                            Enter <ArrowRight className="ml-1 h-4 w-4" />
+                          </>
+                        )}
+                      </Button>
+                    </motion.div>
+                  );
+                })
+              )}
             </div>
           </section>
 
-          {/* Online + DMs */}
-          <aside className="space-y-4">
-            <div className="pm-glass rounded-2xl p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold flex items-center gap-2">
+          {/* Online + chat channels */}
+          <aside className="flex min-h-0 flex-col gap-4 lg:h-full">
+            <div className="pm-glass flex h-[300px] shrink-0 flex-col rounded-2xl p-4 lg:h-[42%] lg:min-h-[210px] lg:max-h-[320px]">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="flex items-center gap-2 text-sm font-semibold">
                   <Users className="h-4 w-4 text-teal-600 dark:text-teal-400" />{" "}
                   Captains Online
                 </h3>
@@ -633,9 +664,9 @@ export function Lobby({
                   <OnlineDot online size={8} /> {totalOnline}
                 </Pill>
               </div>
-              <ScrollArea className="h-56 pr-2">
+              <ScrollArea className="min-h-0 flex-1">
                 {onlineUsers.length === 0 ? (
-                  <p className="text-xs text-muted-foreground py-6 text-center">
+                  <p className="py-6 text-center text-xs text-muted-foreground">
                     {connected
                       ? "No other captains online yet."
                       : "Connecting to the harbor…"}
@@ -651,9 +682,9 @@ export function Lobby({
                           onClick={() => !isMe && openDm(u)}
                           disabled={isMe}
                           className={cn(
-                            "w-full flex items-center gap-2.5 p-2 rounded-lg text-left transition-colors",
+                            "flex w-full items-center gap-2.5 rounded-lg p-2 text-left transition-colors",
                             isMe
-                              ? "opacity-60 cursor-default"
+                              ? "cursor-default opacity-60"
                               : "hover:bg-black/5 dark:hover:bg-white/5",
                           )}
                         >
@@ -666,11 +697,11 @@ export function Lobby({
                             <OnlineDot
                               online
                               size={8}
-                              className="absolute -bottom-0.5 -right-0.5 ring-2 ring-background"
+                              className="absolute -right-0.5 -bottom-0.5 ring-2 ring-background"
                             />
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium truncate">
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-medium">
                               {u.displayName}{" "}
                               {isMe && (
                                 <span className="text-[10px] text-muted-foreground">
@@ -678,7 +709,7 @@ export function Lobby({
                                 </span>
                               )}
                             </div>
-                            <div className="text-[10px] text-muted-foreground truncate">
+                            <div className="truncate text-[10px] text-muted-foreground">
                               {u.roomId ? "In a harbor" : "In the lobby"}
                             </div>
                           </div>
@@ -699,42 +730,123 @@ export function Lobby({
               </ScrollArea>
             </div>
 
-            {/* DM panel */}
-            <div
-              className="pm-glass rounded-2xl overflow-hidden flex flex-col"
-              style={{ height: 360 }}
+            {/* Harbor and direct channels */}
+            <Tabs
+              value={chatTab}
+              onValueChange={(v) => setChatTab(v as "harbor" | "direct")}
+              className="pm-glass flex h-[400px] shrink-0 flex-col overflow-hidden rounded-2xl lg:h-auto lg:min-h-0 lg:flex-1"
             >
-              <div className="px-4 py-3 border-b border-black/5 dark:border-white/10 flex items-center gap-2">
-                <MessageCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                <span className="text-sm font-medium">
-                  {dmTarget
-                    ? `Direct · ${dmTarget.displayName}`
-                    : "Direct Messages"}
-                </span>
-              </div>
-              {dmTarget ? (
-                dmLoading ? (
-                  <div className="flex-1 flex items-center justify-center text-muted-foreground text-xs">
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading…
+              <TabsList className="m-2 mb-0 grid grid-cols-2">
+                <TabsTrigger value="harbor">
+                  <MessageCircle className="mr-1.5 h-3.5 w-3.5" /> Harbor
+                </TabsTrigger>
+                <TabsTrigger value="direct">
+                  <MessageCircle className="mr-1.5 h-3.5 w-3.5" /> Direct
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent
+                value="harbor"
+                className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
+              >
+                {lobbyLoading ? (
+                  <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
                   </div>
                 ) : (
-                  <ChatPanel
-                    socket={socket}
-                    me={me}
-                    mode="dm"
-                    other={dmTarget}
-                    initialMessages={dmHistory}
-                  />
-                )
-              ) : (
-                <div className="flex-1 flex items-center justify-center text-center px-6">
-                  <p className="text-xs text-muted-foreground/80 leading-relaxed">
-                    Pick a captain from the list above to start a private
-                    conversation.
-                  </p>
-                </div>
-              )}
-            </div>
+                  <div className="flex min-h-0 flex-1 flex-col">
+                    <ChatPanel
+                      socket={socket}
+                      me={me}
+                      mode="lobby"
+                      initialMessages={lobbyMessages}
+                      className="flex-1"
+                    />
+                  </div>
+                )}
+              </TabsContent>
+              <TabsContent
+                value="direct"
+                className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
+              >
+                {dmTarget ? (
+                  <>
+                    <div className="flex shrink-0 items-center gap-2 border-b border-black/5 px-3 py-2 dark:border-white/10">
+                      <Avatar
+                        hue={dmTarget.avatarHue}
+                        name={dmTarget.displayName}
+                        size={24}
+                      />
+                      <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+                        Direct · {dmTarget.displayName}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 rounded-lg px-2 text-[11px]"
+                        onClick={() => setDmTarget(null)}
+                      >
+                        <ArrowLeftRight className="h-3.5 w-3.5" /> Change
+                      </Button>
+                    </div>
+                    {dmLoading ? (
+                      <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />{" "}
+                        Loading…
+                      </div>
+                    ) : (
+                      <div className="flex min-h-0 flex-1 flex-col">
+                        <ChatPanel
+                          socket={socket}
+                          me={me}
+                          mode="dm"
+                          other={dmTarget}
+                          initialMessages={dmHistory}
+                          className="flex-1"
+                        />
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="flex min-h-0 flex-1 flex-col">
+                    <div className="border-b border-black/5 px-3 py-2 text-[11px] text-muted-foreground dark:border-white/10">
+                      Pick a captain to message privately
+                    </div>
+                    <ScrollArea className="min-h-0 flex-1">
+                      {otherOnline.length === 0 ? (
+                        <p className="px-4 py-6 text-center text-xs text-muted-foreground">
+                          No other captains available right now. They'll appear
+                          here once they're online.
+                        </p>
+                      ) : (
+                        <div className="space-y-1 p-2">
+                          {otherOnline.map((u) => (
+                            <button
+                              key={u.id}
+                              onClick={() => openDm(u)}
+                              className="pm-pressable flex w-full items-center gap-2.5 rounded-lg p-2 text-left hover:bg-black/5 dark:hover:bg-white/5"
+                            >
+                              <Avatar
+                                hue={u.avatarHue}
+                                name={u.displayName}
+                                size={28}
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="truncate text-sm font-medium">
+                                  {u.displayName}
+                                </div>
+                                <div className="truncate text-[10px] text-muted-foreground">
+                                  {u.roomId ? "In a harbor" : "In the lobby"}
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </ScrollArea>
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
           </aside>
         </div>
       </main>

@@ -120,6 +120,10 @@ export const api = {
       body: JSON.stringify({ roomId, data }),
     }),
 
+  // Harbor wide lobby chat
+  getLobbyChat: () =>
+    jfetch<{ messages: ChatMessage[] }>("/api/messages/lobby"),
+
   // DMs
   getDmHistory: (otherUserId: string) =>
     jfetch<{ other: PublicUser; messages: ChatMessage[] }>(

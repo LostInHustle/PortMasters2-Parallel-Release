@@ -84,10 +84,12 @@ export function MembersPanel({
     return (statuses[b.id]?.gold ?? 0) - (statuses[a.id]?.gold ?? 0);
   });
 
+  const latestNote = systemNotes[systemNotes.length - 1];
+
   return (
-    <div className="pm-glass rounded-2xl flex flex-col overflow-hidden h-full">
-      <div className="px-4 py-3 border-b border-black/5 dark:border-white/10 flex items-center justify-between">
-        <h3 className="text-sm font-semibold flex items-center gap-2">
+    <div className="pm-glass flex h-full flex-col overflow-hidden rounded-2xl">
+      <div className="flex items-center justify-between border-b border-black/5 px-4 py-3 dark:border-white/10">
+        <h3 className="flex items-center gap-2 text-sm font-semibold">
           <Ship className="h-4 w-4 text-teal-600 dark:text-teal-400" /> Harbor
           Roster
         </h3>
@@ -96,7 +98,7 @@ export function MembersPanel({
         </Pill>
       </div>
 
-      <div className="pm-scroll flex-1 min-h-0 overflow-y-auto p-2.5 space-y-1.5">
+      <div className="pm-scroll min-h-0 flex-1 space-y-1.5 overflow-y-auto p-2.5">
         {sorted.map((m) => {
           const st = statuses[m.id];
           const isMe = m.id === me.id;
@@ -120,10 +122,10 @@ export function MembersPanel({
                 }
               }}
               className={cn(
-                "w-full flex items-center gap-2.5 rounded-xl p-2 border text-left transition-colors cursor-pointer hover:bg-black/[0.03] dark:hover:bg-white/[0.05]",
+                "flex w-full cursor-pointer items-center gap-2.5 rounded-xl border p-2 text-left transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.05]",
                 isMe
                   ? "border-teal-500/30 bg-teal-500/[0.06]"
-                  : "border-black/5 dark:border-white/10 bg-background/40",
+                  : "border-black/5 bg-background/40 dark:border-white/10",
               )}
             >
               <div className="relative shrink-0">
@@ -131,16 +133,16 @@ export function MembersPanel({
                 <OnlineDot
                   online
                   size={9}
-                  className="absolute -bottom-0.5 -right-0.5 ring-2 ring-background rounded-full"
+                  className="absolute -right-0.5 -bottom-0.5 rounded-full ring-2 ring-background"
                 />
               </div>
-              <div className="flex-1 min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-sm font-medium truncate">
+                  <span className="truncate text-sm font-medium">
                     {m.displayName}
                   </span>
                   {isHost && (
-                    <Crown className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                    <Crown className="h-3.5 w-3.5 shrink-0 text-amber-500" />
                   )}
                   {isMe && (
                     <Pill tone="sea" className="!py-0">
@@ -153,11 +155,11 @@ export function MembersPanel({
                     </Pill>
                   )}
                 </div>
-                <div className="text-[10px] text-muted-foreground truncate">
+                <div className="truncate text-[10px] text-muted-foreground">
                   {st ? `R${st.round} · ${st.phaseLabel}` : "loading…"}
                 </div>
               </div>
-              <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex shrink-0 items-center gap-1.5">
                 {isBankrupt ? (
                   <Pill tone="rose">
                     <SkullIcon className="h-3 w-3" /> Bankrupt
@@ -187,7 +189,7 @@ export function MembersPanel({
                     title={
                       isMuted ? "Unmute this captain" : "Mute this captain"
                     }
-                    className="p-1 rounded-lg hover:bg-black/[0.05] dark:hover:bg-white/10 text-muted-foreground"
+                    className="rounded-lg p-1 text-muted-foreground hover:bg-black/[0.05] dark:hover:bg-white/10"
                   >
                     {isMuted ? (
                       <Volume2 className="h-3.5 w-3.5" />
@@ -201,29 +203,32 @@ export function MembersPanel({
           );
         })}
         {members.length === 0 && (
-          <div className="text-center text-xs text-muted-foreground py-6">
+          <div className="py-6 text-center text-xs text-muted-foreground">
             No captains in this harbor yet.
           </div>
         )}
       </div>
 
-      {/* System notices */}
-      {systemNotes.length > 0 && (
-        <div className="border-t border-black/5 dark:border-white/10 px-3 py-2 max-h-16 overflow-y-auto pm-scroll">
-          <AnimatePresence initial={false}>
-            {systemNotes.slice(-2).map((n, i) => (
-              <motion.div
-                key={systemNotes.length - 2 + i}
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="text-[10px] text-muted-foreground italic"
-              >
-                {n}
-              </motion.div>
-            ))}
+      {/* A reserved footer, always the same height. The old conditional
+          notice block changed the roster's height mid game and made every
+          row above it shift while a captain was reading. */}
+      <div className="flex h-9 shrink-0 items-center border-t border-black/5 px-4 dark:border-white/10">
+        <div className="min-w-0 flex-1 overflow-hidden">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.p
+              key={latestNote ? systemNotes.length : "quiet"}
+              initial={{ opacity: 0, y: 3 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -3 }}
+              transition={{ duration: 0.14 }}
+              className="truncate text-[10px] italic text-muted-foreground"
+              title={latestNote}
+            >
+              {latestNote ?? "All quiet in the harbor"}
+            </motion.p>
           </AnimatePresence>
         </div>
-      )}
+      </div>
     </div>
   );
 }
