@@ -51,7 +51,10 @@ import {
   restartGame,
   snapToCheckpoint,
   purchaseIntel,
+  equipModule,
+  isGuaranteedOrder,
 } from "../../src/lib/game/engine";
+import { MODULES } from "../../src/lib/game/constants";
 import {
   createInitialGameState,
   type GameContext,
@@ -521,6 +524,189 @@ test("restartGame resets state and stamps the new difficulty's rounds/gold", () 
   assertEqual(s.currentRound, 1, "round reset to 1");
   assertEqual(s.workers.weaver.length, 0, "workers cleared");
   assertEqual(s.money, 90, "monsoon's starting gold, not the old 9999");
+});
+
+// =====================================================================
+// Broker's Whisper: one revealed rumor owns exactly one Phase 2 card.
+// These drive the real purchaseIntel -> startPhase2 path rather than
+// hand writing an intel list, so the port, the card id, and the board
+// count all come from the engine the player actually runs.
+// =====================================================================
+suite("Broker's Whisper one to one");
+
+function whisperState(round = 1): GameState {
+  const s = createInitialGameState(0, 1, 0, "fair_winds");
+  s.currentRound = round;
+  return s;
+}
+
+function moduleById(id: string) {
+  const found = MODULES.find((m) => m.id === id);
+  assert(!!found, `module '${id}' not found in MODULES`);
+  return found;
+}
+
+function claimedCard(state: GameState, orderId: number | undefined) {
+  assert(orderId !== undefined, "rumor should record the card it claimed");
+  const card = state.customerCards.find((c) => c.id === orderId);
+  assert(!!card, `claimed order ${orderId} should exist on the board`);
+  return card;
+}
+
+test("one rumor overwrites exactly one order, at the port the Broker named", () => {
+  const s = whisperState();
+  s.revealedIntel = [{ item: "Hemp", port: "Guangzhou Port" }];
+  startPhase2(s, ctx, []);
+  const intel = s.revealedIntel[0];
+  const card = claimedCard(s, intel.orderId);
+  assertEqual(card.demandPort, "Guangzhou Port", "guaranteed order port");
+  assert(
+    card.resources.some((r) => r.type === "Hemp"),
+    "guaranteed order still demands the rumored good",
+  );
+  assert(
+    isGuaranteedOrder(s, intel.orderId!),
+    "helper identifies the claimed card",
+  );
+  assertEqual(
+    s.customerCards.filter((c) => isGuaranteedOrder(s, c.id)).length,
+    1,
+    "only one card is marked guaranteed",
+  );
+});
+
+test("a different order that wants the same good is never marked guaranteed", () => {
+  const s = whisperState();
+  s.revealedIntel = [{ item: "Hemp", port: "Quanzhou Port" }];
+  startPhase2(s, ctx, []);
+  const intel = s.revealedIntel[0];
+  const claimed = claimedCard(s, intel.orderId);
+  const lookalikeId =
+    s.customerCards.reduce((max, c) => Math.max(max, c.id), -1) + 1;
+  s.customerCards.push({
+    id: lookalikeId,
+    demandPort: claimed.demandPort,
+    resources: [{ type: "Hemp", required: 1 }],
+    reward: 100,
+    totalItems: 1,
+    isProductOrder: false,
+  });
+  assert(
+    !isGuaranteedOrder(s, lookalikeId),
+    "matching the item alone must not earn a badge",
+  );
+  assertEqual(
+    s.customerCards.filter((c) => isGuaranteedOrder(s, c.id)).length,
+    1,
+    "the lookalike did not create a second guaranteed card",
+  );
+});
+
+test("Broker's Network's two rumors claim two distinct orders", () => {
+  const s = whisperState();
+  s.shipLevel = 1;
+  equipModule(s, moduleById("brokers_network"), null, []);
+  s.money = 100;
+  s.phase2DemandTags = [
+    "Hemp",
+    "Silk",
+    "Tea",
+    "Linen Clothes",
+    "Cotton Clothes",
+  ];
+  purchaseIntel(s, []);
+  assertEqual(s.revealedIntel.length, 2, "two rumors revealed");
+  assertEqual(s.money, 96, "both rumors charged at 2 Gold each");
+  startPhase2(s, ctx, []);
+  const ids = s.revealedIntel.map((i) => i.orderId);
+  assert(
+    ids.every((id) => id !== undefined),
+    "each rumor claims an order card",
+  );
+  assertEqual(new Set(ids).size, 2, "the two claims are distinct");
+  for (const intel of s.revealedIntel) {
+    const card = claimedCard(s, intel.orderId);
+    assertEqual(card.demandPort, intel.port, `${intel.item} order port`);
+    assert(
+      card.resources.some((r) => r.type === intel.item),
+      `${intel.item} order demands the rumored good`,
+    );
+  }
+  assertEqual(
+    s.customerCards.filter((c) => isGuaranteedOrder(s, c.id)).length,
+    2,
+    "exactly two cards carry the guarantee badge",
+  );
+});
+
+test("Ocean Interpreter's free extra rumor also claims its own order", () => {
+  const s = whisperState();
+  s.shipLevel = 1;
+  equipModule(s, moduleById("ocean_relay"), null, []);
+  s.money = 100;
+  s.phase2DemandTags = ["Hemp", "Silk", "Tea", "Linen Clothes"];
+  purchaseIntel(s, []);
+  assertEqual(s.revealedIntel.length, 2, "one paid and one free rumor");
+  assertEqual(s.money, 95, "only the base rumor is charged");
+  startPhase2(s, ctx, []);
+  const ids = s.revealedIntel.map((i) => i.orderId);
+  assert(
+    ids.every((id) => id !== undefined),
+    "both rumors claim an order card",
+  );
+  assertEqual(
+    new Set(ids).size,
+    2,
+    "the free rumor did not reuse the paid one",
+  );
+  for (const intel of s.revealedIntel)
+    assertEqual(
+      claimedCard(s, intel.orderId).demandPort,
+      intel.port,
+      "free rumor port",
+    );
+});
+
+test("Broker's Network never spends below zero when only one rumor is affordable", () => {
+  const s = whisperState();
+  s.shipLevel = 1;
+  equipModule(s, moduleById("brokers_network"), null, []);
+  s.money = 2;
+  s.phase2DemandTags = ["Hemp", "Silk"];
+  purchaseIntel(s, []);
+  assertEqual(s.money, 0, "one affordable rumor charged, never negative");
+  assertEqual(s.revealedIntel.length, 1, "only the affordable rumor delivered");
+  startPhase2(s, ctx, []);
+  assertEqual(
+    s.customerCards.filter((c) => isGuaranteedOrder(s, c.id)).length,
+    1,
+    "the one delivered rumor still claims one order",
+  );
+});
+
+test("with Ocean Interpreter, a free rumor still arrives when the second paid one is unaffordable", () => {
+  const s = whisperState();
+  s.equippedModules = [
+    moduleById("brokers_network"),
+    moduleById("ocean_relay"),
+  ];
+  s.intelCost = 2;
+  s.money = 2;
+  s.phase2DemandTags = ["Hemp", "Silk", "Tea"];
+  purchaseIntel(s, []);
+  assertEqual(s.money, 0, "the paid rumor never drives money below zero");
+  assertEqual(
+    s.revealedIntel.length,
+    2,
+    "one paid rumor plus the free Ocean Interpreter rumor",
+  );
+  startPhase2(s, ctx, []);
+  const ids = s.revealedIntel.map((i) => i.orderId);
+  assert(
+    ids.every((id) => id !== undefined),
+    "both delivered rumors claim a card",
+  );
+  assertEqual(new Set(ids).size, 2, "the free rumor claims a different card");
 });
 
 const ok = summary();

@@ -92,6 +92,7 @@ export {
   callBrokersFavor,
   claimWordOnTheDocksReward,
   completeOrder,
+  isGuaranteedOrder,
   purchaseIntel,
   startPhase2,
 } from "./engine/orders";

@@ -16,6 +16,7 @@ import {
   completePhase2,
   explainTransportCost,
   explainVAT,
+  isGuaranteedOrder,
   type PriceBreakdown,
 } from "@/lib/game/engine";
 import type { GameState } from "@/lib/game/types";
@@ -221,9 +222,7 @@ export function Orders({
           const brokerCommissionPct =
             o.reward > 0 ? Math.round((brokerCommission / o.reward) * 100) : 0;
           netProfit -= brokerCommission;
-          const matchesIntel = game.revealedIntel.some((i) =>
-            o.resources.some((r) => r.type === i.item),
-          );
+          const matchesIntel = isGuaranteedOrder(game, o.id);
           return (
             <div
               key={o.id}

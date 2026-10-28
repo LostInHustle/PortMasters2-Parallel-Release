@@ -992,8 +992,10 @@
           log("🚨 AUDIT! Tax Evasion Ledger triggered. Lost 20 Gold!");
         }
         if (transport !== origTransport) {
+          // The crane above already handed the Gold back. This only trues up
+          // the round's freight total; crediting money here again refunded
+          // every crane payout twice.
           const diff = origTransport - transport;
-          game.money += diff;
           game.roundCosts -= diff;
         }
         game.money += reward;
@@ -1123,7 +1125,7 @@
               w.producedCount = (w.producedCount || 0) + amt;
               if (amt > base)
                 log(
-                  `✅ Skilled ${name} finished ${amt}× ${ICONS[w.task]}${w.task}! (Boon Bonus)`,
+                  `✅ ${w.isSkilled ? "Skilled " : ""}${name} finished ${amt}× ${ICONS[w.task]}${w.task}! (Boon Bonus)`,
                 );
               else if (w.isSkilled)
                 log(
@@ -1392,7 +1394,7 @@
         );
         const orders = game.revealedIntel
           .filter((r) => r.order)
-          .map((r) => r.order);
+          .map((r) => ({ ...r.order, isIntel: true }));
         while (orders.length < 5) orders.push(genMixedOrder());
         for (let i = orders.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
@@ -1711,7 +1713,7 @@
     <div class="status-section">
       <h3>🚢 Vessel Status</h3>
       <div class="stat-row"><span>Class</span><span class="stat-value">Level ${game.shipLevel}</span></div>
-      <div class="stat-row"><span>Freight</span><span style="font-size:10px">max(5, n×2 minus ${discount})</span></div>
+      <div class="stat-row"><span>Freight</span><span style="font-size:10px">max(5, n×2 − ${discount})</span></div>
       <div class="stat-row"><span>Modules</span><span class="stat-value">${game.equippedModules.length}/${game.shipLevel}</span></div>
       ${game.equippedModules.map((m) => `<div class="stat-row" style="font-size:10px"><span>${m.icon} ${m.name}</span></div>`).join("")}
     </div>
@@ -2142,7 +2144,7 @@
             }
             return `
             <div class="card">
-              <div class="card-header">📍 ${o.demandPort} ${o.isProductOrder ? "Finished Product Demand" : "Raw Material Demand"}</div>
+              <div class="card-header">📍 ${o.demandPort} ${o.isProductOrder ? "Finished Product Demand" : "Raw Material Demand"}${o.isIntel ? `<span style="display:inline-block;margin-left:8px;color:#B8860B;font-weight:bold;white-space:nowrap">🔮 Guaranteed</span>` : ""}</div>
               <div class="card-body">
                 ${o.resources
                   .map((r) => {

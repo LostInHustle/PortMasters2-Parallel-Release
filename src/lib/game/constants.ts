@@ -439,7 +439,7 @@ export const BOONS_TIER0: Boon[] = [
     id: "master_apprentice",
     name: "Master's Apprentice",
     icon: "🎓",
-    desc: "Hiring workers costs 50% less this round.",
+    desc: "All worker wages are halved this round.",
     modifiers: { hire_discount: 0.5 },
   },
 ];
@@ -503,13 +503,13 @@ export const MODULES_TIER0: Module[] = [
     id: "smugglers_hold",
     name: "Smuggler's Hold",
     icon: "🏴‍☠️",
-    desc: "Purchase costs -15%. Income Tax +20%.",
+    desc: "Purchase costs −15%. Income Tax +20%.",
   },
   {
     id: "bulk_hauler",
     name: "Bulk Hauler Rigging",
     icon: "🏗️",
-    desc: "Transport cost -1 per item. Ship upgrades cost +15 Gold.",
+    desc: "Transport cost −1 per item. Ship upgrades cost +15 Gold.",
   },
   {
     id: "artisans_workshop",
@@ -545,7 +545,7 @@ export const MODULES_TIER0: Module[] = [
     id: "overdrive_engine",
     name: "Overdrive Engine",
     icon: "⚙️",
-    desc: "Transport cost -5 Gold. Maintenance +10 Gold.",
+    desc: "Transport cost −5 Gold. Maintenance +10 Gold.",
   },
 ];
 
@@ -962,7 +962,7 @@ export function tipsText(difficulty: Difficulty): string {
 
 🛒 Buying Strategy:
 1. Reserve funds for maintenance+wages first
-2. Select high value-for-money goods
+2. Select goods with high value for money
 3. Prioritize port specialties + revealed intel
 
 🔄 Bartering Strategy:
@@ -978,7 +978,7 @@ export function tipsText(difficulty: Difficulty): string {
 ⚠️ Risk Control:
 1. Calculate fixed round costs: Maintenance + Wages
 2. Keep funds consistently > fixed costs
-3. Avoid over-expansion cash flow issues
+3. Avoid overexpansion cash flow issues
 
 🏴‍☠️ Pirates and Escorts:
 1. The escort fee scales with your own Gold, so it's relatively cheap exactly when you're poor and the stakes are also low
