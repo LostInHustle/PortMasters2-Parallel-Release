@@ -680,7 +680,7 @@ export function GameRoom({
       });
     } catch {
       toast.error("Save failed", {
-        description: "Could not reach the harbour master.",
+        description: "Could not reach the harbor master.",
       });
     }
   }, [room.id, state.game]);
@@ -913,7 +913,7 @@ export function GameRoom({
           {/* Left: the captain's own rail. On desktop it is exactly the
               height of the workspace and GameStatusPanel scrolls its own
               contents, so a growing hold, loan list, or ledger can never
-              push the page or move the centre column. On smaller screens it
+              push the page or move the center column. On smaller screens it
               is just another stacked block with its natural height. */}
           <div className="order-2 min-h-0 lg:order-1 lg:h-full">
             <div className="pm-glass h-full rounded-2xl p-2.5 lg:overflow-hidden">

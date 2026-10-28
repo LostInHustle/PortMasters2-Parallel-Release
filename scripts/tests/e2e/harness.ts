@@ -12,7 +12,8 @@
 // The pure assertion helpers have no state to duplicate, so they're
 // reexported straight from the original.
 // =====================================================================
-export { assert, assertEqual, assertClose, assertArrayEqual } from "../harness";
+import { reportResults } from "../harness";
+export { assert, assertEqual } from "../harness";
 
 type Result = { name: string; error?: string };
 
@@ -41,17 +42,5 @@ export async function test(
 }
 
 export function summary(): boolean {
-  const failed = results.filter((r) => r.error);
-  const passed = results.length - failed.length;
-  console.log(`\n${"=".repeat(60)}`);
-  console.log(`${passed}/${results.length} passed`);
-  if (failed.length) {
-    console.log(`\n${failed.length} FAILURE(S):`);
-    for (const f of failed) {
-      console.log(`  ✗ ${f.name}`);
-      console.log(`      ${f.error}`);
-    }
-  }
-  console.log("=".repeat(60));
-  return failed.length === 0;
+  return reportResults(results);
 }

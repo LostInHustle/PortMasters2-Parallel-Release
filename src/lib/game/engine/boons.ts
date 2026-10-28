@@ -25,7 +25,7 @@ import { weightedPick } from "../rng";
 import type { GameContext, GameState } from "../types";
 import { startPhase1 } from "./market";
 
-export function draftBoons(state: GameState): Boon[] {
+function draftBoons(state: GameState): Boon[] {
   const gs = {
     money: state.money,
     inventory: state.inventory,

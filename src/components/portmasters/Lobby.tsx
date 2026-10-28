@@ -191,7 +191,7 @@ export function Lobby({
       }
     } catch {
       toast.error("Check in failed", {
-        description: "Could not reach the harbour master. Try again.",
+        description: "Could not reach the harbor master. Try again.",
       });
     } finally {
       setClaiming(false);

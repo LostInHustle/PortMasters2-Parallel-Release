@@ -1,9 +1,9 @@
 // =====================================================================
 // PortMasters 2 Parallel Release: Lords of the Silk Road
-// Game constants. Balance, descriptions, and overall wording are carried
-// over verbatim from the original PortMasters build this project branches
-// from; only the project's own name has been updated where it appears in
-// this text, to match the rebrand (see README.md).
+// Game constants. Balance, descriptions, and overall wording come from the
+// original PortMasters build this project branches from, with the fixes and
+// small clarity edits made since. The project's own name is updated wherever
+// it appears in the text (see README.md).
 // =====================================================================
 
 import {
@@ -98,9 +98,10 @@ export const COLORS_COLORBLIND_SAFE: Record<string, string> = {
 // leaves tier 0, which is what keeps the entry tier exactly the game it
 // has always been.
 //
-// Tier 2 is authored in a following pass, so its arrays are deliberately
-// empty: a difficulty that unlocks tier 2 today simply gains nothing yet,
-// rather than referencing goods that have no price or recipe.
+// Tier 2 is the final charter: spices and pearls with their finished goods,
+// ports, artisans, boons, and modules. Every tier is authored and priced, so
+// a difficulty that unlocks it gains a complete slice of the trade rather
+// than an empty label.
 // =====================================================================
 export const RESOURCES_TIER0 = ["Hemp", "Silk", "Tea"] as const;
 export const RESOURCES_TIER1 = ["Porcelain Clay", "Copper Ore"] as const;
@@ -730,7 +731,7 @@ export function tutorialSteps(
   return [
     {
       title: "⚓ Welcome aboard",
-      content: `<p>${APP_NAME} puts you on the ancient Silk Road. ${cfg.rounds} voyages, limited gold, and a lot of merchants trying to outmaneuver you at every port.</p>
+      content: `<p>${APP_NAME} puts you on the ancient Silk Road. ${cfg.rounds} voyages, limited Gold, and a lot of merchants trying to outmaneuver you at every port.</p>
 <p>These waters are <strong>${cfg.name}</strong>: ${cfg.tagline}</p>
 <p>The rules are easy to pick up, but money is tight early on and a string of bad calls compounds quickly. This covers the four things that catch new players out most.</p>
 <p style="color:#777;font-size:13px">Two minutes to read. Saves a lot of frustrated restarts.</p>`,
@@ -738,8 +739,8 @@ export function tutorialSteps(
     {
       title: "🏆 What you're playing for",
       content: `<p>After ${cfg.rounds} voyages, the player with the highest score wins the title of <strong>Sea Master</strong>. Score comes from trade profits and fulfilled orders.</p>
-<p>One rule overrides everything else: <strong>do not go bankrupt</strong>. Hit zero gold and the game ends immediately. There is no coming back from it.</p>
-<p>Starting gold is <strong>100</strong>. That is enough to get going, but not enough to be careless with.</p>`,
+<p>One rule overrides everything else: <strong>do not go bankrupt</strong>. Hit zero Gold and the game ends immediately. There is no coming back from it.</p>
+<p>Starting Gold is <strong>100</strong>. That is enough to get going, but not enough to be careless with.</p>`,
     },
     {
       title: "🔄 How a voyage works",
@@ -785,7 +786,7 @@ ${mandates.length ? `<p style="font-size:13px;margin-top:10px">📜 On voyage${m
 <div style="background:#C62828;color:#fff;border-radius:6px;padding:12px;margin:12px 0;text-align:center;font-size:14px;font-weight:bold;line-height:1.7">
   Assign a task this voyage.<br>The goods are ready next voyage, not this one.
 </div>
-<p style="font-size:13px;color:#333;line-height:1.6">Weavers (8g), Master Weavers (12g), and Sachet Makers (20g) all charge wages <strong>every voyage</strong>, even when idle. Only hire once you have enough gold to cover at least two rounds of wages alongside your other bills.</p>`,
+<p style="font-size:13px;color:#333;line-height:1.6">Weavers (8g), Master Weavers (12g), and Sachet Makers (20g) all charge wages <strong>every voyage</strong>, even when idle. Only hire once you have enough Gold to cover at least two rounds of wages alongside your other bills.</p>`,
     },
     {
       title: "🏴‍☠️ Pirates at Phase 3",
@@ -956,7 +957,7 @@ export function tipsText(difficulty: Difficulty): string {
 4. Hire only as needed
 
 🔮 Broker's Whisper Strategy:
-1. Buy rumors early if you have spare gold
+1. Buy rumors early if you have spare Gold
 2. Hoard revealed items to guarantee Phase 2 profits
 3. Balance intel purchases with other investments
 

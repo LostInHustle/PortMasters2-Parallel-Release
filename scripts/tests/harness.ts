@@ -75,7 +75,7 @@ export function withFixedRandom<T>(value: number, fn: () => T): T {
   }
 }
 
-export function summary(): boolean {
+export function reportResults(results: Result[]): boolean {
   const failed = results.filter((r) => r.error);
   const passed = results.length - failed.length;
   console.log(`\n${"=".repeat(60)}`);
@@ -89,4 +89,8 @@ export function summary(): boolean {
   }
   console.log("=".repeat(60));
   return failed.length === 0;
+}
+
+export function summary(): boolean {
+  return reportResults(results);
 }

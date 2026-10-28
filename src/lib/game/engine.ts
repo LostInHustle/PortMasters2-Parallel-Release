@@ -1,10 +1,11 @@
 // =====================================================================
 // PortMasters 2 Parallel Release: Lords of the Silk Road game engine
 //
-// Ported faithfully from the original single player build. All wording,
-// log messages, balance, and phase flow are preserved verbatim.
+// Ported faithfully from the original single player build. Wording, log
+// messages, balance, and phase flow follow that build wherever this project
+// has not deliberately fixed or extended them.
 //
-// [ONLINE EXTENSION] The one behavioural addition is a seedable PRNG
+// [ONLINE EXTENSION] The one behavioral addition is a seedable PRNG
 // (mulberry32) used for the session economy. Port market cards, trade
 // orders, and the Broker's intel pool are generated deterministically from
 // (roomId + userId + voyageEpoch + round), so each captain has their own
@@ -23,8 +24,8 @@
 // =====================================================================
 // This file is now a barrel. The engine itself lives in ./engine/*, one
 // module per subsystem, matching how ./backing.ts, ./convoy.ts and the
-// rest of this directory were already organised. Nothing moved between
-// subsystems and no behaviour changed; the split is purely about where
+// rest of this directory were already organized. Nothing moved between
+// subsystems and no behavior changed; the split is purely about where
 // the code sits.
 //
 // The barrel exists so that the dozens of files importing
@@ -80,7 +81,6 @@ export {
   applyHarborPulse,
   applyTidewatchSurge,
   completePhase1,
-  poolsFor,
   purchaseCard,
   startPhase1,
   tallyPurchasesByResource,
@@ -119,7 +119,6 @@ export {
 // ========== Boons and ship modules ==========
 export {
   applyBoon,
-  draftBoons,
   equipModule,
   finalizeModuleSwap,
   handleModuleSelect,
@@ -156,8 +155,6 @@ export {
 // ========== Voyage lifecycle and phase orchestration ==========
 export {
   completePhase2,
-  endGame,
-  endRound,
   finishSettlement,
   merchantRatingForScore,
   nextPhase,
@@ -166,6 +163,4 @@ export {
   showWelcome,
   skipUpgrade,
   snapToCheckpoint,
-  startPhase3,
-  startPhase4,
 } from "./engine/lifecycle";

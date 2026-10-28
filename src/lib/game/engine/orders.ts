@@ -6,7 +6,7 @@
 //
 // completeOrder is the largest function in the engine and is deliberately
 // left whole. Its steps are strictly ordered and the order is the
-// behaviour: VAT comes off the original reward before any percentage
+// behavior: VAT comes off the original reward before any percentage
 // bonus is applied to what remains, freight is charged before the Salvage
 // Crane can refund it, and the Broker's commission is taken last of all.
 // A past bug came from reordering exactly this sequence and paying every

@@ -11,8 +11,8 @@
 // fireWorker charges severance from the raw WAGES table, while hireWorker
 // and payWages both price through getHireCost, which applies the Artisan's
 // Workshop wage penalty and any hire discount. The test named for it below
-// documents today's behaviour so a refactor cannot change it silently. It
-// is deliberately NOT asserting that the behaviour is correct, only that
+// documents today's behavior so a refactor cannot change it silently. It
+// is deliberately NOT asserting that the behavior is correct, only that
 // it is what ships today. Whether severance should follow getHireCost is a
 // balance question for the designer, not something to fix mid refactor.
 //

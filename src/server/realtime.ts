@@ -467,7 +467,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
       const st = statuses.get(id);
       // A member with no cached status at all has certainly not finished, so
       // they are "still out at sea" exactly like one mid voyage. That was
-      // already the behaviour, reached indirectly: a missing status produced
+      // already the behavior, reached indirectly: a missing status produced
       // an empty phase string, which matched neither terminal phase and so
       // returned below. Saying it outright keeps the invariant visible to the
       // reader, and lets the compiler see that `st` is present past this line
