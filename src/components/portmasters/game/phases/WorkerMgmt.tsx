@@ -286,10 +286,10 @@ export function WorkerMgmt({
             </div>
           ))}
         </div>
-        {/* Each hire button wears its own craft's hue. The old three colour
+        {/* Each hire button wears its own craft's hue. The old three color
             cycle put the same saturated green on the first, fourth and
             seventh artisan, so a row of seven read as one repeating stripe
-            and the colour told you nothing about which artisan you were
+            and the color told you nothing about which artisan you were
             about to hire. */}
         <div className="flex flex-wrap justify-center gap-2">
           {roster.map((r) => (

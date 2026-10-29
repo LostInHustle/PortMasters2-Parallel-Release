@@ -261,7 +261,7 @@ export function usePhaseSync(
 
     // Only request phase state once the socket is authenticated, otherwise
     // the server silently drops the request (requireAuth returns null) and
-    // the ready state never initialises.  Same race fix as GameRoom's
+    // the ready state never initializes.  Same race fix as GameRoom's
     // room:join effect: without this, a fast mount + slow auth path means
     // the client never hears who's readied up.
     if (authed) {

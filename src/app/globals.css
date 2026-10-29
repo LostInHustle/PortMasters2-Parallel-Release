@@ -30,7 +30,7 @@
 
 :root {
   --radius: 0.75rem;
-  /* PortMasters 2 Parallel Release maritime palette: seafoam teal + harbour gold */
+  /* PortMasters 2 Parallel Release maritime palette: seafoam teal + harbor gold */
   --background: oklch(0.975 0.012 195);
   --foreground: oklch(0.22 0.03 220);
   --popover: oklch(1 0 0);
@@ -81,7 +81,7 @@
    PortMasters 2 Parallel Release: maritime gradient surfaces and utilities
    ===================================================================== */
 @layer utilities {
-  /* App canvas: a soft, naturally blended sea gradient with harbour glows. */
+  /* App canvas: a soft, naturally blended sea gradient with harbor glows. */
   .pm-canvas {
     background:
       radial-gradient(
@@ -160,7 +160,7 @@
     box-shadow: 0 18px 50px -18px oklch(0.03 0.01 230 / 0.7);
   }
 
-  /* Harbour gold accent gradient text. */
+  /* Harbor gold accent gradient text. */
   .pm-text-gold {
     background: linear-gradient(
       95deg,
@@ -288,15 +288,15 @@
      weavers, brocade violet for the master, sachet rose, copper, celadon,
      balm amber, pearl blue. The roster has grown from three artisans to
      seven, and grew into a wall of identical teal headings above a hire row
-     whose green / amber / grey cycle simply repeated every third button, so
-     colour said nothing about which craft you were looking at and every
+     whose green / amber / gray cycle simply repeated every third button, so
+     color said nothing about which craft you were looking at and every
      group read like the one above it.
 
-     Each type carries only its oklch components, not a finished colour, so
+     Each type carries only its oklch components, not a finished color, so
      one property can serve solid ink, a 7% wash and a 30% border without a
      second variable per shade. It also keeps the minifier honest:
      color-mix() gets rewritten with a flat fallback for old browsers that
-     would paint a chip's text and its background the same colour, whereas
+     would paint a chip's text and its background the same color, whereas
      an unresolvable oklch(var(...)) is passed through untouched and simply
      ignored where it isn't understood.
 

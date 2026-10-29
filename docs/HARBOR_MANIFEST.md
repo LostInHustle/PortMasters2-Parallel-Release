@@ -89,7 +89,7 @@ New mechanism. Effort: substantial. **Shipped.**
 
 **The situation today.** Nothing today lets more than two captains combine toward the same trade goal at once. Every existing tool, barter, loans, Broker's Favor, tops out at two captains.
 
-**What we add.** A captain posts a Convoy Venture, an order sized larger than any single hold could fill alone, open for other captains to buy into with gold or goods before a deadline round. If the venture fills in time, the reward splits by how much each captain actually contributed. If the deadline passes unfilled, every stake only returns in part, so joining one is a real bet on the room finishing it together, not a favor with no downside.
+**What we add.** A captain posts a Convoy Venture, an order sized larger than any single hold could fill alone, open for other captains to buy into with Gold or goods before a deadline round. If the venture fills in time, the reward splits by how much each captain actually contributed. If the deadline passes unfilled, every stake only returns in part, so joining one is a real bet on the room finishing it together, not a favor with no downside.
 
 **Why this fits.** It gives the peer economy this game already leads on a fourth register entirely, pooled stakes rather than one to one trades, something neither this project nor the sibling codebase the source audit compared it against has ever attempted.
 
@@ -129,17 +129,17 @@ New mechanism. Effort: moderate.
 
 ### 07. Bequest Routing
 
-_A bankrupt captain still gets to decide where their gold goes next._
+_A bankrupt captain still gets to decide where their Gold goes next._
 
 Extends a shipped feature. Effort: light. **Shipped.**
 
-**The situation today.** The bankruptcy screen already shows a captain every loan still owed to them, under the heading Silent Partner, and that gold already lands the moment each borrower repays, exactly as described in the correction above. What it does not do yet is give the bankrupt captain any choice in the matter. The gold simply accumulates on an account with no voyage left to spend it in.
+**The situation today.** The bankruptcy screen already shows a captain every loan still owed to them, under the heading Silent Partner, and that Gold already lands the moment each borrower repays, exactly as described in the correction above. What it does not do yet is give the bankrupt captain any choice in the matter. The Gold simply accumulates on an account with no voyage left to spend it in.
 
 **What we add.** At the moment bankruptcy is reached, a captain with open loans still owed to them can designate one still active captain in the same room to receive future repayments instead, turning an inert number into one more decision the room can see a bankrupt captain still making.
 
-**Why this fits.** It respects what already shipped instead of redoing it, and answers the one real gap the shipped version leaves open: gold that currently has nowhere useful to go once its original owner is out of the voyage.
+**Why this fits.** It respects what already shipped instead of redoing it, and answers the one real gap the shipped version leaves open: Gold that currently has nowhere useful to go once its original owner is out of the voyage.
 
-**System notes.** Built as `redirectToUserId`/`redirectToName` on the server's own `LoanRecord`, set only by the lender through a new `loan:redirect` event, checked at the same `aid:repay` settlement point `src/server/realtime.ts` already runs when a debt is repaid. One nuance the original proposal did not anticipate: the original lender's own client still carries the loan in its local `loansGiven` list, and since `aid:repaid` now goes to the redirect target instead of them, they would never otherwise learn it closed. A second, Gold free event, `aid:redirected`, tells their client to stop tracking it (see `clearRedirectedLoan` in `src/lib/game/engine/aid.ts`) without crediting them a second time. The Bankruptcy screen itself gained a `members`/`backing` prop pair to render the picker, both optional so no other caller of that screen needs to change.
+**System notes.** Built as `redirectToUserId`/`redirectToName` on the server's own `LoanRecord`, set only by the lender through a new `loan:redirect` event, checked at the same `aid:repay` settlement point `src/server/realtime.ts` already runs when a debt is repaid. One nuance the original proposal did not anticipate: the original lender's own client still carries the loan in its local `loansGiven` list, and since `aid:repaid` now goes to the redirect target instead of them, they would never otherwise learn it closed. A second event that moves no Gold, `aid:redirected`, tells their client to stop tracking it (see `clearRedirectedLoan` in `src/lib/game/engine/aid.ts`) without crediting them a second time. The Bankruptcy screen itself gained a `members`/`backing` prop pair to render the picker, both optional so no other caller of that screen needs to change.
 
 ## III. Identity and the long game
 
@@ -207,7 +207,7 @@ New mechanism. Effort: light to moderate.
 
 **The situation today.** Once a voyage ends, its only remaining trace is a handful of numbers folded into `CaptainLegacy`: Renown gained, whether the captain was crowned, whether they went bankrupt. The voyage itself, the specific trades, the specific close calls, leaves nothing behind to look back on.
 
-**What we add.** An opt in short recap, generated the moment a voyage concludes, built from a few real numbers already available at that moment: peak Reputation reached, the single largest trade completed, how many times the captain lent or borrowed gold. Saved to the account and viewable later from the Lobby, alongside Captain's Legacy.
+**What we add.** An opt in short recap, generated the moment a voyage concludes, built from a few real numbers already available at that moment: peak Reputation reached, the single largest trade completed, how many times the captain lent or borrowed Gold. Saved to the account and viewable later from the Lobby, alongside Captain's Legacy.
 
 **Why this fits.** Daily Check In already gives a returning captain a reason to open the Lobby every day. This gives that same daily visit something to actually read once they are there, turning a habit built purely around a reward counter into one that also has something narrative behind it.
 
@@ -221,9 +221,9 @@ _The one save endpoint that currently trusts a client completely gets one narrow
 
 New validation logic. Effort: moderate, do this before entries eight, ten, and eleven. **Shipped.**
 
-**The situation today.** Reading `src/app/api/game/state/route.ts` directly confirms the source page's claim: `PUT /api/game/state` validates that the request has the right shape, a room id string and a data object, using Zod, but it never checks whether the actual values inside that data object are plausible given what was saved last time. A captain's browser computes their own gold, score, and inventory, and the server currently writes back whatever arrives without comparing it to anything.
+**The situation today.** Reading `src/app/api/game/state/route.ts` directly confirms the source page's claim: `PUT /api/game/state` validates that the request has the right shape, a room id string and a data object, using Zod, but it never checks whether the actual values inside that data object are plausible given what was saved last time. A captain's browser computes their own Gold, score, and inventory, and the server currently writes back whatever arrives without comparing it to anything.
 
-**What we add.** At that same save endpoint, compare the incoming save against the last known good one, and flag, rather than silently accept, any change larger than the largest change a single round could plausibly produce, in gold, in score, in anything that eventually feeds Renown. This adds one check to an endpoint that already exists. It does not rewrite the endpoint or the trust model the rest of the game is built on.
+**What we add.** At that same save endpoint, compare the incoming save against the last known good one, and flag, rather than silently accept, any change larger than the largest change a single round could plausibly produce, in Gold, in score, in anything that eventually feeds Renown. This adds one check to an endpoint that already exists. It does not rewrite the endpoint or the trust model the rest of the game is built on.
 
 **Why this fits.** This project chose, on purpose, to let every client compute its own state rather than running an authoritative server, and that choice is not being reversed here. It was a reasonable choice when the only thing at stake was one voyage's local score. It stops being reasonable the moment entries eight, ten, and eleven all start reading off account level numbers that a doctored save could inflate, which is exactly why this entry is flagged to ship before those three rather than after.
 
@@ -239,7 +239,7 @@ New mechanism. Effort: light. **Shipped.**
 
 **The situation today.** Room chat and direct messages are both fully open with no moderation tool anywhere in the product, not even a basic mute. The only way a host currently has to deal with an unwanted message is the same restart option covered at length in this project's own README, which resets every captain in the room back to round one.
 
-**What we add.** A host facing control, reachable from the same members panel that already lists everyone in the harbor, that mutes a specific captain's chat for the remainder of the voyage without touching their gold, cargo, ship, or progress in any way. A muted captain keeps playing normally. They simply cannot post to room chat until the voyage ends.
+**What we add.** A host facing control, reachable from the same members panel that already lists everyone in the harbor, that mutes a specific captain's chat for the remainder of the voyage without touching their Gold, cargo, ship, or progress in any way. A muted captain keeps playing normally. They simply cannot post to room chat until the voyage ends.
 
 **Why this fits.** This is a plain gap in this project's own social surface, not a reaction to anything in the sibling codebase. A game whose entire pitch is a small group of real people talking to each other in real time needs some way to handle one disruptive person that costs less than resetting everyone else's progress, and today it has none.
 
@@ -297,7 +297,7 @@ _A glance at the whole harbor, without opening six separate popups._
 
 New interface. Effort: light. **Shipped**, with a correction below to what "the situation today" actually was by the time this got built.
 
-**The situation today, corrected.** By the time this entry was actually picked up, `MembersPanel.tsx` had already grown a live, always visible roster row per captain (round, phase, gold, Reputation, no click required), built from the same `game:status` broadcast this entry's original proposal assumed was still locked behind a one captain, one click, one modal design. That earlier claim, checked directly against the source rather than assumed, did not hold up. What the roster panel does not solve is layout: it sits in the right column of the three column desktop grid, and on any screen under the `lg` breakpoint it stacks to the very bottom of the page, behind the phase panel, so a captain on a phone has to scroll past everything else to see it.
+**The situation today, corrected.** By the time this entry was actually picked up, `MembersPanel.tsx` had already grown a live, always visible roster row per captain (round, phase, Gold, Reputation, no click required), built from the same `game:status` broadcast this entry's original proposal assumed was still locked behind a one captain, one click, one modal design. That earlier claim, checked directly against the source rather than assumed, did not hold up. What the roster panel does not solve is layout: it sits in the right column of the three column desktop grid, and on any screen under the `lg` breakpoint it stacks to the very bottom of the page, behind the phase panel, so a captain on a phone has to scroll past everything else to see it.
 
 **What we actually add.** A second, genuinely distinct component: a slim horizontal strip mounted directly under the header, full width, on every screen size, so the whole harbor's headline numbers are visible without scrolling past anything, on desktop and mobile alike. It does not replace the roster panel, which still owns the fuller view of each captain, the click through to the detail popup, and now the Harbor Watch mute control too; it exists specifically to close the gap in the mobile layout the roster panel's own stacking order left open.
 

@@ -56,24 +56,23 @@ import {
 import { MembersPanel } from "./MembersPanel";
 import { FleetTicker } from "./FleetTicker";
 import { ChatPanel } from "./ChatPanel";
-import { Avatar, MeritIcon, OnlineDot, Pill } from "./shared";
+import { Avatar, HarborCrest, MeritIcon, OnlineDot, Pill } from "./shared";
 import { NotificationCenter } from "./NotificationCenter";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scrollArea";
 import { toast } from "sonner";
 import {
-  Anchor,
   BookOpen,
   DoorOpen,
   Copy,
   Lightbulb,
   Users,
   MessageCircle,
-  Ship,
   LifeBuoy,
   Bell,
   Palette,
+  Ship,
 } from "lucide-react";
 import { cn, normalizeRoomName } from "@/lib/utils";
 import { useColorPreference } from "@/lib/useColorPreference";
@@ -681,7 +680,7 @@ export function GameRoom({
       });
     } catch {
       toast.error("Save failed", {
-        description: "Could not reach the harbour master.",
+        description: "Could not reach the harbor master.",
       });
     }
   }, [room.id, state.game]);
@@ -803,8 +802,8 @@ export function GameRoom({
 
   if (!state.loaded) {
     return (
-      <div className="pm-canvas min-h-screen flex items-center justify-center">
-        <div className="text-muted-foreground flex items-center gap-2">
+      <div className="pm-canvas flex min-h-[100dvh] items-center justify-center">
+        <div className="flex items-center gap-2 text-muted-foreground">
           <Ship className="h-5 w-5 animate-pulse text-teal-500" /> Weighing
           anchor…
         </div>
@@ -813,17 +812,15 @@ export function GameRoom({
   }
 
   return (
-    <div className="pm-canvas min-h-screen w-full flex flex-col">
+    <div className="pm-canvas flex min-h-[100dvh] w-full flex-col lg:h-[100dvh] lg:min-h-0 lg:overflow-hidden">
       {/* Top bar */}
-      <header className="sticky top-0 z-30 px-3 sm:px-5 py-3">
-        <div className="pm-glass rounded-2xl px-4 py-2.5 flex items-center justify-between gap-3 max-w-[1600px] mx-auto">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="pm-grad-primary h-9 w-9 rounded-xl flex items-center justify-center shrink-0">
-              <Anchor className="h-5 w-5 text-white" />
-            </div>
+      <header className="sticky top-0 z-30 shrink-0 px-3 py-3 sm:px-5 lg:static">
+        <div className="pm-glass mx-auto flex h-[60px] w-full max-w-[1600px] items-center justify-between gap-3 rounded-2xl px-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <HarborCrest className="h-9 w-9" />
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h1 className="font-bold leading-tight truncate">
+                <h1 className="truncate font-bold leading-tight">
                   {normalizeRoomName(room.name)}
                 </h1>
                 <Pill tone="sea" className="shrink-0">
@@ -832,7 +829,8 @@ export function GameRoom({
               </div>
               <button
                 onClick={copyCode}
-                className="pm-pressable text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1"
+                title="Copy room code"
+                className="pm-pressable flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
               >
                 <span className="font-mono tracking-widest">{room.code}</span>
                 <Copy className="h-3 w-3" />
@@ -863,7 +861,7 @@ export function GameRoom({
             <Button
               variant="ghost"
               size="sm"
-              className="rounded-lg relative"
+              className="relative rounded-lg"
               onClick={() => {
                 setNotificationsOpen((v) => !v);
                 notifications.markAllRead();
@@ -874,7 +872,7 @@ export function GameRoom({
               {notifications.unreadCount > 0 && (
                 <Pill
                   tone="rose"
-                  className="absolute -top-1 -right-1 !px-1 !py-0 min-w-[16px] h-4 justify-center text-[10px]"
+                  className="absolute -top-1 -right-1 h-4 min-w-[16px] justify-center !px-1 !py-0 text-[10px]"
                 >
                   {notifications.unreadCount > 9
                     ? "9+"
@@ -882,7 +880,7 @@ export function GameRoom({
                 </Pill>
               )}
             </Button>
-            <div className="flex items-center gap-2 pl-2 border-l border-black/5 dark:border-white/10">
+            <div className="flex items-center gap-2 border-l border-black/5 pl-2 dark:border-white/10">
               <Avatar hue={me.avatarHue} name={me.displayName} size={30} ring />
               <Button
                 variant="ghost"
@@ -890,7 +888,7 @@ export function GameRoom({
                 className="rounded-lg"
                 onClick={handleLeave}
               >
-                <DoorOpen className="h-4 w-4 mr-1.5" /> Leave
+                <DoorOpen className="mr-1.5 h-4 w-4" /> Leave
               </Button>
             </div>
           </div>
@@ -898,38 +896,27 @@ export function GameRoom({
       </header>
 
       {/* Main layout */}
-      <main className="flex-1 px-3 sm:px-5 pb-4 max-w-[1600px] w-full mx-auto">
+      <main className="mx-auto flex min-h-0 w-full max-w-[1600px] flex-1 flex-col gap-2.5 px-3 pb-3 sm:px-5">
         {/* [MANIFEST 18: Fleet Ticker] Full width on every screen size, so
             the whole harbor's headline numbers are visible without scrolling
             past the phase panel first, which the roster below already
-            requires on anything under the lg breakpoint. */}
+            requires on anything under the lg breakpoint. It always renders,
+            even for a lone captain, so a second arrival never shoves the
+            entire workspace downward. */}
         <FleetTicker
           socket={socket}
           roomId={room.id}
           me={me}
           initialMembers={members}
         />
-        <div className="grid grid-cols-1 lg:grid-cols-[clamp(220px,22vw,300px)_minmax(0,1fr)_clamp(260px,26vw,360px)] gap-3">
-          {/* Left: status + log.
-              On desktop this rail is pinned to the viewport and each panel
-              scrolls inside its own box, rather than the two simply stacking
-              and growing the page. The status panel grows with play (artisan
-              rows, outstanding loans, round end obligations), which used to
-              push the log far enough down that reaching it scrolled the whole
-              page, including the centre column being worked in. The log keeps
-              a guaranteed share of the rail so it is always on screen.
-              Untouched below lg, where the rail is just another stacked
-              block and the existing mobile ordering still applies. */}
-          {/* Left: the captain's own rail, now a single panel rather than a
-              status column with the ledger stacked underneath it. The panel
-              pins itself to the viewport on desktop and manages its own
-              scrolling internally (pinned summary, then tabs), so the page
-              never grows with it and the ledger is a tab away instead of
-              below the fold. On smaller screens it is just another stacked
-              block with its natural height, and the existing mobile ordering
-              is untouched. */}
-          <div className="order-2 lg:order-1 lg:sticky lg:top-20 lg:h-[calc(100dvh-6rem)]">
-            <div className="pm-glass h-full rounded-2xl p-3">
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[clamp(232px,21vw,292px)_minmax(0,1fr)_clamp(272px,24vw,348px)] lg:overflow-hidden">
+          {/* Left: the captain's own rail. On desktop it is exactly the
+              height of the workspace and GameStatusPanel scrolls its own
+              contents, so a growing hold, loan list, or ledger can never
+              push the page or move the center column. On smaller screens it
+              is just another stacked block with its natural height. */}
+          <div className="order-2 min-h-0 lg:order-1 lg:h-full">
+            <div className="pm-glass h-full rounded-2xl p-2.5 lg:overflow-hidden">
               <GameStatusPanel
                 game={state.game}
                 logs={state.logs}
@@ -941,65 +928,81 @@ export function GameRoom({
             </div>
           </div>
 
-          {/* Center: phase + controls */}
-          <div className="space-y-3 order-1 lg:order-2 min-w-0">
-            <GamePhasePanel
-              game={state.game}
-              ctx={ctx}
-              act={act}
-              members={members}
-              myUserId={me.id}
-              isHost={isHost}
-              phaseSync={phaseSync}
-              barter={barter}
-              aid={aid}
-              backing={backing}
-              voyageResult={voyageResult}
-              myLegacy={myLegacy}
-              onRestart={handleRestart}
-              onShowRumors={() => setRumorOpen(true)}
-              onShowGuide={() => setGuideOpen(true)}
-              onShowTips={() => setTipsOpen(true)}
-              onShowTutorial={() => setTutOpen(true)}
-              colorFor={colorFor}
-            />
-            <GameControlPanel
-              game={state.game}
-              saving={state.saving}
-              isHost={isHost}
-              onSetSail={handleSetSail}
-              onNextPhase={handleNext}
-              onGuide={() => setGuideOpen(true)}
-              onSave={handleSave}
-              onRestart={handleRestart}
-              waiting={phaseSync.waiting}
-              readyCount={phaseSync.readyCount}
-              requiredCount={phaseSync.requiredCount}
-              onCancelReady={phaseSync.cancelReady}
-            />
-            <div className="flex items-center justify-center gap-2 text-[10px] text-muted-foreground/70">
-              <kbd className="rounded bg-black/5 dark:bg-white/10 px-1.5 py-0.5">
-                Ctrl+S
-              </kbd>{" "}
-              Save
-              <kbd className="rounded bg-black/5 dark:bg-white/10 px-1.5 py-0.5">
-                Ctrl+N
-              </kbd>{" "}
-              Next Phase
-              <kbd className="rounded bg-black/5 dark:bg-white/10 px-1.5 py-0.5">
-                Ctrl+R
-              </kbd>{" "}
-              Restart
-              <kbd className="rounded bg-black/5 dark:bg-white/10 px-1.5 py-0.5">
-                F1
-              </kbd>{" "}
-              Guide
+          {/* Center: phase + controls. The phase stage owns the height and
+              scrolls internally on desktop; the command bar and shortcut
+              hint stay put below it. */}
+          <section className="order-1 flex min-h-0 min-w-0 flex-col gap-2.5 lg:order-2 lg:h-full">
+            <div className="min-h-0 lg:flex-1">
+              <GamePhasePanel
+                game={state.game}
+                ctx={ctx}
+                act={act}
+                members={members}
+                myUserId={me.id}
+                isHost={isHost}
+                phaseSync={phaseSync}
+                barter={barter}
+                aid={aid}
+                backing={backing}
+                voyageResult={voyageResult}
+                myLegacy={myLegacy}
+                onRestart={handleRestart}
+                onShowRumors={() => setRumorOpen(true)}
+                onShowGuide={() => setGuideOpen(true)}
+                onShowTips={() => setTipsOpen(true)}
+                onShowTutorial={() => setTutOpen(true)}
+                colorFor={colorFor}
+              />
             </div>
-          </div>
+            <div className="shrink-0 space-y-2">
+              <GameControlPanel
+                game={state.game}
+                saving={state.saving}
+                isHost={isHost}
+                onSetSail={handleSetSail}
+                onNextPhase={handleNext}
+                onGuide={() => setGuideOpen(true)}
+                onSave={handleSave}
+                onRestart={handleRestart}
+                waiting={phaseSync.waiting}
+                readyCount={phaseSync.readyCount}
+                requiredCount={phaseSync.requiredCount}
+                onCancelReady={phaseSync.cancelReady}
+              />
+              <div className="hidden flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[10px] text-muted-foreground/70 md:flex">
+                <span className="inline-flex items-center gap-1">
+                  <kbd className="rounded bg-black/5 px-1.5 py-0.5 dark:bg-white/10">
+                    Ctrl+S
+                  </kbd>{" "}
+                  Save
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <kbd className="rounded bg-black/5 px-1.5 py-0.5 dark:bg-white/10">
+                    Ctrl+N
+                  </kbd>{" "}
+                  Next Phase
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <kbd className="rounded bg-black/5 px-1.5 py-0.5 dark:bg-white/10">
+                    Ctrl+R
+                  </kbd>{" "}
+                  Restart
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <kbd className="rounded bg-black/5 px-1.5 py-0.5 dark:bg-white/10">
+                    F1
+                  </kbd>{" "}
+                  Guide
+                </span>
+              </div>
+            </div>
+          </section>
 
-          {/* Right: roster + chat */}
-          <div className="order-3 space-y-3 min-w-0">
-            <div className="h-[320px]">
+          {/* Right: roster + chat. Both are fixed shares of the rail on
+              desktop, so scrolling a long roster or a long conversation
+              never moves the other panel or the page. */}
+          <aside className="order-3 flex min-h-0 flex-col gap-3 lg:h-full">
+            <div className="h-[320px] shrink-0 lg:h-[31%] lg:min-h-[220px] lg:max-h-[320px]">
               <MembersPanel
                 socket={socket}
                 roomId={room.id}
@@ -1009,26 +1012,23 @@ export function GameRoom({
                 onSelectPlayer={handleSelectPlayer}
               />
             </div>
-            <div
-              className="pm-glass rounded-2xl overflow-hidden flex flex-col"
-              style={{ height: 380 }}
-            >
+            <div className="pm-glass flex h-[400px] shrink-0 flex-col overflow-hidden rounded-2xl lg:h-auto lg:min-h-0 lg:flex-1">
               <Tabs
                 value={chatTab}
                 onValueChange={(v) => setChatTab(v as "room" | "dm")}
-                className="flex flex-col h-full"
+                className="flex h-full min-h-0 flex-col"
               >
-                <TabsList className="grid grid-cols-2 m-2 mb-0">
+                <TabsList className="m-2 mb-0 grid grid-cols-2">
                   <TabsTrigger value="room">
-                    <MessageCircle className="h-3.5 w-3.5 mr-1.5" /> Harbor
+                    <MessageCircle className="mr-1.5 h-3.5 w-3.5" /> Harbor
                   </TabsTrigger>
                   <TabsTrigger value="dm">
-                    <MessageCircle className="h-3.5 w-3.5 mr-1.5" /> Direct
+                    <MessageCircle className="mr-1.5 h-3.5 w-3.5" /> Direct
                   </TabsTrigger>
                 </TabsList>
                 <TabsContent
                   value="room"
-                  className="flex-1 min-h-0 mt-0 data-[state=inactive]:hidden"
+                  className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
                 >
                   <ChatPanel
                     socket={socket}
@@ -1037,11 +1037,12 @@ export function GameRoom({
                     roomId={room.id}
                     initialMessages={roomMessages}
                     disabled={amIMuted}
+                    className="flex-1"
                   />
                 </TabsContent>
                 <TabsContent
                   value="dm"
-                  className="flex-1 min-h-0 mt-0 data-[state=inactive]:hidden"
+                  className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
                 >
                   <DmTab
                     socket={socket}
@@ -1058,7 +1059,7 @@ export function GameRoom({
                 </TabsContent>
               </Tabs>
             </div>
-          </div>
+          </aside>
         </div>
       </main>
 
@@ -1171,10 +1172,10 @@ function DmTab({
 
   if (target) {
     return (
-      <div className="h-full flex flex-col">
-        <div className="px-3 py-2 border-b border-black/5 dark:border-white/10 flex items-center gap-2">
+      <div className="flex h-full flex-col">
+        <div className="flex shrink-0 items-center gap-2 border-b border-black/5 px-3 py-2 dark:border-white/10">
           <Avatar hue={target.avatarHue} name={target.displayName} size={24} />
-          <span className="text-xs font-medium truncate">
+          <span className="truncate text-xs font-medium">
             {target.displayName}
           </span>
           <Button
@@ -1186,13 +1187,14 @@ function DmTab({
             Switch
           </Button>
         </div>
-        <div className="flex-1 min-h-0">
+        <div className="min-h-0 flex-1">
           <ChatPanel
             socket={socket}
             me={me}
             mode="dm"
             other={target}
             initialMessages={history}
+            className="flex-1"
           />
         </div>
       </div>
@@ -1200,30 +1202,30 @@ function DmTab({
   }
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="px-3 py-2 border-b border-black/5 dark:border-white/10 text-[11px] text-muted-foreground">
+    <div className="flex h-full flex-col">
+      <div className="shrink-0 border-b border-black/5 px-3 py-2 text-[11px] text-muted-foreground dark:border-white/10">
         Pick a captain to message privately
       </div>
-      <ScrollArea className="flex-1">
-        <div className="p-2 space-y-1">
+      <ScrollArea className="min-h-0 flex-1">
+        <div className="space-y-1 p-2">
           {list.length === 0 ? (
-            <p className="text-center text-xs text-muted-foreground py-6 px-4">
-              No other captains available right now. They'll appear here once
-              they're online.
+            <p className="px-4 py-6 text-center text-xs text-muted-foreground">
+              No other captains available right now. They&apos;ll appear here
+              once they&apos;re online.
             </p>
           ) : (
             list.map((u) => (
               <button
                 key={u.id}
                 onClick={() => onPick(u)}
-                className="pm-pressable w-full flex items-center gap-2.5 p-2 rounded-lg text-left hover:bg-black/5 dark:hover:bg-white/5"
+                className="pm-pressable flex w-full items-center gap-2.5 rounded-lg p-2 text-left hover:bg-black/5 dark:hover:bg-white/5"
               >
                 <Avatar hue={u.avatarHue} name={u.displayName} size={28} />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium">
                     {u.displayName}
                   </div>
-                  <div className="text-[10px] text-muted-foreground truncate">
+                  <div className="truncate text-[10px] text-muted-foreground">
                     @{u.username}
                   </div>
                 </div>

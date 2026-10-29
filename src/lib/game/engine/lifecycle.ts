@@ -30,7 +30,7 @@ import { resolvePirateAttack } from "./pirates";
 import { calcIncomeTax } from "./pricing";
 import { payMaintenance, payWages, processProduction } from "./workers";
 
-export function endRound(state: GameState, logs: string[]) {
+function endRound(state: GameState, logs: string[]) {
   logs.push(`\n📊=== Round ${state.currentRound} Settlement ===`);
   logs.push(`💰 Revenue this round: ${state.roundRevenue} Gold`);
   const totalCost =
@@ -82,7 +82,7 @@ export function completePhase2(state: GameState, logs: string[]) {
   startPhase3(state, logs);
 }
 
-export function startPhase3(state: GameState, logs: string[]) {
+function startPhase3(state: GameState, logs: string[]) {
   state.phase = 3;
   logs.push("\n👥=== Processing Worker Production ===");
   processProduction(state, logs);
@@ -118,7 +118,7 @@ export function finishSettlement(state: GameState, logs: string[]) {
   startPhase4(state, logs);
 }
 
-export function startPhase4(state: GameState, logs: string[]) {
+function startPhase4(state: GameState, logs: string[]) {
   state.phase = 4;
   logs.push(
     `\n🚢=== Round ${state.currentRound} · Phase 4: Shipyard & Modules ===`,
@@ -144,7 +144,7 @@ export function merchantRatingForScore(score: number): MerchantRating {
   );
 }
 
-export function endGame(state: GameState, logs: string[]) {
+function endGame(state: GameState, logs: string[]) {
   state.gameOver = true;
   state.phase = "endgame";
   logs.push("\n" + "=".repeat(50));

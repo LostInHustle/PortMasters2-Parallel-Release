@@ -69,7 +69,7 @@ export function renownTitleForLevel(level: number): string {
 // very start of a fresh voyage, capped well below anything that would
 // make an experienced captain's early rounds trivial. +3 Gold per level
 // above 1, capped at +60 (reached at level 21), against a starting
-// stake of 100. Applied once, in createInitialGameState (see
+// stake of 90 to 100. Applied once, in createInitialGameState (see
 // src/lib/game/types.ts): it only ever changes a captain's own starting
 // Gold, never the deterministic per round market and order seed shared
 // across the room, so it can't desync one captain's view of the harbor

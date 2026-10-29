@@ -32,8 +32,7 @@ export function PriceBreakdownTooltip({
         <div key={i} className="flex justify-between gap-3">
           <span>{s.label}</span>
           <span>
-            {s.delta >= 0 ? "+" : ""}
-            {s.delta}g
+            {s.delta >= 0 ? `+${s.delta}g` : `−${Math.abs(s.delta)}g`}
           </span>
         </div>
       ))}

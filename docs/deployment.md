@@ -8,10 +8,11 @@ The database is a single SQLite file that this one process reads and writes dire
 
 ```bash
 npm install
+npm run db:push
 npm run dev
 ```
 
-That is all. Running `npm install` also generates the Prisma client, and `npm run dev` creates the SQLite file the first time the database is used. If you prefer to create it explicitly ahead of time, run `npm run db:push` once. The app, including the website and the realtime layer, is then available at `http://localhost:2232`.
+Running `npm install` also generates the Prisma client. `npm run db:push` creates the SQLite schema once; without it, `npm run dev` still starts, but the empty database has no tables and registration fails with "no such table". The app, including the website and the realtime layer, is then available at `http://localhost:2232`.
 
 If you want to share your local instance, for example through ngrok, point it to the same port:
 
@@ -44,6 +45,6 @@ The admin console at `/admin` stays closed until the service has an `ADMIN_KEY` 
 
 ### Picking up a schema change
 
-Schema changes are committed as migrations under `prisma/migrations/` (`npm run db:migrate` locally to generate one). `prisma migrate deploy` runs automatically on every boot via the `start` script and only applies migrations that haven't run yet, so it's safe on every deploy and never modifies existing rows. There is nothing extra to run by hand in production.
+Schema changes are committed as migrations under `prisma/migrations/` (`npm run db:migrate` locally to generate one). `prisma migrate deploy` runs automatically on every boot via the `start` script and only applies migrations that have not run yet, so a deploy never replays history. There is nothing extra to run by hand in production.
 
-If you prefer not to use a volume, you can point `DATABASE_URL` to a managed Postgres instance instead. Change the `datasource` provider in `prisma/schema.prisma` back to `"postgresql"` and run `npx prisma generate`. Everything else, including the merged server and the single port, remains the same.
+Postgres is not a drop in substitute. Prisma 7 connects through a driver adapter, and `src/lib/db.ts` builds `@prisma/adapter-better-sqlite3` directly. Moving to Postgres means changing the datasource provider, installing and wiring a Postgres adapter in that file, and regenerating the client; that path is not covered by the test suite. Use the volume above for a supported deployment.
