@@ -18,6 +18,9 @@ import { Coins, Trophy, SkullIcon } from "lucide-react";
  * scrolling past anything. The live roster comes from useRoomRoster, the
  * same hook MembersPanel uses, rather than threading a second copy of that
  * state down from GameRoom.
+ *
+ * It renders even with a single captain. The old early return made the
+ * whole layout jump down the moment a second player joined.
  */
 export function FleetTicker({
   socket,
@@ -32,19 +35,20 @@ export function FleetTicker({
 }) {
   const { members, statuses } = useRoomRoster(socket, roomId, initialMembers);
 
-  // Me first, same ordering rule MembersPanel already uses, so a captain
-  // finds their own chip in the same spot in both places.
+  // Me first, then the same reputation and gold ordering MembersPanel uses,
+  // so a captain finds their own chip in the same spot in both places.
   const sorted = [...members].sort((a, b) => {
     if (a.id === me.id) return -1;
     if (b.id === me.id) return 1;
-    return 0;
+    const ra = statuses[a.id]?.reputation ?? -1;
+    const rb = statuses[b.id]?.reputation ?? -1;
+    if (rb !== ra) return rb - ra;
+    return (statuses[b.id]?.gold ?? 0) - (statuses[a.id]?.gold ?? 0);
   });
 
-  if (sorted.length <= 1) return null;
-
   return (
-    <div className="pm-glass rounded-2xl px-3 py-2 mb-3 overflow-x-auto pm-scroll">
-      <div className="flex items-center gap-2 w-max min-w-full">
+    <div className="pm-glass flex h-11 shrink-0 items-center overflow-hidden rounded-2xl px-3">
+      <div className="pm-scroll flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
         {sorted.map((m) => {
           const st = statuses[m.id];
           const isMe = m.id === me.id;
@@ -53,14 +57,14 @@ export function FleetTicker({
             <div
               key={m.id}
               className={cn(
-                "flex items-center gap-1.5 rounded-xl px-2 py-1 border shrink-0",
+                "flex shrink-0 items-center gap-1.5 rounded-xl border px-2 py-1",
                 isMe
                   ? "border-teal-500/30 bg-teal-500/[0.06]"
-                  : "border-black/5 dark:border-white/10 bg-background/40",
+                  : "border-black/5 bg-background/40 dark:border-white/10",
               )}
             >
               <Avatar hue={m.avatarHue} name={m.displayName} size={20} />
-              <span className="text-[11px] font-medium max-w-[84px] truncate">
+              <span className="max-w-[84px] truncate text-[11px] font-medium">
                 {isMe ? "You" : m.displayName}
               </span>
               {isBankrupt ? (
@@ -69,8 +73,8 @@ export function FleetTicker({
                 </span>
               ) : (
                 <>
-                  <span className="text-[10px] text-muted-foreground truncate max-w-[96px]">
-                    {st ? st.phaseLabel : "loading…"}
+                  <span className="max-w-[96px] truncate text-[10px] text-muted-foreground">
+                    {st ? st.phaseLabel : "Reading the tide…"}
                   </span>
                   <span className="flex items-center gap-0.5 text-[10px] text-emerald-600 dark:text-emerald-400">
                     <Coins className="h-3 w-3" /> {st ? st.gold : "…"}
@@ -83,6 +87,11 @@ export function FleetTicker({
             </div>
           );
         })}
+        {sorted.length <= 1 && (
+          <span className="truncate pl-1 text-[10px] italic text-muted-foreground/70">
+            Waiting for the next captain to come aboard
+          </span>
+        )}
       </div>
     </div>
   );

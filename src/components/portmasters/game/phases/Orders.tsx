@@ -16,6 +16,7 @@ import {
   completePhase2,
   explainTransportCost,
   explainVAT,
+  isGuaranteedOrder,
   type PriceBreakdown,
 } from "@/lib/game/engine";
 import type { GameState } from "@/lib/game/types";
@@ -26,7 +27,7 @@ import type { PublicUser } from "@/lib/api";
 import { Term } from "../../Term";
 import { ItemIcon } from "../../shared";
 import { PriceBreakdownTooltip } from "../PriceTooltips";
-import { ReadyFooter, type PhaseSync } from "./PhaseShared";
+import { ReadyFooter, RumorBanner, type PhaseSync } from "./PhaseShared";
 
 export function Orders({
   game,
@@ -62,22 +63,10 @@ export function Orders({
         <Coins className="h-5 w-5 text-amber-600 dark:text-amber-400" />
         Trade Manifest
       </h2>
-      {game.revealedIntel.length > 0 && (
-        <div className="rounded-lg border border-amber-500/25 bg-amber-500/[0.06] px-3.5 py-2.5 mb-3.5 text-xs">
-          <strong>🗣️ Broker's Whispers active this round:</strong>{" "}
-          {game.revealedIntel.map((i, idx) => (
-            <span key={idx}>
-              {idx > 0 && ", "}
-              <ItemIcon item={i.item} className="h-3.5 w-3.5" /> {i.item} (
-              {i.port})
-            </span>
-          ))}
-          <span className="text-muted-foreground">
-            {" "}
-            (look for the 🔮 badge below).
-          </span>
-        </div>
-      )}
+      <RumorBanner
+        intel={game.revealedIntel}
+        hint="(look for the 🔮 badge below)."
+      />
       {!favorUnlocked && (
         <div className="rounded-lg border border-dashed border-violet-500/25 bg-violet-500/[0.04] px-3.5 py-2.5 mb-3.5 text-xs text-muted-foreground">
           🔒 <strong className="text-foreground">Broker's Favor</strong> unlocks
@@ -221,15 +210,13 @@ export function Orders({
           const brokerCommissionPct =
             o.reward > 0 ? Math.round((brokerCommission / o.reward) * 100) : 0;
           netProfit -= brokerCommission;
-          const matchesIntel = game.revealedIntel.some((i) =>
-            o.resources.some((r) => r.type === i.item),
-          );
+          const matchesIntel = isGuaranteedOrder(game, o.id);
           return (
             <div
               key={o.id}
               className={cn(
                 "rounded-xl border overflow-hidden flex flex-col",
-                // Harbour gold, filled rather than outlined. The intel
+                // Harbor gold, filled rather than outlined. The intel
                 // "Guaranteed" highlight already owns amber as a thin outline,
                 // so filled versus outlined keeps the two distinguishable
                 // without relying on hue alone.

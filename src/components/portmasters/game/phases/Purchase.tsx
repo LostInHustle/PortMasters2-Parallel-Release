@@ -21,7 +21,7 @@ import {
   ExpectedPriceTooltip,
   priceAwareTermContent,
 } from "../PriceTooltips";
-import { ReadyFooter, type PhaseSync } from "./PhaseShared";
+import { ReadyFooter, RumorBanner, type PhaseSync } from "./PhaseShared";
 
 // Every raw material and product gets a price preview here, not just the
 // ones that happened to roll onto one of this round's five market cards.
@@ -92,22 +92,10 @@ export function Purchase({
           🔮 Broker's Rumor Board
         </Button>
       </div>
-      {game.revealedIntel.length > 0 && (
-        <div className="rounded-lg border border-amber-500/25 bg-amber-500/[0.06] px-3.5 py-2.5 mb-3.5 text-xs">
-          <strong>🗣️ Broker's Whispers active this round:</strong>{" "}
-          {game.revealedIntel.map((i, idx) => (
-            <span key={idx}>
-              {idx > 0 && ", "}
-              <ItemIcon item={i.item} className="h-3.5 w-3.5" /> {i.item} (
-              {i.port})
-            </span>
-          ))}
-          <span className="text-muted-foreground">
-            {" "}
-            (a matching order is guaranteed in Phase 2, buy accordingly).
-          </span>
-        </div>
-      )}
+      <RumorBanner
+        intel={game.revealedIntel}
+        hint="(a matching order is guaranteed in Phase 2, buy accordingly)."
+      />
       <MarketPriceReference game={game} colorFor={resolveColor} />
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
         {game.resourceCards.map((c) => {

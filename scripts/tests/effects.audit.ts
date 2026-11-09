@@ -213,7 +213,7 @@ test("hemp_monopoly: Hemp costs 2 Gold less per unit at the port", () => {
   assertEqual(explainCardPrice(s, card).final, 12, "20 - (4 units * 2g) = 12");
 });
 
-test("master_apprentice: hiring costs 50% less this round", () => {
+test("master_apprentice: halves worker wages for the round", () => {
   const s = freshState();
   applyBoon(s, boon("master_apprentice"), []);
   assertEqual(getHireCost(s, "weaver"), Math.floor(8 * 0.5), "floor(8*0.5)=4");
@@ -361,7 +361,29 @@ test("silk_monopoly: Silk freight waived, Silk product orders pay +20%", () => {
   );
 });
 
-test("brokers_network: intel costs 2 Gold and reveals 2 rumors per purchase", () => {
+test("silk_monopoly: raw Silk orders also travel free and pay +20%", () => {
+  const s = freshState();
+  s.shipLevel = 1;
+  equipModule(s, mod("silk_monopoly"), null, []);
+  s.inventory["Silk"] = 5;
+  s.customerCards = [
+    order({
+      id: 0,
+      resources: [{ type: "Silk", required: 1 }],
+      reward: 100,
+      isProductOrder: false,
+    }),
+  ];
+  const before = s.money;
+  completeOrder(s, 0, []);
+  assertEqual(
+    s.money - before,
+    120,
+    "raw Silk: 20% bonus with no VAT and no freight",
+  );
+});
+
+test("brokers_network: each rumor costs 2 Gold and a purchase reveals 2", () => {
   const s = freshState();
   s.shipLevel = 1;
   equipModule(s, mod("brokers_network"), null, []);
@@ -454,7 +476,7 @@ test("farsight: reveals one Broker's rumor for free at the start of Phase 1", ()
   );
 });
 
-test("kiln_and_forge_guild: charter good orders pay +15%", () => {
+test("kiln_and_forge_guild: Celadon Ware and Bronze Mirror orders pay +15%", () => {
   const s = freshState("open_waters", 4);
   applyBoon(s, boon("kiln_and_forge_guild"), []);
   s.inventory["Bronze Mirror"] = 5;
@@ -483,6 +505,27 @@ test("kiln_and_forge_guild: charter good orders pay +15%", () => {
   );
 });
 
+test("kiln_and_forge_guild: does not pay on tier1 raw goods", () => {
+  const s = freshState("open_waters", 4);
+  applyBoon(s, boon("kiln_and_forge_guild"), []);
+  s.inventory["Porcelain Clay"] = 5;
+  s.customerCards = [
+    order({
+      id: 0,
+      resources: [{ type: "Porcelain Clay", required: 1 }],
+      reward: 100,
+      isProductOrder: false,
+    }),
+  ];
+  const before = s.money;
+  completeOrder(s, 0, []);
+  assertEqual(
+    s.money - before,
+    100 - calcTransportCost(s, 1),
+    "no Kiln and Forge bonus on a raw charter good",
+  );
+});
+
 test("frontier_tariff_relief: VAT on finished goods is halved", () => {
   const s = freshState("open_waters", 4);
   applyBoon(s, boon("frontier_tariff_relief"), []);
@@ -493,7 +536,7 @@ test("frontier_tariff_relief: VAT on finished goods is halved", () => {
   );
 });
 
-test("bureau_token: charter good orders pay +10%", () => {
+test("bureau_token: tier1 raw and finished goods pay +10%", () => {
   const s = freshState("open_waters", 4);
   s.shipLevel = 1;
   equipModule(s, mod("bureau_token"), null, []);
@@ -520,6 +563,58 @@ test("bureau_token: charter good orders pay +10%", () => {
     s.money - before,
     expected,
     "reward boosted 10% AFTER VAT is deducted, before freight",
+  );
+});
+
+test("bureau_token: tier1 raw goods also pay +10%", () => {
+  const s = freshState("open_waters", 4);
+  s.shipLevel = 1;
+  equipModule(s, mod("bureau_token"), null, []);
+  s.inventory["Porcelain Clay"] = 5;
+  s.customerCards = [
+    order({
+      id: 0,
+      resources: [{ type: "Porcelain Clay", required: 1 }],
+      reward: 100,
+      isProductOrder: false,
+    }),
+  ];
+  const before = s.money;
+  completeOrder(s, 0, []);
+  assertEqual(
+    s.money - before,
+    110 - calcTransportCost(s, 1),
+    "raw tier1 good paid a 10% bonus with no VAT",
+  );
+});
+
+test("bureau_token: does not pay on tier2 goods", () => {
+  const s = freshState("open_waters", 8);
+  s.shipLevel = 1;
+  equipModule(s, mod("bureau_token"), null, []);
+  s.inventory["Foreign Balm"] = 5;
+  s.customerCards = [
+    order({
+      id: 0,
+      resources: [{ type: "Foreign Balm", required: 1 }],
+      reward: 100,
+      isProductOrder: true,
+    }),
+  ];
+  const before = s.money;
+  const expected = expectedProductOrderDelta(
+    s,
+    "Foreign Balm",
+    100,
+    1,
+    false,
+    [],
+  );
+  completeOrder(s, 0, []);
+  assertEqual(
+    s.money - before,
+    expected,
+    "tier2 goods are outside the Bureau Token's charter lane",
   );
 });
 
@@ -561,7 +656,7 @@ test("ocean_relay: one extra Broker's Whisper rumor, at no extra cost", () => {
 // =====================================================================
 suite("tier2 boons and modules");
 
-test("exotic_treasures: Foreign Balm / Pearl String orders pay +15%", () => {
+test("exotic_treasures: Foreign Balm and Pearl String orders pay +15%", () => {
   const s = freshState("open_waters", 9); // tier2 unlocked (opens at round 8), no mandate collision on round 9
   applyBoon(s, boon("exotic_treasures"), []);
   s.inventory["Foreign Balm"] = 5;
@@ -587,6 +682,35 @@ test("exotic_treasures: Foreign Balm / Pearl String orders pay +15%", () => {
     s.money - before,
     expected,
     "reward boosted 15% AFTER VAT is deducted, before freight",
+  );
+});
+
+test("exotic_treasures: does not pay on tier1 goods", () => {
+  const s = freshState("open_waters", 9);
+  applyBoon(s, boon("exotic_treasures"), []);
+  s.inventory["Bronze Mirror"] = 5;
+  s.customerCards = [
+    order({
+      id: 0,
+      resources: [{ type: "Bronze Mirror", required: 1 }],
+      reward: 100,
+      isProductOrder: true,
+    }),
+  ];
+  const before = s.money;
+  const expected = expectedProductOrderDelta(
+    s,
+    "Bronze Mirror",
+    100,
+    1,
+    false,
+    [],
+  );
+  completeOrder(s, 0, []);
+  assertEqual(
+    s.money - before,
+    expected,
+    "tier1 goods are outside the Exotic Treasures lane",
   );
 });
 

@@ -52,7 +52,7 @@ Five independent dials, each derived by a pure helper rather than hardcoded into
 
 Easy never leaves tier 0. Standard opens tier 1 at round 4 and tier 2 at round 8. Hard keeps the first five rounds relaxed, then opens tier 1 at round 6 and tier 2 at round 10. Breadth also grows the market hand: 5 cards, then 8, then 11 as tiers open, and each opening is announced by a Silk Road Charter banner.
 
-**Risk severity.** Pirate raids take a fraction of a captain's gold: 15 percent, 25 percent or 40 percent, flat on Easy, stepping up at the voyage midpoint on the other two.
+**Risk severity.** Pirate raids take a fraction of a captain's Gold: 15 percent, 25 percent or 40 percent, flat on Easy, stepping up at the voyage midpoint on the other two.
 
 **Adversity.** Hard only: a corrupt broker can tip off pirates, adding to the raid probability on a 30 percent roll.
 

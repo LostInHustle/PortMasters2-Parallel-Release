@@ -6,7 +6,7 @@
 //
 // completeOrder is the largest function in the engine and is deliberately
 // left whole. Its steps are strictly ordered and the order is the
-// behaviour: VAT comes off the original reward before any percentage
+// behavior: VAT comes off the original reward before any percentage
 // bonus is applied to what remains, freight is charged before the Salvage
 // Crane can refund it, and the Broker's commission is taken last of all.
 // A past bug came from reordering exactly this sequence and paying every
@@ -22,7 +22,10 @@ import {
   BROKERS_FAVOR_UNLOCK_LEVEL,
   ICONS,
   PRODUCTS,
+  PRODUCTS_TIER1,
+  PRODUCTS_TIER2,
   RESOURCES,
+  RESOURCES_TIER1,
   WORD_ON_THE_DOCKS_REWARD,
   WORD_ON_THE_DOCKS_THRESHOLD,
 } from "../constants";
@@ -32,7 +35,7 @@ import {
   mandateIndexFor,
   marketCountsFor,
 } from "../difficulty";
-import { isCharterGood, unlockedPorts } from "../pools";
+import { unlockedPorts } from "../pools";
 import { createRng, type Rng } from "../rng";
 import type { GameContext, GameState } from "../types";
 import { hasModule } from "./core";
@@ -43,6 +46,13 @@ import {
   poolsFor,
 } from "./market";
 import { brokersFavorCommission, calcTransportCost, calcVAT } from "./pricing";
+
+// Each charter lane buff names its own goods. Keeping them as separate sets
+// stops one broad "charter good" test from making the three buffs pay each
+// other's orders.
+const KILN_AND_FORGE_GOODS = new Set<string>(PRODUCTS_TIER1);
+const BUREAU_GOODS = new Set<string>([...RESOURCES_TIER1, ...PRODUCTS_TIER1]);
+const EXOTIC_GOODS = new Set<string>(PRODUCTS_TIER2);
 
 export function completeOrder(
   state: GameState,
@@ -90,7 +100,7 @@ export function completeOrder(
       .reduce((s, r) => s + (r.required ?? 0), 0);
     transport = Math.max(0, transport - t2items * 3);
     if (t2items > 0)
-      logs.push(`⛵ Fleet of Treasures: -${t2items * 3}g freight`);
+      logs.push(`⛵ Fleet of Treasures: −${t2items * 3}g freight`);
   }
   state.money -= transport;
   state.roundCosts += transport;
@@ -100,23 +110,29 @@ export function completeOrder(
     reward = Math.floor(reward * 1.2);
     logs.push("👘 Silk Monopoly: +20% Reward!");
   }
-  // Charter lane payouts: the Kiln and Forge Guild boon and the Maritime
-  // Bureau Token both reward trading the goods a charter opened, so they only
-  // look at orders that actually involve them (see isCharterGood).
-  const hasCharterGood = order.resources.some((r) => isCharterGood(r.type));
+  // Charter lane payouts. Each buff only pays for the goods its own
+  // description names: Kiln and Forge Guild for the two tier1 finished
+  // goods, the Maritime Bureau Token for tier1 raw and finished goods, and
+  // Exotic Treasures for the two tier2 finished goods. A single broad
+  // "charter good" check used to make all three overlap.
+  const hasKilnGood = order.resources.some((r) =>
+    KILN_AND_FORGE_GOODS.has(r.type),
+  );
+  const hasBureauGood = order.resources.some((r) => BUREAU_GOODS.has(r.type));
+  const hasExoticGood = order.resources.some((r) => EXOTIC_GOODS.has(r.type));
   // Added as `reward + floor(reward * pct)` rather than `floor(reward * (1 +
   // pct))`: the latter loses a coin to floating point on common rates (100 *
   // 1.15 is 114.999... in binary), so a stated 15% quietly paid 14%.
-  if (hasCharterGood && state.modifierFlags.charter_order_bonus) {
+  if (hasKilnGood && state.modifierFlags.charter_order_bonus) {
     const pct = state.modifierFlags.charter_order_bonus;
     reward += Math.floor(reward * pct);
     logs.push(`🏮 Kiln and Forge Guild: +${Math.round(pct * 100)}% Reward!`);
   }
-  if (hasCharterGood && hasModule(state, "bureau_token")) {
+  if (hasBureauGood && hasModule(state, "bureau_token")) {
     reward += Math.floor(reward * 0.1);
     logs.push("🎫 Maritime Bureau Token: +10% Reward!");
   }
-  if (hasCharterGood && state.modifierFlags.exotic_order_bonus) {
+  if (hasExoticGood && state.modifierFlags.exotic_order_bonus) {
     const pct = state.modifierFlags.exotic_order_bonus;
     reward += Math.floor(reward * pct);
     logs.push(`💎 Exotic Treasures: +${Math.round(pct * 100)}% Reward!`);
@@ -246,6 +262,38 @@ export function callBrokersFavor(
   );
 }
 
+function revealBrokerRumor(state: GameState, logs: string[]): boolean {
+  if (!state.phase2DemandTags.length) return false;
+  const item =
+    state.phase2DemandTags[
+      Math.floor(Math.random() * state.phase2DemandTags.length)
+    ];
+  state.phase2DemandTags.splice(state.phase2DemandTags.indexOf(item), 1);
+  const openPorts = unlockedPorts(state.difficulty, state.currentRound);
+  const port = openPorts[Math.floor(Math.random() * openPorts.length)];
+  state.revealedIntel.push({ item, port });
+  logs.push(
+    `🗣️ Broker's Whisper: 'Word from ${port}: High demand for ${item}!'`,
+  );
+  // [DIFFICULTY] Corrupt broker (Monsoon only). The rumor above is always
+  // delivered and always true, on every tier: the intel guarantee is never
+  // touched. What a corrupt broker does instead is also sell word of this
+  // hold to the pirates, raising the round's raid chance once. Announced
+  // plainly here rather than hidden, so the captain can price the risk.
+  const cfg = difficultyConfig(state.difficulty);
+  if (
+    cfg.brokerCorruption &&
+    !state.brokerTippedPirates &&
+    Math.random() < cfg.brokerCorruptionChance
+  ) {
+    state.brokerTippedPirates = true;
+    logs.push(
+      `🕵️ That broker was corrupt. The word is good, but your position leaked: raid risk is up ${Math.round(cfg.brokerCorruptionRisk * 100)} points this round.`,
+    );
+  }
+  return true;
+}
+
 export function purchaseIntel(state: GameState, logs: string[]) {
   if (!state.phase2DemandTags.length) {
     logs.push("🔮 The Broker has no more whispers...");
@@ -255,41 +303,21 @@ export function purchaseIntel(state: GameState, logs: string[]) {
     logs.push(`❌ Need ${state.intelCost} Gold for a rumor`);
     return;
   }
-  // Ocean Interpreter adds a rumor that is genuinely free: only the paid
-  // reveals below deduct the fee, so the extra one costs nothing.
+  // Broker's Network adds a second paid reveal. Ocean Interpreter adds a
+  // rumor that is genuinely free, so it still arrives when only one paid
+  // rumor can be afforded. Each paid reveal is checked against the purse
+  // on its own; Broker's Network used to deduct twice after one check and
+  // could drive a captain's money below zero.
   const paidCount = hasModule(state, "brokers_network") ? 2 : 1;
-  const count = paidCount + (hasModule(state, "ocean_relay") ? 1 : 0);
-  for (let i = 0; i < count; i++) {
-    if (!state.phase2DemandTags.length) break;
-    const item =
-      state.phase2DemandTags[
-        Math.floor(Math.random() * state.phase2DemandTags.length)
-      ];
-    state.phase2DemandTags.splice(state.phase2DemandTags.indexOf(item), 1);
-    const openPorts = unlockedPorts(state.difficulty, state.currentRound);
-    const port = openPorts[Math.floor(Math.random() * openPorts.length)];
-    state.revealedIntel.push({ item, port });
-    logs.push(
-      `🗣️ Broker's Whisper: 'Word from ${port}: High demand for ${item}!'`,
-    );
-    if (i < paidCount) state.money -= state.intelCost;
-    // [DIFFICULTY] Corrupt broker (Monsoon only). The rumor above is always
-    // delivered and always true, on every tier: the intel guarantee is never
-    // touched. What a corrupt broker does instead is also sell word of this
-    // hold to the pirates, raising the round's raid chance once. Announced
-    // plainly here rather than hidden, so the captain can price the risk.
-    const cfg = difficultyConfig(state.difficulty);
-    if (
-      cfg.brokerCorruption &&
-      !state.brokerTippedPirates &&
-      Math.random() < cfg.brokerCorruptionChance
-    ) {
-      state.brokerTippedPirates = true;
-      logs.push(
-        `🕵️ That broker was corrupt. The word is good, but your position leaked: raid risk is up ${Math.round(cfg.brokerCorruptionRisk * 100)} points this round.`,
-      );
+  for (let i = 0; i < paidCount; i++) {
+    if (state.money < state.intelCost) {
+      logs.push(`❌ Need ${state.intelCost} Gold for another rumor`);
+      break;
     }
+    if (!revealBrokerRumor(state, logs)) break;
+    state.money -= state.intelCost;
   }
+  if (hasModule(state, "ocean_relay")) revealBrokerRumor(state, logs);
 }
 
 export function startPhase2(
@@ -331,24 +359,33 @@ export function startPhase2(
   }
   // Broker's Whisper guarantee, applied after the shared draw above and
   // entirely with this captain's own randomness, so it can never nudge
-  // what anyone else in the room sees. One order slot is overwritten per
-  // rumor this captain has revealed and not yet cashed in this round
-  // (see purchaseIntel), up to however many revealed items and order
-  // slots there are; previously a single `intelOrderUsed` flag capped
-  // this at one guarantee per round no matter how many rumors a captain
-  // had revealed (Broker's Network reveals two per purchase), so the
-  // second rumor's "guaranteed" order silently never appeared.
+  // what anyone else in the room sees. Each rumor this captain revealed
+  // (see purchaseIntel) owns exactly one order card: it overwrites one
+  // distinct slot with a matching order at the port the Broker named, then
+  // records that card's id on the rumor. The id, not the item name, is what
+  // the trade manifest uses, so another order that happens to want the
+  // same good is never marked as guaranteed. Previously a single
+  // `intelOrderUsed` flag capped this at one guarantee per round no matter
+  // how many rumors a captain had revealed, and the board highlighted every
+  // matching order instead of the one the rumor actually created.
+  for (const intel of state.revealedIntel) intel.orderId = undefined;
   const guaranteedCount = Math.min(
     state.revealedIntel.length,
     state.customerCards.length,
   );
   for (let i = 0; i < guaranteedCount; i++) {
     const intel = state.revealedIntel[i];
+    const card = state.customerCards[i];
     const localRng: Rng = Math.random;
     const guaranteed = (RESOURCES as readonly string[]).includes(intel.item)
       ? genRawOrder(localRng, orderPools, intel.item)
       : genProductOrder(localRng, orderPools, intel.item);
-    state.customerCards[i] = { id: state.customerCards[i].id, ...guaranteed };
+    state.customerCards[i] = {
+      id: card.id,
+      ...guaranteed,
+      demandPort: intel.port,
+    };
+    intel.orderId = card.id;
   }
   // [DIFFICULTY] Imperial mandate: on the rounds this tier schedules one, the
   // Emperor commissions a single large order. Fixed template data with no rng,
@@ -385,4 +422,11 @@ export function startPhase2(
       `📜 Imperial Mandate at ${mandate.port}: ${need} for ${mandate.reward} Gold. The Emperor's commission is exempt from VAT.`,
     );
   }
+}
+
+// True only for the exact Phase 2 card a revealed rumor overwrote. Matching
+// on the demanded item alone would light up every order that shares the good,
+// which made one rumor look like it had guaranteed several orders.
+export function isGuaranteedOrder(state: GameState, orderId: number): boolean {
+  return state.revealedIntel.some((intel) => intel.orderId === orderId);
 }

@@ -186,7 +186,7 @@ export function RumorBoardModal({
             Broker's Rumor Board
           </DialogTitle>
           <DialogDescription>
-            Spend gold to reveal Phase 2 demand rumors!
+            Spend Gold to reveal Phase 2 demand rumors!
           </DialogDescription>
         </DialogHeader>
         <div className="flex justify-center my-2">
@@ -211,7 +211,7 @@ export function RumorBoardModal({
             </>
           ) : (
             <div className="text-muted-foreground text-center py-5 text-sm">
-              ✨ No rumors revealed yet... Spend gold to listen to the Broker's
+              ✨ No rumors revealed yet... Spend Gold to listen to the Broker's
               whispers.
             </div>
           )}
@@ -250,7 +250,7 @@ export function RestartConfirmModal({
             Restart the voyage?
           </DialogTitle>
           <DialogDescription>
-            Every captain currently in this harbor goes back to round one: gold,
+            Every captain currently in this harbor goes back to round one: Gold,
             cargo, workers, and ship upgrades all reset. The harbor also
             reopens, so new captains can join again. This can't be undone.
           </DialogDescription>
@@ -387,6 +387,35 @@ function ProfileStatTile({
         {icon} {value}
       </div>
       <div className="text-[10px] text-muted-foreground mt-0.5">{label}</div>
+    </div>
+  );
+}
+
+function CargoColumn({
+  title,
+  items,
+  inventory,
+  colorFor,
+}: {
+  title: string;
+  items: string[];
+  inventory: Record<string, number>;
+  colorFor: (item: string) => string | undefined;
+}) {
+  return (
+    <div>
+      <div className="text-[10px] font-medium text-muted-foreground mb-1">
+        {title}
+      </div>
+      {items.map((item) => (
+        <div key={item} className="flex items-center text-[12px] py-0.5">
+          <ItemIcon item={item} className="mr-1.5 h-3.5 w-3.5" />
+          <span className="flex-1" style={{ color: colorFor(item) }}>
+            {item}
+          </span>
+          <b style={{ color: colorFor(item) }}>{inventory[item] || 0}</b>
+        </div>
+      ))}
     </div>
   );
 }
@@ -547,50 +576,18 @@ export function PlayerDetailModal({
                     📦 Cargo
                   </h4>
                   <div className="grid grid-cols-2 gap-x-4">
-                    <div>
-                      <div className="text-[10px] font-medium text-muted-foreground mb-1">
-                        Raw Materials
-                      </div>
-                      {unlockedResources(difficulty, detail.round).map((r) => (
-                        <div
-                          key={r}
-                          className="flex items-center text-[12px] py-0.5"
-                        >
-                          <ItemIcon item={r} className="mr-1.5 h-3.5 w-3.5" />
-                          <span
-                            className="flex-1"
-                            style={{ color: resolveColor(r) }}
-                          >
-                            {r}
-                          </span>
-                          <b style={{ color: resolveColor(r) }}>
-                            {detail.inventory[r] || 0}
-                          </b>
-                        </div>
-                      ))}
-                    </div>
-                    <div>
-                      <div className="text-[10px] font-medium text-muted-foreground mb-1">
-                        Finished Goods
-                      </div>
-                      {unlockedProducts(difficulty, detail.round).map((r) => (
-                        <div
-                          key={r}
-                          className="flex items-center text-[12px] py-0.5"
-                        >
-                          <ItemIcon item={r} className="mr-1.5 h-3.5 w-3.5" />
-                          <span
-                            className="flex-1"
-                            style={{ color: resolveColor(r) }}
-                          >
-                            {r}
-                          </span>
-                          <b style={{ color: resolveColor(r) }}>
-                            {detail.inventory[r] || 0}
-                          </b>
-                        </div>
-                      ))}
-                    </div>
+                    <CargoColumn
+                      title="Raw Materials"
+                      items={unlockedResources(difficulty, detail.round)}
+                      inventory={detail.inventory}
+                      colorFor={resolveColor}
+                    />
+                    <CargoColumn
+                      title="Finished Goods"
+                      items={unlockedProducts(difficulty, detail.round)}
+                      inventory={detail.inventory}
+                      colorFor={resolveColor}
+                    />
                   </div>
                 </div>
 

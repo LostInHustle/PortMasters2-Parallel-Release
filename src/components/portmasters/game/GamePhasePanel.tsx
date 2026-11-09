@@ -1,5 +1,6 @@
 "use client";
 
+import { useLayoutEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { GameContext, GameState } from "@/lib/game/types";
 import type { PublicUser } from "@/lib/api";
@@ -68,19 +69,35 @@ export function GamePhasePanel({
   onShowTutorial,
   colorFor,
 }: Props) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const phaseKey = String(game.phase) + ":" + game.currentRound;
+
+  // A new phase always opens at its masthead, never halfway down the
+  // previous screen's scroll position. No state is set here, so this stays
+  // clear of react-hooks/set-state-in-effect.
+  useLayoutEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [phaseKey]);
+
   return (
-    <div className="pm-glass rounded-2xl p-4 sm:p-5 min-h-[520px]">
-      <AnimatePresence mode="sync">
-        <motion.div
-          key={String(game.phase) + ":" + game.currentRound}
-          initial={{ opacity: 0, y: 12, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -12, scale: 0.98 }}
-          transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1.0] }}
-        >
-          {renderPhase()}
-        </motion.div>
-      </AnimatePresence>
+    <div className="pm-glass flex min-h-[520px] flex-col overflow-hidden rounded-2xl lg:h-full lg:min-h-0">
+      <div
+        ref={scrollRef}
+        className="pm-scroll min-h-0 flex-1 overflow-y-auto p-4 sm:p-5"
+      >
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={phaseKey}
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -12, scale: 0.98 }}
+            transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1.0] }}
+            className="min-h-full"
+          >
+            {renderPhase()}
+          </motion.div>
+        </AnimatePresence>
+      </div>
     </div>
   );
 

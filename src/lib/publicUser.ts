@@ -37,7 +37,7 @@ export function publicUser(u: PublicUser): PublicUser {
 }
 
 // A stable avatar hue for a brand new account, derived from the username
-// so the same name always gets the same colour.
+// so the same name always gets the same color.
 export function hueFromString(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360;

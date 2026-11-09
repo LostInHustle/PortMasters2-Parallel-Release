@@ -62,7 +62,7 @@ function DialogContent({
         className={cn(
           // [PM2 LOCAL CHANGE, reapply after any shadcn regeneration]
           // Upstream constrains width but never height. Because the box is
-          // centred with a -50% translate, content taller than the viewport
+          // centered with a -50% translate, content taller than the viewport
           // overflows equally above and below it, putting the close control
           // above the top edge of the screen with nothing to scroll, so the
           // dialog cannot be dismissed at all. That is what made the Harbor

@@ -111,6 +111,110 @@ export function Pill({
   );
 }
 
+// A small caption above a list, used by the lobby's room list.
+export function SectionLabel({
+  children,
+  className,
+  trailing,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  trailing?: React.ReactNode;
+}) {
+  return (
+    <div className={cn("flex items-center justify-between gap-2", className)}>
+      <span className="text-[10px] font-semibold tracking-wide text-muted-foreground/80">
+        {children}
+      </span>
+      {trailing}
+    </div>
+  );
+}
+
+// The shared masthead for every glass panel in the lobby and the session.
+export function PanelHeading({
+  icon: Icon,
+  title,
+  subtitle,
+  action,
+  className,
+}: {
+  icon?: LucideIcon;
+  title: React.ReactNode;
+  subtitle?: React.ReactNode;
+  action?: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex items-center justify-between gap-3", className)}>
+      <div className="min-w-0">
+        <h2 className="flex items-center gap-2 text-lg leading-tight font-semibold">
+          {Icon && (
+            <Icon
+              className="h-5 w-5 shrink-0 text-teal-600 dark:text-teal-400"
+              strokeWidth={2}
+              aria-hidden
+            />
+          )}
+          <span className="truncate">{title}</span>
+        </h2>
+        {subtitle && (
+          <p className="truncate text-xs leading-snug text-muted-foreground">
+            {subtitle}
+          </p>
+        )}
+      </div>
+      {action}
+    </div>
+  );
+}
+
+// A quiet placeholder for empty lists and empty conversations.
+export function EmptyState({
+  title,
+  hint,
+  className,
+}: {
+  icon?: LucideIcon;
+  title: React.ReactNode;
+  hint?: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex flex-col items-center justify-center px-6 text-center",
+        className,
+      )}
+    >
+      <p className="text-xs leading-relaxed text-muted-foreground/80">
+        <span className="text-foreground/70">{title}</span>
+        {hint && (
+          <>
+            <br />
+            {hint}
+          </>
+        )}
+      </p>
+    </div>
+  );
+}
+
+// The harbor mark used on the lobby masthead and the session header.
+export function HarborCrest({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn(
+        "pm-grad-primary grid shrink-0 place-items-center rounded-xl text-white",
+        className,
+      )}
+      aria-hidden
+    >
+      <Anchor className="size-[55%]" strokeWidth={2} />
+    </span>
+  );
+}
+
 // Which lucide-react icon represents each Captain's Merit (see
 // src/lib/game/merits.ts, which deliberately carries no icon of its own
 // since it's shared with the server). Kept here rather than duplicated at

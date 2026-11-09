@@ -348,7 +348,7 @@ It lives right in the existing "Post an Offer" panel during the Bartering window
 ### What you will actually see on screen
 
 - A direct offer you posted, or one aimed at you, shows a small lock badge reading "Just for [name]" right on the offer itself, so it is easy to tell apart from the ordinary open ones.
-- If an offer was not posted for you and was not posted by you, you will simply never see it on your own board at all, it does not appear as greyed out or unavailable, it is not there.
+- If an offer was not posted for you and was not posted by you, you will simply never see it on your own board at all, it does not appear as grayed out or unavailable, it is not there.
 
 ### Step by step: how to confirm it is working
 
@@ -485,6 +485,6 @@ The design source for all eighteen, with what each one does and why, now lives i
 
 **Dropped, not pending:** Bilingual Harbor, which was entry 15 in the original manifest. English and Chinese localization was built in full and then removed at the project owner's request, so it is not outstanding work and should not be picked back up without a fresh decision.
 
-The manifest also recommends an order that is not this numeric one, since it sequences by dependency instead. Of what remains, Quick Start Match and Voyage Chronicle are the two with no blockers at all; the other five each need either a dependency they build on or a design decision (a balance session, a banding numbers pass, a rollover cadence, an eligibility rule) answered first, all called out in the manifest's own open questions section.
+The manifest also recommends an order that is not this numeric one, since it sequences by dependency instead. Of what remains, Voyage Chronicle is the only one with no blocker at all. Quick Start Match needs an eligibility ruling first, and the other five each need either a dependency they build on or a design decision (a balance session, a banding numbers pass, a rollover cadence, or Partial Sight's trust threshold) answered first, all called out in the manifest's own open questions section.
 
 As each of the remaining seven gets built, this document should grow a matching section for it, written the same way: what it does in plain words, exactly what you will see on screen, and a step by step way to confirm it yourself while actually playing.

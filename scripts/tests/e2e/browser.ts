@@ -15,7 +15,7 @@ import type { TestClient } from "./api";
 
 let browser: Browser | null = null;
 
-export async function getBrowser(): Promise<Browser> {
+async function getBrowser(): Promise<Browser> {
   if (!browser) browser = await chromium.launch();
   return browser;
 }

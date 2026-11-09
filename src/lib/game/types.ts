@@ -65,7 +65,14 @@ export type OrderCard = {
   isMandate?: boolean;
 };
 
-export type IntelItem = { item: string; port: string };
+export type IntelItem = {
+  item: string;
+  port: string;
+  // The id of the one Phase 2 order this rumor overwrote in startPhase2.
+  // It stays undefined until that phase deals its board, and the trade
+  // manifest reads it to badge only that exact card.
+  orderId?: number;
+};
 
 export type Worker = {
   task: string | null;

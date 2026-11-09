@@ -89,32 +89,37 @@ export function GameControlPanel({
   }
 
   return (
-    <div className="pm-glass rounded-2xl px-3 py-2.5 flex items-center gap-2 flex-wrap">
+    <div className="pm-glass flex flex-wrap items-center gap-2 rounded-2xl px-3 py-2.5">
       <Button
         className={cn(
-          "rounded-lg",
+          "min-w-[124px] rounded-lg",
           !startDisabled && "pm-grad-primary text-white",
         )}
         variant={startDisabled ? "secondary" : "default"}
         disabled={startDisabled}
         onClick={onSetSail}
       >
-        <Play className="h-4 w-4 mr-1.5" /> {startText}
+        <Play className="mr-1.5 h-4 w-4" /> {startText}
       </Button>
       <Button
         className={cn(
-          "rounded-lg",
+          "min-w-[116px] rounded-lg",
           !nextDisabled && !waiting && "pm-grad-emerald text-white",
         )}
         variant={nextDisabled ? "secondary" : waiting ? "secondary" : "default"}
         disabled={nextDisabled}
         onClick={waiting ? onCancelReady : onNextPhase}
       >
-        {nextText} <ChevronRight className="h-4 w-4 ml-1" />
+        {nextText} <ChevronRight className="ml-1 h-4 w-4" />
       </Button>
+
       <div className="flex-1" />
+
       <div className="flex items-center gap-2">
-        <span className="hidden md:inline-flex items-center gap-1.5 text-[11px] text-muted-foreground px-2">
+        <span
+          className="hidden items-center gap-1.5 px-2 text-[11px] text-muted-foreground md:inline-flex"
+          aria-live="polite"
+        >
           {saving ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
           ) : (
@@ -128,16 +133,18 @@ export function GameControlPanel({
           size="sm"
           className="rounded-lg"
           onClick={onGuide}
+          title="Navigation guide"
         >
-          <BookOpen className="h-4 w-4 mr-1.5" /> Guide
+          <BookOpen className="mr-1.5 h-4 w-4" /> Guide
         </Button>
         <Button
           variant="ghost"
           size="sm"
           className="rounded-lg"
           onClick={onSave}
+          title="Save voyage"
         >
-          <Save className="h-4 w-4 mr-1.5" /> Save
+          <Save className="mr-1.5 h-4 w-4" /> Save
         </Button>
         <Button
           variant="ghost"
@@ -151,7 +158,7 @@ export function GameControlPanel({
           }
           onClick={onRestart}
         >
-          <RotateCcw className="h-4 w-4 mr-1.5" /> Restart
+          <RotateCcw className="mr-1.5 h-4 w-4" /> Restart
         </Button>
       </div>
     </div>

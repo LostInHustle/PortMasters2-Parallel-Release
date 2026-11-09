@@ -132,7 +132,7 @@ export function processProduction(state: GameState, logs: string[]) {
         w.producedCount = (w.producedCount || 0) + amt;
         if (amt > base)
           logs.push(
-            `✅ Skilled ${name} finished ${amt}× ${ICONS[w.task]}${w.task}! (Boon Bonus)`,
+            `✅ ${w.isSkilled ? "Skilled " : ""}${name} finished ${amt}× ${ICONS[w.task]}${w.task}! (Boon Bonus)`,
           );
         else if (w.isSkilled)
           logs.push(

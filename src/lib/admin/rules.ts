@@ -16,8 +16,6 @@
 
 export type Role = "player" | "moderator" | "admin";
 
-export const ROLES: readonly Role[] = ["player", "moderator", "admin"];
-
 // Rows written before the role column existed, or a value that somehow
 // escaped validation, read as an ordinary player rather than throwing.
 export function normalizeRole(value: unknown): Role {

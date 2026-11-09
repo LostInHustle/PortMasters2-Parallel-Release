@@ -100,7 +100,7 @@ export function explainTransportCost(
       cost - state.modifierFlags.transport_flat_discount,
     );
     steps.push({
-      label: `${boonNameForModifierKey("transport_flat_discount")} (-${state.modifierFlags.transport_flat_discount}g)`,
+      label: `${boonNameForModifierKey("transport_flat_discount")} (−${state.modifierFlags.transport_flat_discount}g)`,
       delta: next - cost,
     });
     cost = next;
@@ -189,7 +189,7 @@ export function explainVAT(
   if (state.modifierFlags.vat_discount) {
     const next = Math.floor(vat * (1 - state.modifierFlags.vat_discount));
     steps.push({
-      label: `${boonNameForModifierKey("vat_discount")} (-${Math.round(state.modifierFlags.vat_discount * 100)}%)`,
+      label: `${boonNameForModifierKey("vat_discount")} (−${Math.round(state.modifierFlags.vat_discount * 100)}%)`,
       delta: next - vat,
     });
     vat = next;
@@ -197,7 +197,7 @@ export function explainVAT(
   if (hasModule(state, "tax_evasion")) {
     const next = Math.floor(vat * 0.5);
     steps.push({
-      label: "Tax Evasion Ledger module (-50%)",
+      label: "Tax Evasion Ledger module (−50%)",
       delta: next - vat,
     });
     vat = next;
@@ -228,7 +228,7 @@ export function explainCardPrice(
   if (state.modifierFlags.purchase_discount) {
     const next = Math.floor(cost * (1 - state.modifierFlags.purchase_discount));
     steps.push({
-      label: `${boonNameForModifierKey("purchase_discount")} (-${Math.round(state.modifierFlags.purchase_discount * 100)}%)`,
+      label: `${boonNameForModifierKey("purchase_discount")} (−${Math.round(state.modifierFlags.purchase_discount * 100)}%)`,
       delta: next - cost,
     });
     cost = next;
@@ -243,7 +243,7 @@ export function explainCardPrice(
     );
     if (reduction > 0) {
       steps.push({
-        label: `${boonNameForModifierKey("hemp_price_reduction")} (-${state.modifierFlags.hemp_price_reduction}g/Hemp)`,
+        label: `${boonNameForModifierKey("hemp_price_reduction")} (−${state.modifierFlags.hemp_price_reduction}g/Hemp)`,
         delta: -reduction,
       });
       cost -= reduction;
@@ -258,7 +258,7 @@ export function explainCardPrice(
       0,
     );
     if (reduction > 0) {
-      steps.push({ label: "Kiln Cellar module (-2g/unit)", delta: -reduction });
+      steps.push({ label: "Kiln Cellar module (−2g/unit)", delta: -reduction });
       cost -= reduction;
     }
   }
@@ -272,7 +272,7 @@ export function explainCardPrice(
     );
     if (reduction > 0) {
       steps.push({
-        label: "Foreign Quarter Pass module (-3g/unit)",
+        label: "Foreign Quarter Pass module (−3g/unit)",
         delta: -reduction,
       });
       cost -= reduction;
@@ -280,7 +280,7 @@ export function explainCardPrice(
   }
   if (hasModule(state, "smugglers_hold")) {
     const next = Math.floor(cost * 0.85);
-    steps.push({ label: "Smuggler's Hold module (-15%)", delta: next - cost });
+    steps.push({ label: "Smuggler's Hold module (−15%)", delta: next - cost });
     cost = next;
   }
 
@@ -319,20 +319,20 @@ export function explainExpectedPrice(
       min = Math.floor(min * factor);
       max = Math.floor(max * factor);
       modifiers.push(
-        `${boonNameForModifierKey("purchase_discount")} (-${Math.round(state.modifierFlags.purchase_discount * 100)}%)`,
+        `${boonNameForModifierKey("purchase_discount")} (−${Math.round(state.modifierFlags.purchase_discount * 100)}%)`,
       );
     }
     if (itemType === "Hemp" && state.modifierFlags.hemp_price_reduction) {
       min = Math.max(0, min - state.modifierFlags.hemp_price_reduction);
       max = Math.max(0, max - state.modifierFlags.hemp_price_reduction);
       modifiers.push(
-        `${boonNameForModifierKey("hemp_price_reduction")} (-${state.modifierFlags.hemp_price_reduction}g/unit)`,
+        `${boonNameForModifierKey("hemp_price_reduction")} (−${state.modifierFlags.hemp_price_reduction}g/unit)`,
       );
     }
     if (hasModule(state, "smugglers_hold")) {
       min = Math.floor(min * 0.85);
       max = Math.floor(max * 0.85);
-      modifiers.push("Smuggler's Hold module (-15%)");
+      modifiers.push("Smuggler's Hold module (−15%)");
     }
   }
 

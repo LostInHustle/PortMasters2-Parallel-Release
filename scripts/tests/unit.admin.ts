@@ -1,7 +1,7 @@
 // =====================================================================
 // The moderation rules behind the admin console (src/lib/admin/rules.ts):
 // the permission matrix every console route enforces, the ban reason
-// normaliser, and the throttle that slows down guesses at the admin key.
+// normalizer, and the throttle that slows down guesses at the admin key.
 // Pure logic only, like every other suite here; the database side of the
 // console is exercised end to end in scripts/tests/e2e/scenarios/adminConsole.ts.
 //

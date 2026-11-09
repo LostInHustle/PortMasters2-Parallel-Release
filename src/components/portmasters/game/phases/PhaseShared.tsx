@@ -6,8 +6,10 @@ import type { usePhaseSync } from "@/lib/usePhaseSync";
 import type { useBarter } from "@/lib/useBarter";
 import type { useAid } from "@/lib/useAid";
 import type { useBacking } from "@/lib/useBacking";
+import type { IntelItem } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { ReadyBar } from "../ReadyBar";
+import { ItemIcon } from "../../shared";
 
 // Shared types and components used across multiple phase screens (see the
 // phases/ folder). Split out of GamePhasePanel.tsx, which used to hold every
@@ -16,6 +18,31 @@ export type PhaseSync = ReturnType<typeof usePhaseSync>;
 export type Barter = ReturnType<typeof useBarter>;
 export type Aid = ReturnType<typeof useAid>;
 export type Backing = ReturnType<typeof useBacking>;
+
+// The Broker's Whispers summary shown on both boards. The hint differs
+// because Phase 1 points ahead to the guaranteed order and Phase 2 points
+// at the badge on the card itself.
+export function RumorBanner({
+  intel,
+  hint,
+}: {
+  intel: readonly IntelItem[];
+  hint: string;
+}) {
+  if (intel.length === 0) return null;
+  return (
+    <div className="rounded-lg border border-amber-500/25 bg-amber-500/[0.06] px-3.5 py-2.5 mb-3.5 text-xs">
+      <strong>🗣️ Broker's Whispers active this round:</strong>{" "}
+      {intel.map((i, idx) => (
+        <span key={idx}>
+          {idx > 0 && ", "}
+          <ItemIcon item={i.item} className="h-3.5 w-3.5" /> {i.item} ({i.port})
+        </span>
+      ))}
+      <span className="text-muted-foreground"> {hint}</span>
+    </div>
+  );
+}
 
 // ========== Shared "ready" footer ==========
 // Every phase component takes its data as explicit props rather than
